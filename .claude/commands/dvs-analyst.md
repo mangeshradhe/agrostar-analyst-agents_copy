@@ -70,6 +70,7 @@ WHERE isDeliveryViaStoreEnabled = TRUE
 - **Join:** `order_management_order.shipping_address_id` = `csr_shippingaddress.id`
 - Key fields: `taluka`, `district`, `state`, `village`, `pin_code`
 - Always `LOWER(TRIM(...))` before joining with `servingTaluka` parts
+- Use this as the authoritative address source for farmer location — more reliable than embedded address fields on the order
 
 ### DVS Routing Engine — PromisedTAT
 - **Table:** `prod_db_views.PromisedTAT`
@@ -149,6 +150,36 @@ WHERE o.initiating_source NOT LIKE 'B2B%'
 - `total_price` per item = invoice amount for that item (already includes qty)
 - `total_price / quantity` = per unit invoice price
 - Sum of `total_price` across items = actual invoice amount for the order
+
+---
+
+## Channel & Fulfillment Classification
+
+### Initiating Source → Channel
+`order_management_order.initiating_source` tells you how the order was placed:
+
+| initiating_source starts with | Channel | Notes |
+|-------------------------------|---------|-------|
+| `B2B` | B2B | Institutional / bulk orders — exclude from DVS demand analysis |
+| `APP` | B2C | Farmer placed via Agrostar app |
+| `CSR` | B2C | Call centre / CSR placed on behalf of farmer |
+| `SupportCSR` | B2C | Support team placed on behalf of farmer |
+
+**B2C filter:** `initiating_source NOT LIKE 'B2B%'`
+**B2B filter:** `initiating_source LIKE 'B2B%'`
+
+---
+
+### FC vs Retail Store Fulfillment
+The `order_type` and `retail_store_code` fields together tell you where a B2C order was fulfilled:
+
+| Condition | Fulfillment | Meaning |
+|-----------|-------------|---------|
+| `order_type = 'STORE-ORDER'` AND `retail_store_code IS NOT NULL` | **DVS (Retail Store)** | Order fulfilled by Saathi store via DVS |
+| `order_type = 'STORE-ORDER'` AND `retail_store_code IS NULL` | **FC (rerouted)** | DVS was attempted but partner missed SLA → order pulled back to FC; check `order_management_orderreroutinglogs` for which store missed it |
+| `order_type != 'STORE-ORDER'` | **FC** | Never touched DVS — fulfilled directly from Fulfillment Centre |
+
+**Rule:** If `retail_store_code IS NOT NULL`, the store fulfilled it. If NULL, FC handled it regardless of `order_type`.
 
 ---
 
