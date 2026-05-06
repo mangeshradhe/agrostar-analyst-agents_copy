@@ -127,10 +127,11 @@ Stage 5: Delivered to farmer
 
 **B2C order filter** (exclude B2B from demand calculation):
 ```sql
-WHERE o.initiating_source NOT LIKE 'B2B%'
-  AND o.status NOT LIKE '%EDIT%'
-  AND o.status NOT LIKE '%RET%'
-  AND o.status NOT LIKE '%CANC%'
+WHERE LOWER(o.initiating_source) NOT LIKE 'b2b%'
+  AND o.unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+  AND o.status NOT IN ('MOB_APP_UNVERIFIED')
+  AND o.status NOT LIKE 'edited%'
+  AND o.unicommerce_status NOT LIKE 'edited%'
 ```
 
 **Key demand metrics per partner per taluka:**
@@ -143,13 +144,40 @@ WHERE o.initiating_source NOT LIKE 'B2B%'
 - `leakage_distance` — resolved = no, reason = distance
 - `leakage_rerouted` — partner assigned but re-routed to FC
 
-### Order Item Detail
+### Order Item Detail & Invoice Amount (Store-Fulfilled Orders)
 - **Table:** `prod_db_views.order_management_orderitem`
 - **Join:** `orderitem.order_id` = `order_management_order.sales_order_id`
-- One order can have multiple items
-- `total_price` per item = invoice amount for that item (already includes qty)
+- One order can have **multiple rows** (one per item) — always SUM to get order-level value
+- `total_price` per item = invoice amount for that line (already includes qty)
 - `total_price / quantity` = per unit invoice price
-- Sum of `total_price` across items = actual invoice amount for the order
+- `SUM(total_price)` across items = total invoiced amount for the order
+
+**CRITICAL — Invoice source by fulfillment type:**
+
+| Fulfillment | Invoice Source | Why |
+|---|---|---|
+| **STORE-FULFILLMENT** | `order_management_orderitem.total_price` (SUM per order) | Store orders never appear in `invoiced_report` |
+| **FC-FULFILLMENT** | `pristine_wms_views.invoiced_report` | FC orders flow through WMS and are captured there |
+
+`pristine_wms_views.invoiced_report` only contains FC-fulfilled orders. **Never use it for DVS/store GMV.** Using it for "total B2C sales" will silently miss all store-side revenue.
+
+```sql
+-- Correct: Store-fulfilled invoiced GMV
+SELECT
+  o.sales_order_id,
+  o.retail_store_code,
+  SUM(oi.total_price) AS invoiced_gmv
+FROM `agrostar-data.prod_db_views.order_management_order` o
+JOIN `agrostar-data.prod_db_views.order_management_orderitem` oi ON oi.order_id = o.sales_order_id
+WHERE DATE(o.created_on) BETWEEN @start_date AND @end_date
+  AND LOWER(o.initiating_source) NOT LIKE 'b2b%'
+  AND o.retail_store_code IS NOT NULL AND o.retail_store_code != ''
+  AND o.unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+  AND o.status NOT IN ('MOB_APP_UNVERIFIED')
+  AND o.status NOT LIKE 'edited%'
+  AND o.unicommerce_status NOT LIKE 'edited%'
+GROUP BY 1, 2
+```
 
 ---
 
@@ -171,15 +199,23 @@ WHERE o.initiating_source NOT LIKE 'B2B%'
 ---
 
 ### FC vs Retail Store Fulfillment
-The `order_type` and `retail_store_code` fields together tell you where a B2C order was fulfilled:
+Fulfillment type is determined **solely by `retail_store_code`** — `order_type` is NOT required:
+
+```sql
+CASE
+  WHEN retail_store_code IS NULL OR retail_store_code = '' THEN 'FC-FULFILLMENT'
+  ELSE 'STORE-FULFILLMENT'
+END AS fulfillment_type
+```
 
 | Condition | Fulfillment | Meaning |
 |-----------|-------------|---------|
-| `order_type = 'STORE-ORDER'` AND `retail_store_code IS NOT NULL` | **DVS (Retail Store)** | Order fulfilled by Saathi store via DVS |
-| `order_type = 'STORE-ORDER'` AND `retail_store_code IS NULL` | **FC (rerouted)** | DVS was attempted but partner missed SLA → order pulled back to FC; check `order_management_orderreroutinglogs` for which store missed it |
-| `order_type != 'STORE-ORDER'` | **FC** | Never touched DVS — fulfilled directly from Fulfillment Centre |
+| `retail_store_code IS NOT NULL AND retail_store_code != ''` | **STORE-FULFILLMENT** | Fulfilled by Saathi store via DVS |
+| `retail_store_code IS NULL OR retail_store_code = ''` | **FC-FULFILLMENT** | Fulfilled from FC (either never attempted DVS, or re-routed back from store) |
 
-**Rule:** If `retail_store_code IS NOT NULL`, the store fulfilled it. If NULL, FC handled it regardless of `order_type`.
+**Critical:** `retail_store_code` can be an **empty string `""`** (not just NULL) for FC orders. Checking only `IS NULL` will misclassify those FC orders as store-fulfilled.
+
+**Re-routed orders:** If `order_type = 'STORE-ORDER'` but `retail_store_code` is NULL/empty, DVS was attempted but the store missed the SLA and the order was pulled back to FC. Use `order_management_orderreroutinglogs` to find which store originally missed it.
 
 ---
 
@@ -189,11 +225,16 @@ The `order_type` and `retail_store_code` fields together tell you where a B2C or
 
 ```sql
 FROM `agrostar-data.prod_db_views.order_management_order` o
-WHERE o.order_type = 'STORE-ORDER'
-  AND DATE(o.created_on) BETWEEN <start_date> AND <end_date>
-  AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.status, '')), r'cancelled|edited|error|mob_unverified|future order')
-  AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.unicommerce_status, '')), r'cancelled|edited|error|mob_unverified|future order')
+WHERE DATE(o.created_on) BETWEEN <start_date> AND <end_date>
+  AND LOWER(o.initiating_source) NOT LIKE 'b2b%'               -- B2C only
+  AND o.unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+  AND o.status NOT IN ('MOB_APP_UNVERIFIED')
+  AND o.status NOT LIKE 'edited%'
+  AND o.unicommerce_status NOT LIKE 'edited%'
+  AND (o.retail_store_code IS NOT NULL AND o.retail_store_code != '')  -- Store-fulfilled only
 ```
+
+Remove the last line if you want ALL B2C orders (FC + Store). Add `LOWER(o.initiating_source) LIKE 'b2b%'` to flip to B2B.
 
 - `created_on` = when the order was created — **always use this as the date filter**
 - `retail_store_code` = Saathi store identifier
@@ -260,19 +301,23 @@ Columns: `order_id`, `status`, `created_on`, `source`, `updated_by`
 - **Breakdowns:** by store, state, cluster, time period
 
 ```sql
--- Monthly demand per store
+-- Monthly invoiced GMV per store (store-fulfilled orders only)
 SELECT
   o.retail_store_code,
   DATE_TRUNC(DATE(o.created_on), MONTH) AS month,
   COUNT(DISTINCT o.sales_order_id) AS total_orders,
-  ROUND(SUM(o.grand_total), 2) AS gmv
+  ROUND(SUM(oi.total_price), 2) AS invoiced_gmv
 FROM `agrostar-data.prod_db_views.order_management_order` o
-WHERE o.order_type = 'STORE-ORDER'
-  AND DATE(o.created_on) BETWEEN @start_date AND @end_date
-  AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.status, '')), r'cancelled|edited|error|mob_unverified|future order')
-  AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.unicommerce_status, '')), r'cancelled|edited|error|mob_unverified|future order')
+JOIN `agrostar-data.prod_db_views.order_management_orderitem` oi ON oi.order_id = o.sales_order_id
+WHERE DATE(o.created_on) BETWEEN @start_date AND @end_date
+  AND LOWER(o.initiating_source) NOT LIKE 'b2b%'
+  AND o.retail_store_code IS NOT NULL AND o.retail_store_code != ''
+  AND o.unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+  AND o.status NOT IN ('MOB_APP_UNVERIFIED')
+  AND o.status NOT LIKE 'edited%'
+  AND o.unicommerce_status NOT LIKE 'edited%'
 GROUP BY 1, 2
-ORDER BY month, gmv DESC
+ORDER BY month, invoiced_gmv DESC
 ```
 
 ---
@@ -288,10 +333,13 @@ ORDER BY month, gmv DESC
 WITH dvs_orders AS (
   SELECT sales_order_id, created_on AS order_created_on
   FROM `agrostar-data.prod_db_views.order_management_order`
-  WHERE order_type = 'STORE-ORDER'
-    AND DATE(created_on) BETWEEN @start_date AND @end_date
-    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(status, '')), r'cancelled|edited|error|mob_unverified|future order')
-    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(unicommerce_status, '')), r'cancelled|edited|error|mob_unverified|future order')
+  WHERE DATE(created_on) BETWEEN @start_date AND @end_date
+    AND LOWER(initiating_source) NOT LIKE 'b2b%'
+    AND retail_store_code IS NOT NULL AND retail_store_code != ''
+    AND unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+    AND status NOT IN ('MOB_APP_UNVERIFIED')
+    AND status NOT LIKE 'edited%'
+    AND unicommerce_status NOT LIKE 'edited%'
 ),
 first_action AS (
   SELECT order_id, MIN(created_on) AS first_action_time,
@@ -348,10 +396,13 @@ GROUP BY order_id
 WITH dvs_orders AS (
   SELECT sales_order_id, created_on AS order_created_on
   FROM `agrostar-data.prod_db_views.order_management_order`
-  WHERE order_type = 'STORE-ORDER'
-    AND DATE(created_on) BETWEEN @start_date AND @end_date
-    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(status, '')), r'cancelled|edited|error|mob_unverified|future order')
-    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(unicommerce_status, '')), r'cancelled|edited|error|mob_unverified|future order')
+  WHERE DATE(created_on) BETWEEN @start_date AND @end_date
+    AND LOWER(initiating_source) NOT LIKE 'b2b%'
+    AND retail_store_code IS NOT NULL AND retail_store_code != ''
+    AND unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+    AND status NOT IN ('MOB_APP_UNVERIFIED')
+    AND status NOT LIKE 'edited%'
+    AND unicommerce_status NOT LIKE 'edited%'
 ),
 order_times AS (
   SELECT
@@ -403,10 +454,13 @@ SELECT
         / COUNT(DISTINCT o.sales_order_id), 2) AS rto_rate_pct
 FROM `agrostar-data.prod_db_views.order_management_order` o
 JOIN `agrostar-data.prod_db_views.order_management_orderhistorymeta` h ON h.order_id = o.sales_order_id
-WHERE o.order_type = 'STORE-ORDER'
-  AND DATE(o.created_on) BETWEEN @start_date AND @end_date
-  AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.status, '')), r'cancelled|edited|error|mob_unverified|future order')
-  AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.unicommerce_status, '')), r'cancelled|edited|error|mob_unverified|future order')
+WHERE DATE(o.created_on) BETWEEN @start_date AND @end_date
+  AND LOWER(o.initiating_source) NOT LIKE 'b2b%'
+  AND o.retail_store_code IS NOT NULL AND o.retail_store_code != ''
+  AND o.unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+  AND o.status NOT IN ('MOB_APP_UNVERIFIED')
+  AND o.status NOT LIKE 'edited%'
+  AND o.unicommerce_status NOT LIKE 'edited%'
 GROUP BY 1
 ORDER BY rto_rate_pct DESC
 ```
@@ -431,10 +485,13 @@ WITH delivered AS (
   FROM `agrostar-data.prod_db_views.delivery_shippingpackage` sp
   JOIN `agrostar-data.prod_db_views.delivery_shippingpackagestatushistory` h ON h.package_id = sp.code
   JOIN `agrostar-data.prod_db_views.order_management_order` o ON CAST(o.unicommerce_id AS STRING) = sp.order_id
-  WHERE o.order_type = 'STORE-ORDER'
-    AND DATE(o.created_on) BETWEEN @start_date AND @end_date
-    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.status, '')), r'cancelled|edited|error|mob_unverified|future order')
-    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.unicommerce_status, '')), r'cancelled|edited|error|mob_unverified|future order')
+  WHERE DATE(o.created_on) BETWEEN @start_date AND @end_date
+    AND LOWER(o.initiating_source) NOT LIKE 'b2b%'
+    AND o.retail_store_code IS NOT NULL AND o.retail_store_code != ''
+    AND o.unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+    AND o.status NOT IN ('MOB_APP_UNVERIFIED')
+    AND o.status NOT LIKE 'edited%'
+    AND o.unicommerce_status NOT LIKE 'edited%'
   GROUP BY 1,2,3,4
 )
 SELECT
@@ -535,6 +592,10 @@ These were discovered through live testing — not in any schema documentation:
 | ~37% of B2C demand has no `PromisedTAT` record | Orders created via CRM/support may bypass the DVS routing engine. DVS push rate should be computed only over orders WITH a TAT record, not total demand. |
 | `isDeliveryViaStoreEnabled` & `servingTaluka` in institution | These fields exist in `galaxy_views.institution` at runtime but may not appear in BQ schema previews — they are in the underlying `galaxy_prod.institution` table. |
 | `dvsResolutionReason` in PromisedTAT | Same as above — field exists at runtime but not in the view's formal schema. |
+| `retail_store_code` empty string | FC-fulfilled orders can have `retail_store_code = ''` (empty string), not just NULL. Always check `IS NULL OR = ''` together — checking only `IS NULL` misclassifies some FC orders as store-fulfilled. |
+| `invoiced_report` does NOT contain store orders | `pristine_wms_views.invoiced_report` only has FC-fulfilled orders. For store-fulfilled (DVS) GMV, always use `SUM(order_management_orderitem.total_price)`. Using `invoiced_report` for "total B2C sales" silently drops all DVS revenue. |
+| Status exclusions — use exact values, not REGEXP | Correct exclusions: `unicommerce_status NOT IN ('FUTURE ORDER','CANCELLED','DISPUTED_ADDRESS')`, `status NOT IN ('MOB_APP_UNVERIFIED')`, `status/unicommerce_status NOT LIKE 'edited%'`. Do not use REGEXP_CONTAINS — it is approximate and may over-filter. |
+| `initiating_source` case sensitivity | Always use `LOWER(initiating_source) NOT LIKE 'b2b%'` — the field value casing is inconsistent in the database. |
 
 ---
 
