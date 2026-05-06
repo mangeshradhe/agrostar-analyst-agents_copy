@@ -1,0 +1,8 @@
+# Personal Claude Code settings — each user has their own MCP permissions
+.claude/settings.local.json
+
+# macOS
+.DS_Store
+
+# Sensitive / personal notes
+*.private.md
