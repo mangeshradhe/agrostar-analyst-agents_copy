@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DVS B2C Fulfillment — May 2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6fa; color: #1a1a2e; padding: 24px; }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 28px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+    .card { background: #fff; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .card h2 { font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .full { grid-column: 1 / -1; }
+    .kpi-row { display: flex; gap: 16px; margin-bottom: 24px; }
+    .kpi { flex: 1; background: #fff; border-radius: 12px; padding: 18px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .kpi .label { font-size: 12px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .kpi .value { font-size: 28px; font-weight: 700; }
+    .kpi .sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    .store { color: #6366f1; }
+    .fc { color: #f59e0b; }
+    .total { color: #111827; }
+    canvas { max-height: 280px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 8px 10px; background: #f9fafb; color: #6b7280; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #e5e7eb; }
+    td { padding: 9px 10px; border-bottom: 1px solid #f3f4f6; }
+    tr:last-child td { border-bottom: none; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+    .badge-store { background: #ede9fe; color: #5b21b6; }
+    .badge-fc { background: #fef3c7; color: #92400e; }
+    .bar-bg { background: #f3f4f6; border-radius: 4px; height: 6px; overflow: hidden; margin-top: 4px; }
+    .bar-fill { height: 100%; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+  <h1>DVS B2C Fulfillment Dashboard</h1>
+  <p class="subtitle">May 1–6, 2026 &nbsp;·&nbsp; B2C channel &nbsp;·&nbsp; All states</p>
+
+  <!-- KPI row -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="label">Total B2C Orders</div>
+      <div class="value total">6,548</div>
+      <div class="sub">May 1–6, 2026</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Store-Fulfilled</div>
+      <div class="value store">3,992 <span style="font-size:16px;font-weight:500">(61%)</span></div>
+      <div class="sub">₹1.63 Cr GMV</div>
+    </div>
+    <div class="kpi">
+      <div class="label">FC-Fulfilled</div>
+      <div class="value fc">2,556 <span style="font-size:16px;font-weight:500">(39%)</span></div>
+      <div class="sub">₹83.9 L GMV</div>
+    </div>
+    <div class="kpi">
+      <div class="label">DVS Share of GMV</div>
+      <div class="value store">66%</div>
+      <div class="sub">₹1.63 Cr of ₹2.47 Cr</div>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- Day-on-day line chart -->
+    <div class="card full">
+      <h2>Day-on-Day Orders — Store vs FC</h2>
+      <canvas id="trendChart"></canvas>
+    </div>
+
+    <!-- State-wise bar chart -->
+    <div class="card">
+      <h2>State-wise Orders — Store vs FC</h2>
+      <canvas id="stateChart"></canvas>
+    </div>
+
+    <!-- State table -->
+    <div class="card">
+      <h2>State-wise Breakdown</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>State</th>
+            <th>Store</th>
+            <th>FC</th>
+            <th>DVS %</th>
+            <th>Mix</th>
+          </tr>
+        </thead>
+        <tbody id="stateTable"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    // ── Data ────────────────────────────────────────────────────────────────
+    const trendData = [
+      { date: 'May 1', store: 191, fc: 1 },
+      { date: 'May 2', store: 582, fc: 646 },
+      { date: 'May 3', store: 311, fc: 105 },
+      { date: 'May 4', store: 816, fc: 713 },
+      { date: 'May 5', store: 993, fc: 627 },
+      { date: 'May 6', store: 1099, fc: 464 },
+    ];
+
+    const stateData = [
+      { state: 'Gujarat',        store: 718,  fc: 311  },
+      { state: 'Madhya Pradesh', store: 233,  fc: 397  },
+      { state: 'Maharashtra',    store: 846,  fc: 667  },
+      { state: 'Rajasthan',      store: 698,  fc: 408  },
+      { state: 'Uttar Pradesh',  store: 468,  fc: 773  },
+    ];
+
+    const stateGmv = {
+      'Gujarat':        { store: 3229831,  fc: 1210655  },
+      'Madhya Pradesh': { store: 807923,   fc: 1328385  },
+      'Maharashtra':    { store: 2242467,  fc: 1806175  },
+      'Rajasthan':      { store: 3552177,  fc: 1500216  },
+      'Uttar Pradesh':  { store: 1391724,  fc: 2546322  },
+    };
+
+    const STORE_COLOR = '#6366f1';
+    const FC_COLOR    = '#f59e0b';
+
+    // ── Trend Line Chart ─────────────────────────────────────────────────────
+    new Chart(document.getElementById('trendChart'), {
+      type: 'line',
+      data: {
+        labels: trendData.map(d => d.date),
+        datasets: [
+          {
+            label: 'Store-Fulfilled',
+            data: trendData.map(d => d.store),
+            borderColor: STORE_COLOR,
+            backgroundColor: STORE_COLOR + '18',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            borderWidth: 2.5,
+          },
+          {
+            label: 'FC-Fulfilled',
+            data: trendData.map(d => d.fc),
+            borderColor: FC_COLOR,
+            backgroundColor: FC_COLOR + '18',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            borderWidth: 2.5,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } },
+          tooltip: {
+            callbacks: {
+              footer: (items) => {
+                const total = items.reduce((s, i) => s + i.parsed.y, 0);
+                const store = items.find(i => i.dataset.label === 'Store-Fulfilled')?.parsed.y || 0;
+                return `DVS share: ${Math.round(store/total*100)}%  |  Total: ${total}`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } },
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        },
+      },
+    });
+
+    // ── State Bar Chart ──────────────────────────────────────────────────────
+    new Chart(document.getElementById('stateChart'), {
+      type: 'bar',
+      data: {
+        labels: stateData.map(d => d.state),
+        datasets: [
+          {
+            label: 'Store-Fulfilled',
+            data: stateData.map(d => d.store),
+            backgroundColor: STORE_COLOR,
+            borderRadius: 4,
+          },
+          {
+            label: 'FC-Fulfilled',
+            data: stateData.map(d => d.fc),
+            backgroundColor: FC_COLOR,
+            borderRadius: 4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } },
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } },
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        },
+      },
+    });
+
+    // ── State Table ──────────────────────────────────────────────────────────
+    const tbody = document.getElementById('stateTable');
+    stateData.forEach(row => {
+      const total = row.store + row.fc;
+      const dvsPct = Math.round(row.store / total * 100);
+      const storeWidth = dvsPct;
+      const fcWidth = 100 - dvsPct;
+
+      const dominant = dvsPct >= 50
+        ? `<span class="badge badge-store">Store dominant</span>`
+        : `<span class="badge badge-fc">FC dominant</span>`;
+
+      tbody.innerHTML += `
+        <tr>
+          <td><strong>${row.state}</strong></td>
+          <td>${row.store.toLocaleString()}</td>
+          <td>${row.fc.toLocaleString()}</td>
+          <td><strong>${dvsPct}%</strong> ${dominant}</td>
+          <td style="width:80px">
+            <div class="bar-bg">
+              <div class="bar-fill" style="width:${storeWidth}%;background:${STORE_COLOR}"></div>
+            </div>
+          </td>
+        </tr>
+      `;
+    });
+  </script>
+</body>
+</html>

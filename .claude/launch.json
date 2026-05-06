@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dvs-charts",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "7891", "--directory", "/Users/darpan/Documents/claude code/DVS Analysis"],
+      "port": 7891
+    }
+  ]
+}
