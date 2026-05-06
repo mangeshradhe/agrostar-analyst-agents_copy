@@ -13,21 +13,30 @@ echo "────────────────────────�
 echo ""
 echo "🔍 Looking for your Google Drive..."
 
-# Auto-detect Google Drive CloudStorage path
-GDRIVE_BASE="$HOME/Library/CloudStorage"
+# If this script is being run from inside the Drive folder, use that as the path
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DRIVE_PATH=""
 
-if [ -d "$GDRIVE_BASE" ]; then
-  for account_dir in "$GDRIVE_BASE"/GoogleDrive-*; do
-    candidate="$account_dir/My Drive/Agrostar Analyst Agents"
-    if [ -d "$candidate" ]; then
-      DRIVE_PATH="$candidate"
-      ACCOUNT=$(basename "$account_dir" | sed 's/GoogleDrive-//')
-      echo "   ✅ Found Drive at: $candidate"
-      echo "   📧 Account: $ACCOUNT"
-      break
-    fi
-  done
+if [[ "$SCRIPT_DIR" == *"Agrostar Analyst Agents"* ]]; then
+  DRIVE_PATH="$SCRIPT_DIR"
+  echo "   ✅ Running from Drive folder: $DRIVE_PATH"
+fi
+
+# Otherwise auto-detect Google Drive CloudStorage path
+if [ -z "$DRIVE_PATH" ]; then
+  GDRIVE_BASE="$HOME/Library/CloudStorage"
+  if [ -d "$GDRIVE_BASE" ]; then
+    for account_dir in "$GDRIVE_BASE"/GoogleDrive-*; do
+      candidate="$account_dir/My Drive/Agrostar Analyst Agents"
+      if [ -d "$candidate" ]; then
+        DRIVE_PATH="$candidate"
+        ACCOUNT=$(basename "$account_dir" | sed 's/GoogleDrive-//')
+        echo "   ✅ Found Drive at: $candidate"
+        echo "   📧 Account: $ACCOUNT"
+        break
+      fi
+    done
+  fi
 fi
 
 if [ -z "$DRIVE_PATH" ]; then

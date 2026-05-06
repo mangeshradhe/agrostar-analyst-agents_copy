@@ -49,6 +49,14 @@ for file in .claude/commands/*.md; do
   echo "   ✅ commands/$filename"
 done
 
+# ─── Also sync setup scripts so team can run directly from Drive ─────────────
+cp setup-agents.sh "$DRIVE_PATH/setup-agents.sh"
+chmod +x "$DRIVE_PATH/setup-agents.sh"
+echo "   ✅ setup-agents.sh"
+
+cp setup-agents.ps1 "$DRIVE_PATH/setup-agents.ps1"
+echo "   ✅ setup-agents.ps1"
+
 echo ""
 echo "✅ All done! GitHub + Google Drive are in sync."
 echo "   Drive path: $DRIVE_PATH"
