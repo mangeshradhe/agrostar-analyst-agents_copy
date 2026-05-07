@@ -32,7 +32,9 @@ You serve four functions:
 | **Channel** | `B2B` or `B2C` — determines which bin stock is reserved for, and which order pipeline is being served |
 | **Header / Line pattern** | Operations (GRN, pick, transfer, etc.) have a header (one per job) and lines (one per SKU/item) |
 | **Item / SKU** | `item_no` in WMS = `ItemSKU` = SKU code — joins to `item_mst.item_code` and `prod_db_views.item_master.product_code` |
-| **Serial Number** | Every item inwarded gets a unique serial number — tracked at individual item level across GRN, picking, cycle count, and inventory tables |
+| **Serial Number** | Every item inwarded gets a **unique serial number** — each physical unit has its own serial. Tracked across GRN, picking, cycle count, and inventory ledger |
+| **Box** | A box contains **one or more serial numbers of the same lot and expiry date**. During putaway, staff scan at box level or individual serial level. A box groups serials that were received together in the same batch |
+| **Lot No / Expiry** | Some items carry a vendor lot number and expiry date (e.g. pesticides, fertilisers). Some items do NOT — lot and expiry fields will be NULL for those SKUs |
 | **Work Type** | User's function in the warehouse — PICKER, PACKER, INBOUND, OUTBOUND, CYCLECOUNT, etc. |
 | **Product Group** | When anyone in the business says "product group" they mean `sub_sub_product_group` in `item_mst` — NOT the `product_group` field |
 | **VTO Transfers** | `transfer_no` starting with `VTO` = direct inbound GRN from manufacturers (NOT FC-to-FC movement). Always exclude VTO from FC-to-FC transfer analysis |
@@ -266,7 +268,21 @@ ORDER BY 2, units_picked DESC
 
 ### Inbound — GRN Flow
 
-**Inbound flow:** Vendor ships → Gate Entry → GRN (Goods Receipt Note) → IQC (Incoming QC) → Putaway → Bin Stock
+**Operational GRN process (step by step):**
+1. Create GRN header (`grn_header`)
+2. Select the Purchase Order against which GRN is being done (`document_no` = PO number, `document_type` = PO)
+3. Select the item(s) to receive — creates `grn_line` rows
+4. Create serial numbers for each item received — creates `grn_line_serial` rows (one serial per physical unit)
+   - For items with lot tracking: serial is tagged with `vendor_lot_no` + `expiry_date`
+   - For items without lot/expiry: `vendor_lot_no` and `expiry_date` are NULL
+5. Complete the GRN (`is_done = 1` on `grn_header`)
+6. Create putaway (`putaway_header` + `putaway_lines`)
+7. Scan items into bins — staff scan individual serials or whole boxes (a box = multiple serials of same lot/expiry)
+8. Complete putaway (`is_done = 1` on `putaway_header`) → stock lands in bin
+
+**Key distinction:** GRN captures what was received and how many. Putaway captures where each unit was physically placed in the warehouse. Both must be complete for stock to be available.
+
+**Data flow:** `grn_header` → `grn_line` (qty level) → `grn_line_serial` (serial level) → `putaway_header` → `putaway_lines` (bin placement)
 
 #### `grn_header` — GRN Header
 | Field | Type | Notes |
@@ -715,7 +731,7 @@ ORDER BY available_qty DESC
 9. **All WMS views are non-partitioned.** No partition key — use `DATE(created_on)` filters and keep date windows tight to avoid full scans.
 10. **`item_inventory` vs `item_bin_inventory`:** `item_inventory` is FC-level aggregate; `item_bin_inventory` is bin-level detail. Both are snapshots — use `item_inventory_ledger` for historical movements.
 11. **VTO transfers ≠ FC-to-FC.** `transfer_no LIKE 'VTO%'` = manufacturer direct inbound. **Always exclude from FC-to-FC analysis by default** and notify the user. Only include if explicitly asked.
-12. **Serial number tracking.** Every item inwarded gets a unique serial number. Item-level tracking is available via `grn_line_serial`, `item_serial_inventory`, `cycle_count_serial` tables — use these when tracking individual units.
+12. **Serial number tracking.** Every item inwarded gets a unique serial number — one serial per physical unit. Use `grn_line_serial`, `item_serial_inventory`, `cycle_count_serial` for unit-level tracking. A **box** groups multiple serials of the same lot/expiry. Some items have no lot or expiry — `vendor_lot_no` and `expiry_date` will be NULL for those SKUs.
 13. **"Product group" = `sub_sub_product_group`.** Whenever a user says "product group" or "PG", they mean `item_mst.sub_sub_product_group` — NOT `item_mst.product_group`. Apply this translation automatically in every query.
 
 ---
