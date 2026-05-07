@@ -659,6 +659,57 @@ ORDER BY 1
 8. **Numeric fields are STRING** — `event_props_totalordervalue`, `event_props_sellingprice`, `event_props_amount` etc. are all STRINGs. Always `CAST(... AS FLOAT64)` before summing.
 9. **`purchase_request_created`** ≠ fulfilled order. This is the app-side event. Cross-reference with `prod_db_views.order_management_order` using `event_props_orderid` = `sales_order_id` for fulfillment status.
 10. **No partition key** — these are views over the datalake. Always filter on `clevertap_time_stamp` to limit scan cost.
+11. **`app_launched` has no field agent identifier** — `event_props_fieldagentmobilenumber` does NOT exist in `app_launched`. Cannot segment by user type there. Use `dashboard_viewed` or any post-login table for partner vs field agent split.
+12. **`app_launched` is Android-only** — `event_props_ct_source` = "Mobile" always, `event_props_ct_os_version` = Android version (6–16). iOS users do not appear in this table at all.
+13. **iOS users cannot be directly identified** — CleverTap does not capture browser UA or device OS for web sessions. No table in `saathi_clevertap_views` has an iOS/Android flag for web sessions. Best proxy: `event_props_ct_source = "Web"` in `dashboard_viewed` — these are predominantly iOS users since Android users use the native app. However this cannot be confirmed from CleverTap data alone; web server/CDN logs would be needed.
+14. **Platform structural change from Feb 2026** — Before Feb 2026, `dashboard_viewed` only shows `event_props_ct_source = "Web"` (the app was web-based). From Feb 2026, native Android app events appear as `event_props_ct_source = "Mobile"`. Do NOT compare "Web" user counts across 2024–2025 vs 2026 — they are not apples-to-apples.
+15. **`dashboard_viewed` platform split (Jan–Apr 2026):** Mobile = ~11,000 unique users/month (native Android), Web = ~900–1,050 unique users/month (iOS/web proxy). Web users are ~8–9% of total active base post Feb 2026.
+16. **User-Days as unit for cross-feature analysis** — When measuring "did user X do event A and event B on the same day", use `identity + DATE(clevertap_time_stamp)` as the unit (user-day), not just `identity`. A user opening Hisaab on 6 different days contributes 6 user-days — each day is an independent opportunity to also open Transactions.
+
+---
+
+## Validated Benchmarks (Apr–May 2026, Saathi Partners)
+
+### DAU / MAU
+| Month | MAU | Avg DAU | DAU/MAU % |
+|-------|-----|---------|-----------|
+| Jan 2026 | 9,799 | 3,296 | 33.6% |
+| Feb 2026 | 9,209 | 3,235 | 35.1% |
+| Mar 2026 | 9,170 | 3,065 | 33.4% |
+| Apr 2026 | 9,130 | 2,956 | 32.4% |
+
+Field Agents (same period): MAU ~9,000–9,400, DAU/MAU ~13–17% — far less habitual than partners.
+
+### Retention (Saathi Partners, Apr–May 2026, via `dashboard_viewed`)
+- **D+1 retention:** ~65% average (range 58–72% depending on day)
+- **Saturday D+1:** lowest ~59–63% (partners don't return on Sundays)
+- **Sunday D+1:** rebounds to 69–72% into Monday
+- **Weekly W1 retention:** ~77–79% (extremely stable)
+- **Weekly W2 retention:** ~74–76%
+- **Weekly W3 retention:** ~74% (curve is flat = habitual sticky base)
+
+### Hisaab → Transaction Tab Flow (Apr–May 2026, Saathi Partners)
+**Hypothesis: Partners who view Hisaab will also visit Transaction tab.**
+
+| Level | Base | Crossover % |
+|-------|------|------------|
+| Period (same month) | 8,972 users | 63.2% |
+| Same day (user-days) | 58,357 | 46.5% |
+| Same session | 107,738 sessions | 41.0% |
+
+**Direction breakdown (same-day crossover cases):**
+- **59.1%** open both in the same minute — adjacent tab navigation, essentially one action
+- **37.6%** open Hisaab first, then Transactions — median gap 30 mins, P25 = 2 mins
+- **3.3%** open Transactions first, then Hisaab — direction of hypothesis is confirmed
+
+**State split — same-day %:**
+- High (>47%): Gujarat 55%, Rajasthan 51.7%, UP 47.9%, MP 47.0%
+- Low (<37%): Karnataka 34.8%, Telangana 32.9%, AP 32.7%
+- North/West India aligns with hypothesis; South India does not — independent feature usage in South.
+
+**Day of week pattern — same-day %:**
+- Highest: Wednesday ~50% (mid-week reconciliation activity)
+- Lowest: Sunday ~42%, Monday ~44%
 
 ---
 
