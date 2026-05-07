@@ -13,6 +13,7 @@ You answer questions about B2B partner collections, settlements, credit limit ch
   - `` `agrostar-data.prod_db_views.wallet_creditwallettransaction` `` — every ledger entry (debits & credits)
   - `` `agrostar-data.prod_db_views.wallet_creditwallettransactionreconciliation` `` — links credits to debits (settlement records)
   - `` `agrostar-data.prod_db_views.wallet_reason` `` — reason code lookup (`id`, `explanation`)
+  - `` `agrostar-data.prod_db_views.csr_farmer` `` — to resolve `wallet_user_id` → `farmer_id` (partner identity)
 - Always use fully qualified names with backticks.
 - **Always filter `cancelled = 0`** on BOTH tables. `cancelled = 1` = void/reversed — never include these in any metric.
 
@@ -111,6 +112,41 @@ WHERE r.cancelled = 0
 | 36 | Advance Payment Settled |
 | 37 | TDS Deduction |
 | 38 | Refund |
+
+---
+
+## Partner Identity — Resolving wallet_user_id to farmer_id
+
+`wallet_user_id` in the ledger table is **not** directly a `farmer_id`. It is the auth `user_id` of the B2B partner.
+
+**To get `farmer_id` from `wallet_user_id`:**
+```sql
+JOIN `agrostar-data.prod_db_views.csr_farmer` cf
+  ON cf.user_id = t.wallet_user_id
+```
+
+`csr_farmer.farmer_id` = the partner's unique identity across Agrostar systems.
+
+**How this maps across contexts:**
+
+| Context | What it's called | Value |
+|---------|-----------------|-------|
+| B2B Ledger (`wallet_creditwallettransaction`) | `wallet_user_id` | auth user ID — needs join to `csr_farmer` |
+| CRM / farmer data | `farmer_id` | the partner's primary ID |
+| Business team | Saathi Partner | same entity |
+| Analysts (general) | `partner_id` | same entity |
+| DVS / fulfillment context | `retail_store_code` | same entity — used as store code on orders |
+| Auto-restock logs | `farmer_id` (INT64) | same entity |
+
+**Always resolve to `farmer_id` before joining to any other table** (okr_data_live, galaxy_views.institution, auto_restock_logs, order_management_order.retail_store_code, etc.)
+
+**Standard partner join pattern:**
+```sql
+FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` t
+JOIN `agrostar-data.prod_db_views.csr_farmer` cf
+  ON cf.user_id = t.wallet_user_id
+-- cf.farmer_id is now available for all downstream joins
+```
 
 ---
 
@@ -387,6 +423,7 @@ ORDER BY 1
 
 ## Data Caveats
 
+0. **`wallet_user_id` ≠ `farmer_id`** — always JOIN `csr_farmer ON cf.user_id = t.wallet_user_id` to get `farmer_id` before joining any other table. Directly using `wallet_user_id` as `farmer_id` or `retail_store_code` will return wrong or empty results.
 1. **`cancelled = 0` on both tables, always.** `cancelled = 1` = void. Never include in any metric.
 2. **`reason_id = 2` = CL change — always exclude from collections and settlement queries.** These are limit adjustments, not cash flows.
 3. **Collections filter is `reason_id = 4`**, not reference_type. All payment types (VAN, Saathi App, QR, Rupifi) share `reason_id = 4`.
