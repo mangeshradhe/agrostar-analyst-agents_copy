@@ -32,7 +32,10 @@ You serve four functions:
 | **Channel** | `B2B` or `B2C` — determines which bin stock is reserved for, and which order pipeline is being served |
 | **Header / Line pattern** | Operations (GRN, pick, transfer, etc.) have a header (one per job) and lines (one per SKU/item) |
 | **Item / SKU** | `item_no` in WMS = `ItemSKU` = SKU code — joins to `item_mst.item_code` and `prod_db_views.item_master.product_code` |
+| **Serial Number** | Every item inwarded gets a unique serial number — tracked at individual item level across GRN, picking, cycle count, and inventory tables |
 | **Work Type** | User's function in the warehouse — PICKER, PACKER, INBOUND, OUTBOUND, CYCLECOUNT, etc. |
+| **Product Group** | When anyone in the business says "product group" they mean `sub_sub_product_group` in `item_mst` — NOT the `product_group` field |
+| **VTO Transfers** | `transfer_no` starting with `VTO` = direct inbound GRN from manufacturers (NOT FC-to-FC movement). Always exclude VTO from FC-to-FC transfer analysis |
 
 ---
 
@@ -506,9 +509,23 @@ Manual inventory corrections (positive or negative), requires approval.
 ### Transfers — FC-to-FC Movement
 
 #### `transfer_header` — Inter-FC Transfer Header
+
+**⚠️ CRITICAL — VTO Exclusion Rule:**
+`transfer_no` values starting with `VTO` are **direct inbound from manufacturers** — they are NOT FC-to-FC movements. They use the transfer table as a vehicle for vendor GRNs.
+
+**Default behaviour:** Always exclude `VTO` from any FC-to-FC transfer analysis and inform the user:
+> *"Note: I've excluded VTO transfers (direct manufacturer inbounds). If you also want to include those, let me know."*
+
+Only include VTO if the user explicitly asks for all transfer types or specifically asks about manufacturer inbounds.
+
+```sql
+-- Standard FC-to-FC transfer filter (exclude VTO)
+WHERE transfer_no NOT LIKE 'VTO%'
+```
+
 | Field | Type | Notes |
 |-------|------|-------|
-| `transfer_no` | STRING | Transfer job ID |
+| `transfer_no` | STRING | Transfer job ID — prefix `VTO` = manufacturer inbound, not FC-to-FC |
 | `doc_type` | STRING | Transfer document type |
 | `from_location_code` | STRING | Source FC |
 | `to_location_code` | STRING | Destination FC |
@@ -697,6 +714,9 @@ ORDER BY available_qty DESC
 8. **`pick_header` vs archive tables.** `pick_header` = active picks only. `pick_header_arc_main` = archive. For historical analysis join all three via the `pick_header_arc_main` view pattern.
 9. **All WMS views are non-partitioned.** No partition key — use `DATE(created_on)` filters and keep date windows tight to avoid full scans.
 10. **`item_inventory` vs `item_bin_inventory`:** `item_inventory` is FC-level aggregate; `item_bin_inventory` is bin-level detail. Both are snapshots — use `item_inventory_ledger` for historical movements.
+11. **VTO transfers ≠ FC-to-FC.** `transfer_no LIKE 'VTO%'` = manufacturer direct inbound. **Always exclude from FC-to-FC analysis by default** and notify the user. Only include if explicitly asked.
+12. **Serial number tracking.** Every item inwarded gets a unique serial number. Item-level tracking is available via `grn_line_serial`, `item_serial_inventory`, `cycle_count_serial` tables — use these when tracking individual units.
+13. **"Product group" = `sub_sub_product_group`.** Whenever a user says "product group" or "PG", they mean `item_mst.sub_sub_product_group` — NOT `item_mst.product_group`. Apply this translation automatically in every query.
 
 ---
 
