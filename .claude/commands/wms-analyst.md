@@ -539,6 +539,70 @@ Current inventory snapshot per SKU per FC.
 | `saleable_quantity` | INTEGER | `good_quantity - reserve_quantity` |
 | `reserve_quantity` | INTEGER | Qty reserved for pending orders |
 
+#### `item_serial_inventory` — Serial-Level Live Inventory ⭐ most granular
+One row per serial number currently in the warehouse. Shows exactly where each physical unit is (bin + FC) and its expiry/lot details.
+
+**⚠️ Always filter `is_used = 0` for live available serials.** `is_used = 1` = serial has been picked/invoiced/transferred out — no longer in stock.
+
+**`bin_mst` join requires both columns:** `bin_code = bin.bin_code AND location_code = bin.location_code` — bin codes are not globally unique across FCs.
+
+**Expiry analysis:** Filter `DATE(expiry_date) IS NOT NULL` to include only lot-tracked items. Non-expiry items have `expiry_date = NULL`.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `item_no` | STRING | SKU code |
+| `location_code` | STRING | FC |
+| `serial_no` | STRING | Unique serial — same serial tracked from GRN → pick → invoice |
+| `box_no` | STRING | Box this serial belongs to — connects to GRN/putaway box concept |
+| `vendor_lot_no` | STRING | Vendor lot/batch — NULL for non-lot items |
+| `expiry_date` | DATE | Expiry date — NULL for non-expiry items |
+| `bin_code` | STRING | Current bin location |
+| `is_used` | INTEGER | **`0` = available in stock, `1` = used/picked/out** — always filter `is_used = 0` for live inventory |
+| `mrp` | FLOAT | MRP at time of inward |
+| `is_expiry_mandatory` | INTEGER | 1 = expiry tracking required for this SKU |
+
+**Business expiry ageing buckets** (standard classification):
+
+| Bucket label | Condition |
+|---|---|
+| `6_expired` | `days_to_expiry < 0` |
+| `1_0_90 days` | `0 < days <= 90` — urgent, near expiry |
+| `2_90_120 days` | `90 < days <= 120` |
+| `3_120_150 days` | `120 < days <= 150` |
+| `4_150_365 days` | `150 < days <= 365` |
+| `5_more than 1 year` | `days > 365` |
+
+Bucket names are prefixed with numbers so they sort correctly in BI tools.
+
+```sql
+-- Live serial inventory with expiry ageing (exclude non-expiry items)
+SELECT
+  s.item_no,
+  itm.display_name,
+  itm.sub_sub_product_group  AS product_group,  -- business "product group" = sub_sub_product_group
+  s.location_code,
+  s.serial_no,
+  s.vendor_lot_no,
+  s.expiry_date,
+  s.bin_code,
+  bin.bin_type,
+  DATE_DIFF(s.expiry_date, CURRENT_DATE(), DAY) AS days_to_expiry,
+  CASE
+    WHEN DATE_DIFF(s.expiry_date, CURRENT_DATE(), DAY) < 0            THEN '6_expired'
+    WHEN DATE_DIFF(s.expiry_date, CURRENT_DATE(), DAY) <= 90          THEN '1_0_90 days'
+    WHEN DATE_DIFF(s.expiry_date, CURRENT_DATE(), DAY) <= 120         THEN '2_90_120 days'
+    WHEN DATE_DIFF(s.expiry_date, CURRENT_DATE(), DAY) <= 150         THEN '3_120_150 days'
+    WHEN DATE_DIFF(s.expiry_date, CURRENT_DATE(), DAY) <= 365         THEN '4_150_365 days'
+    ELSE '5_more than 1 year'
+  END AS ageing_bucket
+FROM `agrostar-data.pristine_wms_views.item_serial_inventory` s
+LEFT JOIN `agrostar-data.pristine_wms_views.item_mst` itm ON itm.item_code = s.item_no
+LEFT JOIN `agrostar-data.pristine_wms_views.bin_mst` bin
+  ON bin.bin_code = s.bin_code AND bin.location_code = s.location_code
+WHERE s.is_used = 0                          -- live stock only
+  AND DATE(s.expiry_date) IS NOT NULL        -- expiry-tracked items only
+```
+
 #### `item_bin_inventory` — Bin-Level Inventory Snapshot
 Current inventory snapshot per SKU per bin (more granular than `item_inventory`).
 
@@ -1059,6 +1123,9 @@ ORDER BY available_qty DESC
 28. **`invoice_header` dedup = same invoice at different time states.** `PARTITION BY InvoiceNo ORDER BY UpdatedOn DESC` — take latest. Different reason from `invoiced_report` dedup — don't confuse the two patterns.
 29. **`invoiced_report.good_qty` is unreliable for qty.** Always use `COUNT(DISTINCT serial_no)` as the correct unit count.
 30. **`invoiced_report` serial_no = same serial from GRN → pick → invoice.** One physical unit traceable end-to-end across all three stages.
+31. **`item_serial_inventory.is_used`** — `0` = serial is live/available in stock. `1` = picked/invoiced/transferred out. Always filter `is_used = 0` for current stock analysis. Without this filter you get all serials ever inwarded.
+32. **`item_serial_inventory` bin join needs two conditions** — `bin_code = bin.bin_code AND location_code = bin.location_code`. Bin codes are not globally unique across FCs.
+33. **Inventory granularity ladder:** `item_inventory` (FC+SKU aggregate) → `item_bin_inventory` (FC+SKU+Bin qty) → `item_serial_inventory` (FC+SKU+Bin+Serial, with expiry/lot). Use the most granular table needed for the question.
 
 ---
 
