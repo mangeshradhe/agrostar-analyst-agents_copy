@@ -245,7 +245,9 @@ Always use the view `pick_line` to get complete picking history.
 | `qty_ordered` | INTEGER | Quantity to pick |
 | `qty_picked` | INTEGER | Quantity actually picked |
 | `pick_status` | STRING | PENDING, PICKED, SHORT, CANCELLED |
+| `pick_create_date` | TIMESTAMP | When the pick job was created — use for start lag calculation |
 | `picked_date` | TIMESTAMP | When this serial was actually scanned — NULL until scanned. Use `MIN/MAX` across pick_no for first/last scan times |
+| `consolidation_date` | TIMESTAMP | When this serial was consolidated (packed/boxed for dispatch) — step between picking and invoicing. NULL until consolidated |
 | `oqc_good_qty` | INTEGER | Outbound QC — good units |
 | `oqc_bad_qty` | INTEGER | Outbound QC — bad/rejected units |
 | `expiry_date` | DATE | Batch expiry |
@@ -612,58 +614,181 @@ Manual inventory corrections (positive or negative), requires approval.
 
 ---
 
-### Transfers — FC-to-FC Movement
+### Transfers
 
-#### `transfer_header` — Inter-FC Transfer Header
+#### Transfer Types
+
+| Type | Identified by | Meaning |
+|------|--------------|---------|
+| **FC-to-FC stock transfer** | `transfer_no NOT LIKE 'VTO%'`, `prcess_type` | Regular inter-warehouse stock movement |
+| **RGP (Returnable Gate Pass)** | `rgp_party_no IS NOT NULL` / `prcess_type` | Goods sent to external vendor/party temporarily — expected back |
+| **VTO** | `transfer_no LIKE 'VTO%'` | Direct manufacturer inbound — NOT FC-to-FC |
+
+#### Transfer Lifecycle — 9 TAT Stages
+
+Every transfer has up to 9 measurable timestamps across multiple tables:
+
+| Stage | Source | Field |
+|-------|--------|-------|
+| 1. Transfer created | `transfer_header` | `created_on` |
+| 2. Inventory reserved | `sale_order_log` WHERE `document_Action = 'Reserved'` | `MAX(created_on)` |
+| 3. Pick created | `pick_line` | `pick_create_date` |
+| 4. First item picked | `pick_line` | `MIN(picked_date)` |
+| 5. Last item picked | `pick_line` | `MAX(picked_date)` |
+| 6. First consolidated | `pick_line` | `MIN(consolidation_date)` |
+| 7. Last consolidated | `pick_line` | `MAX(consolidation_date)` |
+| 8. Invoiced / Dispatched | `invoice_transfer_header` | `CreatedOn` / `DispatchedOn` |
+| 9. Received at destination | `return_grn_header` WHERE `document_no = transfer_no` | `MAX(completed_on)` |
+
+**Reservation** = inventory ring-fenced/allocated for this transfer. Every sale order and transfer order must have inventory reserved before it can be picked. Triggered automatically by the system when an order/transfer is confirmed.
+
+**Consolidation** = physically packing/boxing picked items before dispatch. Happens after picking, before invoicing. `consolidation_date` on `pick_line` is when each serial was consolidated into a shipment unit.
+
+**Transfer receipt** = tracked in `return_grn_header` (NOT `grn_header`). When transferred goods arrive at the destination FC, the receiving operation creates a record in `return_grn_header` with `document_no = transfer_no`. `grn_header` is only for vendor/PO inbounds.
+
+#### `transfer_header` — Transfer Header
 
 **⚠️ CRITICAL — VTO Exclusion Rule:**
-`transfer_no` values starting with `VTO` are **direct inbound from manufacturers** — they are NOT FC-to-FC movements. They use the transfer table as a vehicle for vendor GRNs.
+`transfer_no` values starting with `VTO` are **direct inbound from manufacturers** — NOT FC-to-FC. Always exclude from transfer analysis by default and tell the user.
 
-**Default behaviour:** Always exclude `VTO` from any FC-to-FC transfer analysis and inform the user:
-> *"Note: I've excluded VTO transfers (direct manufacturer inbounds). If you also want to include those, let me know."*
-
-Only include VTO if the user explicitly asks for all transfer types or specifically asks about manufacturer inbounds.
+**Cancellation filter:** Always filter `is_cancel1 = 0` (note: field is `is_cancel1`, not `is_cancel`)
 
 ```sql
--- Standard FC-to-FC transfer filter (exclude VTO)
+-- Standard transfer filter (exclude VTO, exclude cancelled)
 WHERE transfer_no NOT LIKE 'VTO%'
+  AND is_cancel1 = 0
 ```
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `transfer_no` | STRING | Transfer job ID — prefix `VTO` = manufacturer inbound, not FC-to-FC |
-| `doc_type` | STRING | Transfer document type |
+| `transfer_no` | STRING | Transfer ID — `VTO%` = manufacturer inbound, not FC-to-FC |
+| `doc_type` | STRING | Document type |
+| `prcess_type` | STRING | Process type — distinguishes FC-to-FC vs RGP vs other (**source typo**: `prcess_type` not `process_type`) |
 | `from_location_code` | STRING | Source FC |
 | `to_location_code` | STRING | Destination FC |
-| `posting_date` | TIMESTAMP | Transfer date |
-| `state_code` | STRING | State code (for tax/GST purposes) |
+| `rgp_party_no` | STRING | RGP party — populated for Returnable Gate Pass transfers |
+| `vendor_no` | STRING | Vendor — relevant for RGP/VTO |
+| `vendor_name` | STRING | Vendor name |
+| `posting_date` | TIMESTAMP | Transfer posting date |
+| `state_code` | STRING | State code (for GST) |
 | `status` | STRING | OPEN, COMPLETED, CANCELLED |
 | `created_by` | STRING | User who created |
-| `created_on` | TIMESTAMP | Created |
-| `is_inbound_complete` | INTEGER | 1 = receiving FC confirmed receipt |
-| `is_outbound_complete` | INTEGER | 1 = sending FC confirmed dispatch |
+| `created_on` | TIMESTAMP | Transfer created |
+| `is_inbound_complete` | INTEGER | 1 = destination FC confirmed receipt |
+| `is_outbound_complete` | INTEGER | 1 = source FC confirmed dispatch |
+| `is_cancel1` | INTEGER | **Cancellation flag — always filter `is_cancel1 = 0`** (not `is_cancel`) |
 
-#### `transfer_line` — Inter-FC Transfer Lines
+#### `transfer_line` — Transfer Lines
 | Field | Type | Notes |
 |-------|------|-------|
 | `transfer_no` | STRING | FK → `transfer_header.transfer_no` |
 | `item_no` | STRING | SKU |
 | `item_desc` | STRING | Item name |
-| `status` | STRING | Line status |
+| `status` | STRING | Line status — filter `status NOT IN ('CANCELLED')` |
 | `quantity` | INTEGER | Qty to transfer |
 | `transfer_price` | FLOAT | Price per unit |
 | `amount` | FLOAT | Line value |
 | `good_qty` | INTEGER | Good qty transferred |
 | `invoice_no` | STRING | Transfer invoice |
-| `is_cancel` | INTEGER | 1 = cancelled |
+| `is_cancel` | INTEGER | 1 = line cancelled |
 | `cgst_amount` / `sgst_amount` / `igst_amount` | FLOAT | Tax amounts |
+
+#### `invoice_transfer_header` — Transfer Invoice
+Separate from `invoiced_report` (customer orders). FC-to-FC transfers get their own invoice table.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `DisplayOrderCode` | STRING | FK → `transfer_header.transfer_no` |
+| `InvoiceNo` | STRING | Invoice number |
+| `CreatedOn` | TIMESTAMP | Invoice created |
+| `DispatchedOn` | TIMESTAMP | Dispatched from source FC |
+| `VehicleNo` | STRING | Vehicle number |
+| `LRNo` | STRING | Lorry Receipt number |
+| `LRDate` | DATE | LR date |
+| `TransporterName` | STRING | Transporter |
+| `FreightAmount` | FLOAT | Freight cost |
+
+#### `sale_order_log` — Order / Transfer Reservation Log
+Tracks when inventory was reserved for any sale order or transfer order.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `DisplayOrderCode` | STRING | FK → `transfer_header.transfer_no` or sale order code |
+| `document_Action` | STRING | Action type — filter `= 'Reserved'` for inventory reservation event |
+| `created_on` | TIMESTAMP | When this action occurred |
+
+```sql
+-- When was inventory reserved for each transfer
+SELECT DisplayOrderCode, MAX(created_on) AS fulfilled_on
+FROM `agrostar-data.pristine_wms_views.sale_order_log`
+WHERE document_Action = 'Reserved'
+GROUP BY 1
+```
+
+```sql
+-- Full transfer TAT: all 9 stages
+WITH reserved AS (
+  SELECT DisplayOrderCode, MAX(created_on) AS fulfilled_on
+  FROM `agrostar-data.pristine_wms_views.sale_order_log`
+  WHERE document_Action = 'Reserved'
+  GROUP BY 1
+),
+pick_times AS (
+  SELECT sale_no, pick_no, pick_create_date,
+    MIN(picked_date)        AS first_pick,
+    MAX(picked_date)        AS last_pick,
+    MIN(consolidation_date) AS first_consolidate,
+    MAX(consolidation_date) AS last_consolidate
+  FROM `agrostar-data.pristine_wms_views.pick_line`
+  GROUP BY 1, 2, 3
+),
+transfer_received AS (
+  SELECT document_no, MAX(completed_on) AS received_on
+  FROM `agrostar-data.pristine_wms_views.return_grn_header`  -- transfers received here, not grn_header
+  GROUP BY 1
+)
+SELECT
+  th.transfer_no,
+  th.from_location_code,
+  th.to_location_code,
+  th.prcess_type,
+  th.created_on                                                              AS transfer_created,
+  r.fulfilled_on,
+  pt.pick_create_date,
+  pt.first_pick,
+  pt.last_pick,
+  pt.first_consolidate,
+  pt.last_consolidate,
+  inv.CreatedOn                                                              AS invoiced_on,
+  inv.DispatchedOn,
+  tr.received_on,
+  -- Key durations (hours)
+  DATETIME_DIFF(r.fulfilled_on,    th.created_on,    HOUR) AS created_to_reserved_hrs,
+  DATETIME_DIFF(pt.first_pick,     r.fulfilled_on,   HOUR) AS reserved_to_first_pick_hrs,
+  DATETIME_DIFF(pt.last_consolidate, pt.last_pick,   HOUR) AS pick_to_consolidate_hrs,
+  DATETIME_DIFF(inv.DispatchedOn,  pt.last_consolidate, HOUR) AS consolidate_to_dispatch_hrs,
+  DATETIME_DIFF(tr.received_on,    inv.DispatchedOn, HOUR) AS dispatch_to_received_hrs
+FROM `agrostar-data.pristine_wms_views.transfer_header` th
+LEFT JOIN reserved          r   ON r.DisplayOrderCode  = th.transfer_no
+LEFT JOIN pick_times        pt  ON pt.sale_no           = th.transfer_no
+LEFT JOIN `agrostar-data.pristine_wms_views.invoice_transfer_header` inv
+                                ON inv.DisplayOrderCode = th.transfer_no
+LEFT JOIN transfer_received tr  ON tr.document_no       = th.transfer_no
+WHERE DATE(th.created_on) BETWEEN @start_date AND @end_date
+  AND th.transfer_no NOT LIKE 'VTO%'
+  AND th.is_cancel1 = 0
+```
 
 ---
 
 ### Returns
 
-#### `return_grn_header` — Customer Return Receipt
-Goods returned from customers (RTO or farmer-initiated return) arriving back at FC.
+#### `return_grn_header` — Return Receipt (Customer Returns AND Transfer Receipts)
+**Dual purpose table** — used for two distinct scenarios:
+1. **Customer returns** — RTO or farmer-initiated returns arriving back at FC
+2. **Transfer receipts** — when FC-to-FC transfer goods arrive at destination FC. Join: `document_no = transfer_header.transfer_no`
+
+Always check `document_type` or `return_type` to distinguish which scenario a record belongs to.
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -859,6 +984,13 @@ ORDER BY available_qty DESC
 17. **Gate entry = `gate_entry` table with `status = 'GRN START'`** for the correct truck-arrival timestamp. Without this filter you get wrong timestamps.
 18. **Putaway TAT uses `MIN(created_on)` / `MAX(completed_on)`** across all putaway headers per GRN — a GRN can spawn multiple putaway jobs.
 19. **Do not filter `is_done = 1` only for GRN counts.** This hides pending GRNs and understates the true inbound picture. Include all statuses and use `type_pendency` classification to show what's still open.
+20. **`transfer_header` cancellation = `is_cancel1`** (not `is_cancel`). Always filter `is_cancel1 = 0`. `transfer_line` cancellation uses `status NOT IN ('CANCELLED')`.
+21. **`prcess_type` on `transfer_header` has a source typo** — the column is `prcess_type` not `process_type`. Reference exactly as `prcess_type`.
+22. **`return_grn_header` is dual purpose** — customer returns AND FC-to-FC transfer receipts. Join: `document_no = transfer_no` for transfer receipts. Use `return_type`/`document_type` to distinguish.
+23. **Transfer invoice = `invoice_transfer_header`**, not `invoiced_report`. `invoiced_report` is customer orders only. Join: `invoice_transfer_header.DisplayOrderCode = transfer_header.transfer_no`.
+24. **`sale_order_log`** tracks reservation events for both sale orders and transfer orders. Filter `document_Action = 'Reserved'` + `MAX(created_on)` per order to get when inventory was ring-fenced.
+25. **`pick_line` has `consolidation_date`** — the step after picking where items are packed/boxed before dispatch. Separate from `picked_date`. Use `MIN/MAX` across pick_no for consolidation window.
+26. **Transfer TAT has 9 stages** spanning 5 tables: `transfer_header` → `sale_order_log` → `pick_line` → `invoice_transfer_header` → `return_grn_header`. Never compute transfer TAT from a single table.
 
 ---
 
