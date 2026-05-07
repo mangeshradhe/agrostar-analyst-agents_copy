@@ -160,21 +160,48 @@ One row per SKU per order.
 #### `invoiced_report` — Invoiced Order Lines (FC-Fulfilled)
 **Critical:** This table contains ONLY FC-fulfilled (non-DVS) orders. Store/DVS orders are NOT here. Use `prod_db_views.order_management_orderitem` for DVS/store GMV.
 
+**Granularity:** One row per `serial_no` per SKU per `InvoiceNo`. One order (`DisplayOrderCode`) can have multiple invoices (multiple shipments). Within one invoice, each serial appears exactly once.
+
+**⚠️ Always deduplicate before use** — `PARTITION BY CONCAT(DisplayOrderCode, serial_no)`:
+- One order spans multiple invoices (partial shipments, re-invoicing after return)
+- The same `serial_no` can appear in multiple invoices of the same order
+- Dedup ensures each physical unit counted **once per order**
+- No ORDER BY needed — we don't prefer one invoice over another, just want one occurrence per serial per order
+
+```sql
+-- Always start with this base CTE
+WITH ir AS (
+  SELECT * FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY CONCAT(DisplayOrderCode, serial_no)) AS rn
+    FROM `agrostar-data.pristine_wms_views.invoiced_report`
+  ) WHERE rn = 1
+)
+```
+
+**Qty = `COUNT(DISTINCT serial_no)`** — not `good_qty`. One serial = one physical unit. Same serial tracked from GRN → pick → invoice.
+
+**Cancellation = double filter required:**
+```sql
+AND ir.line_status NOT IN ('CANCELLED')
+AND sol.line_status NOT IN ('CANCELLED')   -- also join sale_order_line on invoice_no
+```
+
 | Field | Type | Notes |
 |-------|------|-------|
-| `DisplayOrderCode` | STRING | Order reference |
+| `DisplayOrderCode` | STRING | Order reference — one order can have multiple InvoiceNos |
 | `Code` | STRING | Line code |
-| `InvoiceNo` | STRING | Invoice number |
+| `InvoiceNo` | STRING | Invoice number — joins to `invoice_header.InvoiceNo` |
 | `ItemSKU` | STRING | SKU code |
+| `serial_no` | STRING | **Item's unique serial** — same serial from GRN through invoice. `COUNT(DISTINCT serial_no)` = correct qty |
 | `TotalPrice` | FLOAT | Line total |
 | `SellingPrice` | FLOAT | Per-unit price |
 | `Discount` | FLOAT | Discount applied |
 | `FacilityCode` | STRING | FC that fulfilled |
-| `line_status` | STRING | INVOICED, CANCELLED, etc. |
-| `good_qty` | INTEGER | Units invoiced |
+| `line_status` | STRING | INVOICED, CANCELLED — cross-check with `sale_order_line` too |
+| `good_qty` | INTEGER | **Do not use for qty** — use `COUNT(DISTINCT serial_no)` instead |
 | `CreatedOn` | TIMESTAMP | Invoice created time |
 | `updated_on` | TIMESTAMP | Last update |
-| `is_return` | INTEGER | 1 = this is a return credit note |
+| `is_return` | INTEGER | 1 = return credit note |
 | `return_no` | STRING | Return reference |
 | `ShippingCharges` | FLOAT | Shipping charged |
 | `CashOnDeliveryCharges` | FLOAT | COD charges |
@@ -182,23 +209,60 @@ One row per SKU per order.
 | `sgst_amt` / `cgst_amt` / `igst_amt` | FLOAT | Tax amounts |
 | `gross_amount` | FLOAT | Total incl. tax |
 | `tcs_amount` | FLOAT | TCS |
-| `expiry_date` | DATE | Batch expiry date |
+| `expiry_date` | DATE | Batch expiry |
 | `vendor_lot_no` | STRING | Vendor lot/batch |
 
+#### `invoice_header` — Invoice Header (Status & Dispatch)
+One row per `InvoiceNo` — header metadata. Join to `invoiced_report` on `InvoiceNo` for channel, dispatch time, status.
+
+**Has duplicates** — same invoice at different states over time (unlike `invoiced_report` where duplicates are same-serial-across-invoices). Always take the latest:
 ```sql
--- FC-fulfilled GMV by facility (use invoiced_report, NOT for DVS)
+WITH ih AS (
+  SELECT * FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY InvoiceNo ORDER BY UpdatedOn DESC) AS rn
+    FROM `agrostar-data.pristine_wms_views.invoice_header`
+  ) WHERE rn = 1
+)
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `InvoiceNo` | STRING | Joins to `invoiced_report.InvoiceNo` |
+| `invoice_status` | STRING | Current invoice status |
+| `Channel` | STRING | B2B or B2C — get channel from here |
+| `DispatchedOn` | TIMESTAMP | When dispatched from FC |
+| `UpdatedOn` | TIMESTAMP | Last status update — use DESC for dedup |
+
+```sql
+-- FC-fulfilled GMV: correct dedup + serial count + double cancel + channel
+WITH ir AS (
+  SELECT * FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY CONCAT(DisplayOrderCode, serial_no)) AS rn
+    FROM `agrostar-data.pristine_wms_views.invoiced_report`
+  ) WHERE rn = 1
+),
+ih AS (
+  SELECT * FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY InvoiceNo ORDER BY UpdatedOn DESC) AS rn
+    FROM `agrostar-data.pristine_wms_views.invoice_header`
+  ) WHERE rn = 1
+)
 SELECT
-  FacilityCode,
-  DATE_TRUNC(DATE(CreatedOn), MONTH) AS month,
-  COUNT(DISTINCT DisplayOrderCode) AS orders,
-  SUM(good_qty) AS units,
-  ROUND(SUM(TotalPrice), 2) AS invoiced_gmv
-FROM `agrostar-data.pristine_wms_views.invoiced_report`
-WHERE DATE(CreatedOn) BETWEEN @start_date AND @end_date
-  AND is_return = 0
-  AND line_status NOT IN ('CANCELLED')
-GROUP BY 1, 2
-ORDER BY 2, invoiced_gmv DESC
+  ir.FacilityCode,
+  ih.Channel,
+  DATE_TRUNC(DATE(ir.CreatedOn), MONTH)  AS month,
+  COUNT(DISTINCT ir.DisplayOrderCode)    AS orders,
+  COUNT(DISTINCT ir.serial_no)           AS units,
+  ROUND(SUM(ir.TotalPrice), 2)           AS invoiced_gmv
+FROM ir
+JOIN ih ON ih.InvoiceNo = ir.InvoiceNo
+JOIN `agrostar-data.pristine_wms_views.sale_order_line` sol ON sol.invoice_no = ir.InvoiceNo
+WHERE DATE(ir.CreatedOn) BETWEEN @start_date AND @end_date
+  AND ir.is_return = 0
+  AND ir.line_status  NOT IN ('CANCELLED')
+  AND sol.line_status NOT IN ('CANCELLED')
+GROUP BY 1, 2, 3
+ORDER BY 3, invoiced_gmv DESC
 ```
 
 ---
@@ -991,6 +1055,10 @@ ORDER BY available_qty DESC
 24. **`sale_order_log`** tracks reservation events for both sale orders and transfer orders. Filter `document_Action = 'Reserved'` + `MAX(created_on)` per order to get when inventory was ring-fenced.
 25. **`pick_line` has `consolidation_date`** — the step after picking where items are packed/boxed before dispatch. Separate from `picked_date`. Use `MIN/MAX` across pick_no for consolidation window.
 26. **Transfer TAT has 9 stages** spanning 5 tables: `transfer_header` → `sale_order_log` → `pick_line` → `invoice_transfer_header` → `return_grn_header`. Never compute transfer TAT from a single table.
+27. **`invoiced_report` dedup = same serial across multiple invoices of same order** (not identical pipeline rows). One order → multiple invoices (shipments). Same serial can appear in multiple invoices. `PARTITION BY CONCAT(DisplayOrderCode, serial_no)` with no ORDER BY collapses to one occurrence per serial per order.
+28. **`invoice_header` dedup = same invoice at different time states.** `PARTITION BY InvoiceNo ORDER BY UpdatedOn DESC` — take latest. Different reason from `invoiced_report` dedup — don't confuse the two patterns.
+29. **`invoiced_report.good_qty` is unreliable for qty.** Always use `COUNT(DISTINCT serial_no)` as the correct unit count.
+30. **`invoiced_report` serial_no = same serial from GRN → pick → invoice.** One physical unit traceable end-to-end across all three stages.
 
 ---
 
