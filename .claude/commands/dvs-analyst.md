@@ -555,6 +555,50 @@ Has failure log?
 
 ---
 
+#### OCP Restock Failure → Payment Behaviour (Validated Hypothesis)
+
+**Business hypothesis:** "When restock fails due to OCP, partners realise the business loss and pay within 1–2 days."
+
+**Validated finding (Feb–May 2026 data):**
+- Only **20.5% of OCP failure events** result in a payment within 2 days — hypothesis is partially true but significantly overstated
+- When payment does happen, it's fast: **median D+1, avg 0.95 days** — the urgency is real for those who act
+- **₹2.43 Cr collected** in 3 months purely triggered by OCP restock failure events (zero active intervention)
+- April OCP failures exploded 3.8x vs March (2,441 vs 646) — credit health deteriorating at start of FY27
+- Payment response rate declining: Mar 24.6% → Apr 19.4% → May 20.4%
+
+**Partner behaviour segments (across full period):**
+
+| Segment | Partners | Avg OCP Events | Response Rate | Amount Collected | Avg per Event |
+|---|---|---|---|---|---|
+| Always Pays | 27 | 3.0 | 100% | ₹49.24L | ₹54,715 |
+| Usually Pays | 69 | 5.4 | 60.8% | ₹73.02L | ₹35,304 |
+| One-time (paid) | 46 | 1.0 | 100% | ₹15.58L | ₹33,871 |
+| Rarely Pays | 135 | 13.1 | 23.4% | ₹1.06Cr | ₹31,078 |
+| Never Pays | 156 | 7.9 | 0% | ₹0 | — |
+
+**Key insight by segment:**
+- **Always Pays (27 partners):** Conditioned to respond. Avg ticket rising month-on-month (₹49K → ₹64K → ₹67K). Protect their credit health.
+- **Usually Pays (69 partners):** Highest ROI intervention target — call on days they don't pay to push toward 100%.
+- **Rarely Pays (135 partners):** Contribute most absolute collections (₹1.06Cr) but only 23% response rate. High-touch outreach on OCP failure day can unlock ~₹1.6Cr additional collections.
+- **Never Pays (156 partners):** OCP pain signal has no effect. Escalate to credit review — CL reduction or advance payment mandate needed.
+
+**How to validate OCP → payment hypothesis for any period:**
+```sql
+-- Join chain: auto_restock_logs.farmer_id → csr_farmer.farmer_id → csr_farmer.user_id
+--             → wallet_creditwallettransaction.wallet_user_id (reason_id=4, transaction_type=1, cancelled=0)
+-- For each OCP failure event: check if payment exists within DATE(failure) to DATE(failure) + 2 days
+-- Segment partners by: times_paid / total_ocp_events across the period
+```
+
+**17 partners moved Rarely Pays (March) → Never Pays (April) — the most urgent cohort:**
+These partners proved they can pay (paid in March) but went silent in April. Top priority for direct outreach:
+- SHUBHANGI KRUSHI KENDRA, Buldhana MH — paid ₹1.25L in March, 18 April OCP events, silent
+- J P AGRO SALES SAMRAU, Jodhpur RJ — paid ₹3.9L in March, highest value recovery opportunity
+- mongali krashi sewa kendra, Seoni MP — 63% response in March, 8 April events, silent
+- SHIV SHAKTI KRISHI SEWA KENDRA, Raisen MP — 71% response in March, 6 April events, silent
+
+---
+
 ### 8. LMD Reconciliation — Has the LMD partner paid back?
 - After delivery, LMD must remit the collected amount back to Agrostar
 - **Table:** `delivery_shippingpackage.reconciliation_status`
