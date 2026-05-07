@@ -467,7 +467,95 @@ ORDER BY rto_rate_pct DESC
 
 ---
 
-### 7. LMD Reconciliation — Has the LMD partner paid back?
+### 7. Restock — Did the system send inventory to the store?
+
+When a store marks an order `ON_HOLD` (no inventory), an auto-restock system attempts to place a B2B replenishment order to the store **once per day**.
+
+#### Auto-Restock Logs
+- **Table:** `prod_db_views.auto_restock_logs`
+- **Purpose:** Records every **failed** auto-restock attempt. No entry = either succeeded or was never triggered.
+- **Join:** `auto_restock_logs.farmer_id` (INT64) = `CAST(retail_store_code AS INT64)`
+
+| Column | Notes |
+|---|---|
+| `obj_id` | PK |
+| `farmer_id` | Retail store code (INT64) — store that needs restocking |
+| `cart_id` | Restock order cart — multiple cart_ids per store per day = multiple attempts |
+| `status` | Always `FAILED` — only failures are logged |
+| `reason` | Human-readable failure description |
+| `error_codes` | Comma-separated codes in `[CC17, FC19]` format — **must strip brackets before splitting** |
+| `products_sku_code` | SKU being restocked |
+| `products_qty` | Quantity attempted |
+| `created_at` | Timestamp of the attempt |
+
+**Key behaviours:**
+- System runs **once per day** per store
+- Multiple rows per store per day — one per SKU
+- Only FAILED attempts are logged — absence of a log does NOT mean restock was never tried
+- To check if restock succeeded: absence of failure log + B2B order placed after ON_HOLD date = restock succeeded
+- To check if truly never triggered: absence of failure log + no B2B order placed = never triggered
+
+#### Error Code Buckets (apply by priority — take highest-priority code when multiple exist)
+
+| Priority | Error Code | Bucket | Owner |
+|---|---|---|---|
+| 1 | CC22 | OCP | Credit/OCP team |
+| 2 | CC15 | OCP | Credit/OCP team |
+| 3 | CC16 | OCP | Credit/OCP team |
+| 4 | CC20 | OCP | Credit/OCP team |
+| 5 | CC21 | OCP | Credit/OCP team |
+| 6 | CC17 | Low Credit Limit | Finance |
+| 7 | CC13 | Max Placement Exceeded | Ops |
+| 8 | FC19 | Inventory Threshold | Supply/Procurement |
+| 9 | FC08 | UF Threshold | Catalog |
+| — | All others | Others | Investigate |
+
+**How to extract primary error code per store per day:**
+```sql
+-- Explode error_codes, assign priority, pick highest per farmer per day
+WITH exploded AS (
+  SELECT
+    farmer_id,
+    DATE(created_at) AS log_date,
+    TRIM(REGEXP_REPLACE(ec, r'[\[\] ]', '')) AS error_code
+  FROM `agrostar-data.prod_db_views.auto_restock_logs`
+  CROSS JOIN UNNEST(SPLIT(REGEXP_REPLACE(error_codes, r'[\[\] ]', ''), ',')) AS ec
+  WHERE DATE(created_at) BETWEEN @start_date AND @end_date
+    AND error_codes IS NOT NULL AND error_codes != '[]'
+    AND TRIM(REGEXP_REPLACE(ec, r'[\[\] ]', '')) != ''
+),
+prioritized AS (
+  SELECT farmer_id, log_date, error_code,
+    CASE error_code
+      WHEN 'CC22' THEN 1 WHEN 'CC15' THEN 2 WHEN 'CC16' THEN 3
+      WHEN 'CC20' THEN 4 WHEN 'CC21' THEN 5 WHEN 'CC17' THEN 6
+      WHEN 'CC13' THEN 7 WHEN 'FC19' THEN 8 WHEN 'FC08' THEN 9
+      ELSE 10
+    END AS priority
+  FROM exploded
+)
+SELECT
+  farmer_id,
+  log_date,
+  ARRAY_AGG(error_code ORDER BY priority ASC LIMIT 1)[OFFSET(0)] AS primary_error_code
+FROM prioritized
+GROUP BY farmer_id, log_date
+```
+
+#### Restock Root Cause Classification (for stuck ON_HOLD orders)
+To correctly classify why a stuck order hasn't been restocked:
+
+```
+Has failure log?
+  YES → bucket by primary error code (OCP / Credit / Threshold etc.)
+  NO  → Did a B2B order get placed for this store after ON_HOLD date?
+          YES → Restock Succeeded — store received inventory but hasn't packed yet → Ground Ops to call store
+          NO  → Never Triggered — system didn't fire → manual B2B intervention needed
+```
+
+---
+
+### 8. LMD Reconciliation — Has the LMD partner paid back?
 - After delivery, LMD must remit the collected amount back to Agrostar
 - **Table:** `delivery_shippingpackage.reconciliation_status`
 - **SLA:** Reconciliation expected same day or next day after delivery
@@ -596,6 +684,10 @@ These were discovered through live testing — not in any schema documentation:
 | `invoiced_report` does NOT contain store orders | `pristine_wms_views.invoiced_report` only has FC-fulfilled orders. For store-fulfilled (DVS) GMV, always use `SUM(order_management_orderitem.total_price)`. Using `invoiced_report` for "total B2C sales" silently drops all DVS revenue. |
 | Status exclusions — use exact values, not REGEXP | Correct exclusions: `unicommerce_status NOT IN ('FUTURE ORDER','CANCELLED','DISPUTED_ADDRESS')`, `status NOT IN ('MOB_APP_UNVERIFIED')`, `status/unicommerce_status NOT LIKE 'edited%'`. Do not use REGEXP_CONTAINS — it is approximate and may over-filter. |
 | `initiating_source` case sensitivity | Always use `LOWER(initiating_source) NOT LIKE 'b2b%'` — the field value casing is inconsistent in the database. |
+| `auto_restock_logs` only records failures | Absence of a log for a store does NOT mean restock was never attempted. Must cross-check with B2B orders to distinguish "succeeded" from "never triggered". |
+| `auto_restock_logs.error_codes` format | Field is stored as `[CC17, FC19]` — must strip brackets and spaces with `REGEXP_REPLACE(error_codes, r'[\[\] ]', '')` before splitting on `,`. |
+| `PENDING` status in orderhistorymeta | Intermediate status between order assignment and first action. Source = `USER_ACTION`, updated_by = `PARTNER`. Means store has seen the order but not yet acted. Not previously documented in schema. |
+| `order_management_ordermetadata` timestamps | `order_delivery_date`, `ready_to_ship_time`, `order_cut_off_time` are Unix milliseconds — convert with `TIMESTAMP_MILLIS(field)`. Join: `ordermetadata.order_id` = `order_management_order.sales_order_id`. |
 
 ---
 
