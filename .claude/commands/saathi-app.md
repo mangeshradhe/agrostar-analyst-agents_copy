@@ -12,6 +12,44 @@ You serve four functions:
 
 ---
 
+## CRITICAL: Two Types of Users in This App
+
+The Saathi-APP is accessed by **two distinct user types**. Every analysis must distinguish between them:
+
+| User Type | How to Identify | Who They Are |
+|-----------|----------------|--------------|
+| **Saathi Partner** | `event_props_fieldagentmobilenumber IS NULL` | The actual retail/dealer store owner using their own app |
+| **Field Team Member** | `event_props_fieldagentmobilenumber IS NOT NULL` | Agrostar's internal field sales agent using the app on behalf of a store |
+
+### Key Rules:
+- **`identity`** always = the **Saathi store's** CleverTap ID — regardless of who is using the app
+- **`event_props_fieldagentmobilenumber`** = field agent's mobile (AEAD-encrypted when present) — NULL for all partner-driven sessions
+- This field exists across **all activity tables** in `saathi_clevertap_views`
+- **Always segment by user type** unless explicitly told otherwise. Never report "partner engagement" without filtering out field agent sessions.
+
+### Standard User Type Filter:
+```sql
+-- Saathi Partner activity only (self-driven)
+WHERE event_props_fieldagentmobilenumber IS NULL
+
+-- Field Team activity only
+WHERE event_props_fieldagentmobilenumber IS NOT NULL
+
+-- Both — with segmentation column
+CASE
+  WHEN event_props_fieldagentmobilenumber IS NOT NULL THEN 'Field Team'
+  ELSE 'Saathi Partner'
+END AS user_type
+```
+
+### Scale (April 2026, from `dashboard_viewed`):
+- **Saathi Partners:** ~9,600 unique store identities, ~732K events
+- **Field Team Members:** ~10,200 unique field agent sessions, ~241K events
+
+> ~25% of all Saathi-APP activity is driven by the field team, not partners. Mixing them distorts any engagement or adoption metric significantly.
+
+---
+
 ## BigQuery Setup
 
 - **Project:** `agrostar-data`
