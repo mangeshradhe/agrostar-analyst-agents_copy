@@ -269,20 +269,69 @@ ORDER BY 2, units_picked DESC
 ### Inbound — GRN Flow
 
 **Operational GRN process (step by step):**
-1. Create GRN header (`grn_header`)
-2. Select the Purchase Order against which GRN is being done (`document_no` = PO number, `document_type` = PO)
-3. Select the item(s) to receive — creates `grn_line` rows
-4. Create serial numbers for each item received — creates `grn_line_serial` rows (one serial per physical unit)
-   - For items with lot tracking: serial is tagged with `vendor_lot_no` + `expiry_date`
+1. Create GRN header (`grn_header`) — truck arrives, `gate_entry` record created with `status = 'GRN START'`
+2. Select the Purchase Order against which GRN is being done (`document_no` = PO number, `document_type = 'Purchase Order'`)
+3. Select the item(s) to receive — creates `grn_line` rows (qty level) and `grn_line_distribution` rows (lot/expiry level)
+4. Create serial numbers for each item — creates `grn_line_serial` rows (one serial per physical unit)
+   - For items with lot tracking: serial tagged with `vendor_lot_no` + `expiry_date`
    - For items without lot/expiry: `vendor_lot_no` and `expiry_date` are NULL
 5. Complete the GRN (`is_done = 1` on `grn_header`)
 6. Create putaway (`putaway_header` + `putaway_lines`)
-7. Scan items into bins — staff scan individual serials or whole boxes (a box = multiple serials of same lot/expiry)
+7. Scan items into bins — staff scan individual serials or whole boxes (box = multiple serials of same lot/expiry)
 8. Complete putaway (`is_done = 1` on `putaway_header`) → stock lands in bin
 
-**Key distinction:** GRN captures what was received and how many. Putaway captures where each unit was physically placed in the warehouse. Both must be complete for stock to be available.
+**Key distinction:** GRN captures what was received and how many. Putaway captures where each unit was physically placed. Both must be complete for stock to be available.
 
-**Data flow:** `grn_header` → `grn_line` (qty level) → `grn_line_serial` (serial level) → `putaway_header` → `putaway_lines` (bin placement)
+**Data flow:** `gate_entry` → `grn_header` → `grn_line` (qty) + `grn_line_distribution` (lot/expiry) → `grn_line_serial` (serial) → `putaway_header` → `putaway_lines` (bin)
+
+---
+
+#### Inbound TAT — 4 Stages
+
+Every inbound operation has 4 measurable stages. Always use this framework for TAT analysis:
+
+| Stage | Formula | What it measures |
+|-------|---------|-----------------|
+| **Gate → GRN Start** | `grn_start - gate_entry_on` (hours) | How long truck waited before GRN was started |
+| **GRN Start → IQC Done** | `iqc_completed_on - grn_start` (hours) | Quality inspection time |
+| **IQC Done → Putaway Created** | `putaway_created - iqc_completed_on` (hours) | Lag before putaway is initiated |
+| **Putaway Created → Putaway Done** | `putaway_completed - putaway_created` (hours) | Actual putaway execution |
+
+**GRN Start = conditional anchor** — NOT raw `created_on`:
+```sql
+CASE WHEN gh.approve_reject_on IS NULL THEN gh.created_on ELSE gh.approve_reject_on END AS grn_start
+```
+If an approval step exists, work begins at `approve_reject_on`. Otherwise `created_on` is used. Always use this logic — raw `created_on` alone gives wrong TAT.
+
+**Gate entry timestamp:**
+```sql
+-- gate_entry table — filter status = 'GRN START' for the moment truck arrived
+SELECT gate_entry_no, created_on AS gate_entry_on
+FROM `agrostar-data.pristine_wms_views.gate_entry`
+WHERE status = 'GRN START'
+```
+
+**Putaway TAT — a GRN can have multiple putaway jobs:**
+```sql
+-- Always aggregate across all putaway headers for a GRN
+SELECT grn_no, MIN(created_on) AS putaway_created, MAX(completed_on) AS putaway_completed
+FROM `agrostar-data.pristine_wms_views.putaway_header`
+GROUP BY grn_no
+```
+
+---
+
+#### Pendency Classification (3-stage waterfall)
+
+```sql
+CASE
+  WHEN gh.completed_on IS NULL      THEN 'GRN Pending'
+  WHEN gh.iqc_completed_on IS NULL  THEN 'IQC Pending'
+  WHEN putaway_completed IS NULL    THEN 'Putaway Pending'
+  ELSE NULL  -- fully done
+END AS type_pendency
+```
+Evaluated in order — each stage implies the previous is complete. Always include pending GRNs in analysis (do NOT filter `is_done = 1` only) — this hides operational bottlenecks.
 
 #### `grn_header` — GRN Header
 | Field | Type | Notes |
@@ -291,8 +340,8 @@ ORDER BY 2, units_picked DESC
 | `gate_entry_no` | STRING | Gate entry reference |
 | `grn_status` | STRING | OPEN, COMPLETED, CANCELLED |
 | `iqc_status` | STRING | IQC (Inbound QC) status |
-| `document_no` | STRING | Purchase order / transfer reference |
-| `document_type` | STRING | PO, TRANSFER, etc. |
+| `document_no` | STRING | Purchase order reference |
+| `document_type` | STRING | Always `'Purchase Order'` for vendor GRNs (not 'PO') |
 | `vendor_no` | STRING | Vendor identifier |
 | `vendor_name` | STRING | Vendor display name |
 | `invoice_no` | STRING | Vendor invoice number |
@@ -300,13 +349,17 @@ ORDER BY 2, units_picked DESC
 | `location_code` | STRING | FC receiving the goods |
 | `created_by` | STRING | User who created GRN |
 | `created_on` | TIMESTAMP | GRN creation time |
+| `approve_reject_on` | TIMESTAMP | Time of approval/rejection — use as GRN start if not NULL |
 | `completed_on` | TIMESTAMP | GRN completion time |
+| `iqc_completed_on` | TIMESTAMP | IQC (Inbound QC) completion time |
 | `is_done` | INTEGER | 1 = GRN completed |
 | `total_grn_qty` | INTEGER | Total qty received |
 | `good_qty` | INTEGER | Good units received |
 | `bad_qty` | INTEGER | Damaged/bad units received |
 
-#### `grn_line` — GRN Lines
+#### `grn_line` — GRN Lines (qty level)
+Qty-level summary per item per GRN. Use for shortage analysis (invoiced vs physical qty).
+
 | Field | Type | Notes |
 |-------|------|-------|
 | `grn_no` | STRING | FK → `grn_header.grn_no` |
@@ -318,22 +371,32 @@ ORDER BY 2, units_picked DESC
 | `invoice_mrp` | FLOAT | MRP on invoice |
 | `grn_line_status` | STRING | Line status |
 
+#### `grn_line_distribution` — GRN Lines (lot/expiry level) ⭐ preferred for item analysis
+**More granular than `grn_line`** — one row per item per lot/expiry distribution within a GRN. This is the correct base table for item-level GRN analysis (quantity received, lot tracking, expiry). `grn_line` only gives qty totals; `grn_line_distribution` gives the lot/batch breakdown.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | INTEGER | Row identifier — use `DISTINCT(id)` to deduplicate |
+| `grn_no` | STRING | FK → `grn_header.grn_no` |
+| `item_no` | STRING | SKU received |
+| `vendor_lot_no` | STRING | Vendor lot/batch number — NULL for non-lot items |
+| `expiry_date` | DATE | Expiry date — NULL for non-expiry items |
+| `qty` | INTEGER | Qty received for this lot/expiry combination |
+
 ```sql
--- Vendor receiving performance: shortage rate by vendor
+-- Vendor receiving performance using grn_line_distribution (correct approach)
 SELECT
   gh.vendor_name,
   gh.location_code,
   COUNT(DISTINCT gh.grn_no) AS grn_count,
-  SUM(gl.invoiced_qty) AS invoiced_units,
-  SUM(gl.physical_qty) AS received_units,
-  SUM(gl.shortage_qty) AS shortage_units,
-  ROUND(100.0 * SUM(gl.shortage_qty) / NULLIF(SUM(gl.invoiced_qty), 0), 2) AS shortage_pct
-FROM `agrostar-data.pristine_wms_views.grn_header` gh
-JOIN `agrostar-data.pristine_wms_views.grn_line` gl ON gl.grn_no = gh.grn_no
+  SUM(gld.qty) AS received_units,
+  COUNTIF(gld.expiry_date IS NOT NULL) AS lot_tracked_lines,
+  COUNTIF(gld.expiry_date IS NULL) AS non_expiry_lines
+FROM `agrostar-data.pristine_wms_views.grn_line_distribution` gld
+JOIN `agrostar-data.pristine_wms_views.grn_header` gh ON gh.grn_no = gld.grn_no
 WHERE DATE(gh.created_on) BETWEEN @start_date AND @end_date
-  AND gh.grn_status = 'COMPLETED'
 GROUP BY 1, 2
-ORDER BY shortage_units DESC
+ORDER BY received_units DESC
 ```
 
 #### `putaway_header` — Putaway Header
@@ -664,22 +727,52 @@ WHERE DATE(soh.created_on) BETWEEN @start_date AND @end_date
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
 ```
 
-### 2. Inbound: GRN → Putaway TAT
+### 2. Inbound: Full 4-Stage TAT (Gate → GRN Start → IQC → Putaway)
 ```sql
--- Time from GRN completion to putaway completion (inbound speed)
+-- Full inbound TAT across all 4 stages including pendency classification
+WITH putaway_agg AS (
+  SELECT
+    grn_no,
+    MIN(created_on)   AS putaway_created,
+    MAX(completed_on) AS putaway_completed   -- MAX not single row — GRN can have multiple putaway jobs
+  FROM `agrostar-data.pristine_wms_views.putaway_header`
+  GROUP BY grn_no
+),
+gate AS (
+  SELECT gate_entry_no, created_on AS gate_entry_on
+  FROM `agrostar-data.pristine_wms_views.gate_entry`
+  WHERE status = 'GRN START'
+)
 SELECT
   gh.location_code,
   gh.vendor_name,
   gh.grn_no,
-  gh.completed_on AS grn_done,
-  ph.completed_on AS putaway_done,
-  TIMESTAMP_DIFF(ph.completed_on, gh.completed_on, HOUR) AS grn_to_putaway_hrs
+  -- Correct GRN start anchor
+  CASE WHEN gh.approve_reject_on IS NULL THEN gh.created_on ELSE gh.approve_reject_on END AS grn_start,
+  gh.iqc_completed_on,
+  pa.putaway_created,
+  pa.putaway_completed,
+  -- 4-stage TAT (hours)
+  DATETIME_DIFF(
+    CASE WHEN gh.approve_reject_on IS NULL THEN gh.created_on ELSE gh.approve_reject_on END,
+    gate.gate_entry_on, HOUR)                                              AS gate_to_grn_start_hrs,
+  DATETIME_DIFF(gh.iqc_completed_on,
+    CASE WHEN gh.approve_reject_on IS NULL THEN gh.created_on ELSE gh.approve_reject_on END,
+    HOUR)                                                                  AS grn_start_to_iqc_hrs,
+  DATETIME_DIFF(pa.putaway_created, gh.iqc_completed_on, HOUR)            AS iqc_to_putaway_start_hrs,
+  DATETIME_DIFF(pa.putaway_completed, pa.putaway_created, HOUR)           AS putaway_duration_hrs,
+  -- Pendency classification
+  CASE
+    WHEN gh.completed_on     IS NULL THEN 'GRN Pending'
+    WHEN gh.iqc_completed_on IS NULL THEN 'IQC Pending'
+    WHEN pa.putaway_completed IS NULL THEN 'Putaway Pending'
+    ELSE NULL
+  END AS type_pendency
 FROM `agrostar-data.pristine_wms_views.grn_header` gh
-JOIN `agrostar-data.pristine_wms_views.putaway_header` ph ON ph.grn_no = gh.grn_no
+LEFT JOIN gate        ON gate.gate_entry_no  = gh.gate_entry_no
+LEFT JOIN putaway_agg pa ON pa.grn_no        = gh.grn_no
 WHERE DATE(gh.created_on) BETWEEN @start_date AND @end_date
-  AND gh.is_done = 1
-  AND ph.is_done = 1
-ORDER BY grn_to_putaway_hrs DESC
+ORDER BY gh.created_on DESC
 ```
 
 ### 3. Pick Line → OQC (Outbound Quality)
@@ -733,6 +826,12 @@ ORDER BY available_qty DESC
 11. **VTO transfers ≠ FC-to-FC.** `transfer_no LIKE 'VTO%'` = manufacturer direct inbound. **Always exclude from FC-to-FC analysis by default** and notify the user. Only include if explicitly asked.
 12. **Serial number tracking.** Every item inwarded gets a unique serial number — one serial per physical unit. Use `grn_line_serial`, `item_serial_inventory`, `cycle_count_serial` for unit-level tracking. A **box** groups multiple serials of the same lot/expiry. Some items have no lot or expiry — `vendor_lot_no` and `expiry_date` will be NULL for those SKUs.
 13. **"Product group" = `sub_sub_product_group`.** Whenever a user says "product group" or "PG", they mean `item_mst.sub_sub_product_group` — NOT `item_mst.product_group`. Apply this translation automatically in every query.
+14. **`grn_line_distribution` not `grn_line` for item analysis.** `grn_line` = qty summary per item. `grn_line_distribution` = lot/expiry breakdown per item — use this as the base for any item-level GRN query. Always `SELECT DISTINCT(id)` to avoid duplicate rows.
+15. **`document_type` value is `'Purchase Order'`** (full string) — not `'PO'`. Filtering `= 'PO'` returns nothing.
+16. **GRN start ≠ `created_on`.** Always use `CASE WHEN approve_reject_on IS NULL THEN created_on ELSE approve_reject_on END` as the GRN start anchor for any TAT calculation.
+17. **Gate entry = `gate_entry` table with `status = 'GRN START'`** for the correct truck-arrival timestamp. Without this filter you get wrong timestamps.
+18. **Putaway TAT uses `MIN(created_on)` / `MAX(completed_on)`** across all putaway headers per GRN — a GRN can spawn multiple putaway jobs.
+19. **Do not filter `is_done = 1` only for GRN counts.** This hides pending GRNs and understates the true inbound picture. Include all statuses and use `type_pendency` classification to show what's still open.
 
 ---
 
