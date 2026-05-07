@@ -29,16 +29,50 @@ You answer questions about B2B partner collections, settlements, credit limit ch
 | `transaction_type` | INT64 | `0` = DEBIT, `1` = CREDIT |
 | `amount` | FLOAT64 | Transaction amount (₹) |
 | `reference_type` | STRING | Nature/channel of transaction |
+| `reference_sub_type` | STRING | More granular sub-classification. Key values: `RAZORPAY_QR_CODE` (QR payment), `PAY_BY_PRODUCT_GROUP` (Saathi App pay by product group). Use this for QR/PBP identification — more reliable than `description` parsing |
 | `reference_id` | STRING | External reference (order ID, payment ref, etc.) |
 | `created_on` | TIMESTAMP | When transaction was created |
 | `updated_on` | TIMESTAMP | Last update time |
 | `due_date` | TIMESTAMP | Payment due date — populated for ORDER debits (reason_id = 3) |
-| `description` | STRING | Free-text description |
+| `description` | STRING | Free-text description — use for payment mode classification when `reference_sub_type` is insufficient |
 | `cancelled` | INT64 | `1` = void/reversed. **Always filter `cancelled = 0`** |
+| `is_usable` | INT64 | `1` = credit has been unholded and applied. `0` = credit received but sitting on hold, waiting for manual settlement by a user. **For collection totals: do NOT filter on is_usable** (money is received regardless). For settlement/application analysis: filter `is_usable = 1` |
 | `reason_id` | INT64 | Granular reason code — join to `wallet_reason` for explanation |
 | `interest_amount` | FLOAT64 | Accrued interest on this debit — **not yet posted to ledger**. Populated on `transaction_type = 0` entries. Separate from posted interest (`reason_id = 10`). |
 | `transaction_committed_by_id` | INT64 | User who committed this entry |
 | `wallet_user_id` | INT64 | B2B partner's wallet user ID |
+
+---
+
+### `wallet_creditwallettransactionmetadata`
+
+Links credits to the user who unholded them. Critical for VAN payment identification.
+**One transaction can have multiple metadata rows** — always deduplicate with `DISTINCT` when joining.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `transaction_id` | INT64 | FK → `wallet_creditwallettransaction.id` |
+| `unhold_by` | STRING | ID (as string) of user who released/unholded this credit. `NULL` = not yet unholded. Cast to INT64 to join `auth_user` |
+
+**VAN identification via `unhold_by`:**
+```sql
+CASE
+  WHEN wmd.unhold_by IS NOT NULL
+   AND SAFE_CAST(wmd.unhold_by AS STRING) NOT IN ('537940')
+  THEN 'VAN'
+  ELSE 'Other'
+END AS payment_channel
+```
+`537940` = system auto-process user (permanent constant). If a real human unholded → VAN payment. If system/NULL → auto-processed payment (RazorPay, QR, etc.).
+
+---
+
+### `auth_user`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INT64 | Auth user ID — join: `user.id = SAFE_CAST(wmd.unhold_by AS INT64)` |
+| `username` | STRING | Username of the person who unholded |
 
 ---
 
@@ -161,14 +195,24 @@ WHERE reason_id = 4          -- Payment
   AND cancelled = 0
 ```
 
-**Payment mode breakdown:**
+**Payment mode breakdown (apply in priority order — first match wins):**
 
-| Mode | Filter |
-|------|--------|
-| VAN Account | `reference_type IN ('VAN', 'FINBOXVANPAYMENT')` |
-| Saathi App (regular) | `reference_type = 'RAZORPAYPAYMENT_APP' AND LOWER(description) NOT LIKE '%qr code%'` |
-| Saathi QR Code | `reference_type = 'RAZORPAYPAYMENT_APP' AND LOWER(description) LIKE '%qr code%'` |
-| Rupifi | `reference_type IN ('RUPIFI_PAYMENT_APP', 'RUPIFI_PAYMENT_APP1')` |
+| Mode | Filter | Source |
+|------|--------|--------|
+| QR Code Payment | `reference_sub_type = 'RAZORPAY_QR_CODE'` | `reference_sub_type` — most reliable |
+| SAPP Pay By Product Group | `reference_sub_type = 'PAY_BY_PRODUCT_GROUP'` | `reference_sub_type` — most reliable |
+| VAN | `wmd.unhold_by IS NOT NULL AND wmd.unhold_by NOT IN ('537940')` | JOIN `wallet_creditwallettransactionmetadata` — real human unholded = VAN |
+| SAPP Order Level | `description LIKE 'Payment received from the user through Saathi App for order ID%'` | `description` pattern |
+| Alternate Bank (NEFT) | `LOWER(description) LIKE '%neft%'` | `description` pattern |
+| RazorPay / Saathi App | `LOWER(description) LIKE '%razor%' OR LOWER(description) LIKE '%saathi app%'` | `description` pattern |
+| Manual / Other | everything else | fallback |
+
+**Key rules:**
+- `reference_sub_type` takes priority over `description` patterns — check it first
+- VAN requires joining `wallet_creditwallettransactionmetadata` on `transaction_id` — a real human (unhold_by ≠ NULL and ≠ '537940') released the credit manually
+- `537940` = permanent constant for the system auto-process user. If unhold_by = '537940' or NULL → auto-processed, NOT VAN
+- `wallet_creditwallettransactionmetadata` has multiple rows per transaction — always `DISTINCT` when joining
+- For collection totals, do NOT filter on `is_usable` — all received payments count regardless of hold status
 
 ---
 
@@ -380,19 +424,71 @@ ORDER BY od.order_fy
 
 ### Collections — today / this month / FY27 / FY26
 
+Payment mode classification requires joining `wallet_creditwallettransactionmetadata` for VAN detection.
+
+```sql
+WITH base AS (
+  SELECT
+    t.id,
+    t.amount,
+    t.reference_sub_type,
+    t.description,
+    t.created_on,
+    wmd.unhold_by
+  FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` t
+  LEFT JOIN (
+    SELECT DISTINCT transaction_id, unhold_by
+    FROM `agrostar-data.prod_db_views.wallet_creditwallettransactionmetadata`
+  ) wmd ON wmd.transaction_id = t.id
+  WHERE t.reason_id = 4
+    AND t.transaction_type = 1
+    AND t.cancelled = 0
+    AND DATE(t.created_on) >= '2025-04-01'
+),
+classified AS (
+  SELECT
+    *,
+    CASE
+      WHEN DATE(created_on) = CURRENT_DATE()                                             THEN 'Today'
+      WHEN DATE(created_on) BETWEEN DATE_TRUNC(CURRENT_DATE(), MONTH) AND CURRENT_DATE() THEN 'This Month'
+      WHEN DATE(created_on) BETWEEN '2026-04-01' AND CURRENT_DATE()                      THEN 'FY27'
+      WHEN DATE(created_on) BETWEEN '2025-04-01' AND '2026-03-31'                        THEN 'FY26 (Last FY)'
+    END AS period,
+    CASE
+      WHEN reference_sub_type = 'RAZORPAY_QR_CODE'                                         THEN 'QR Code Payment'
+      WHEN reference_sub_type = 'PAY_BY_PRODUCT_GROUP'                                     THEN 'SAPP Pay By Product Group'
+      WHEN unhold_by IS NOT NULL AND unhold_by NOT IN ('537940')                           THEN 'VAN'
+      WHEN description LIKE 'Payment received from the user through Saathi App for order ID%' THEN 'SAPP Order Level'
+      WHEN LOWER(description) LIKE '%neft%'                                                THEN 'Alternate Bank'
+      WHEN LOWER(description) LIKE '%razor%' OR LOWER(description) LIKE '%saathi app%'    THEN 'RazorPay / Saathi App'
+      ELSE 'Manual / Other'
+    END AS payment_mode
+  FROM base
+)
+SELECT
+  period,
+  payment_mode,
+  COUNT(*) AS transaction_count,
+  ROUND(SUM(amount), 2) AS collection_amount
+FROM classified
+WHERE period IS NOT NULL
+GROUP BY 1, 2
+ORDER BY
+  CASE period WHEN 'Today' THEN 1 WHEN 'This Month' THEN 2 WHEN 'FY27' THEN 3 ELSE 4 END,
+  collection_amount DESC
+```
+
+**For a simple total-only view (no mode breakdown):**
 ```sql
 SELECT
   CASE
-    WHEN DATE(created_on) = CURRENT_DATE()                              THEN 'Today'
+    WHEN DATE(created_on) = CURRENT_DATE()                                             THEN 'Today'
     WHEN DATE(created_on) BETWEEN DATE_TRUNC(CURRENT_DATE(), MONTH) AND CURRENT_DATE() THEN 'This Month'
-    WHEN DATE(created_on) BETWEEN '2026-04-01' AND CURRENT_DATE()       THEN 'FY27'
-    WHEN DATE(created_on) BETWEEN '2025-04-01' AND '2026-03-31'         THEN 'FY26 (Last FY)'
+    WHEN DATE(created_on) BETWEEN '2026-04-01' AND CURRENT_DATE()                      THEN 'FY27'
+    WHEN DATE(created_on) BETWEEN '2025-04-01' AND '2026-03-31'                        THEN 'FY26 (Last FY)'
   END AS period,
-  ROUND(SUM(CASE WHEN reference_type IN ('VAN','FINBOXVANPAYMENT') THEN amount ELSE 0 END), 2) AS van_collection,
-  ROUND(SUM(CASE WHEN reference_type = 'RAZORPAYPAYMENT_APP' AND LOWER(description) LIKE '%qr code%' THEN amount ELSE 0 END), 2) AS qr_collection,
-  ROUND(SUM(CASE WHEN reference_type = 'RAZORPAYPAYMENT_APP' AND LOWER(description) NOT LIKE '%qr code%' THEN amount ELSE 0 END), 2) AS saathi_app_collection,
-  ROUND(SUM(CASE WHEN reference_type IN ('RUPIFI_PAYMENT_APP','RUPIFI_PAYMENT_APP1') THEN amount ELSE 0 END), 2) AS rupifi_collection,
-  ROUND(SUM(amount), 2) AS total_collection
+  ROUND(SUM(amount), 2) AS total_collection,
+  COUNT(*) AS transaction_count
 FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction`
 WHERE reason_id = 4
   AND transaction_type = 1
@@ -426,13 +522,19 @@ ORDER BY 1
 0. **`wallet_user_id` ≠ `farmer_id`** — always JOIN `csr_farmer ON cf.user_id = t.wallet_user_id` to get `farmer_id` before joining any other table. Directly using `wallet_user_id` as `farmer_id` or `retail_store_code` will return wrong or empty results.
 1. **`cancelled = 0` on both tables, always.** `cancelled = 1` = void. Never include in any metric.
 2. **`reason_id = 2` = CL change — always exclude from collections and settlement queries.** These are limit adjustments, not cash flows.
-3. **Collections filter is `reason_id = 4`**, not reference_type. All payment types (VAN, Saathi App, QR, Rupifi) share `reason_id = 4`.
+3. **Collections filter is `reason_id = 4`**, not reference_type. All payment types (VAN, Saathi App, QR, etc.) share `reason_id = 4`.
 4. **Settlement is at reconciliation-record level**, not at debit level. A single ₹100 debit may have 3 reconciliation records settling it across different days and by different credit types.
 5. **WCP/OCP is per reconciliation record.** A single debit can be partly WCP and partly OCP depending on when each settlement arrived vs `due_date`.
 6. **Partial settlement** = `SUM(r.amount WHERE reconciled_for_id = debit.id)` < `debit.amount`. Always check reconciliation — don't assume uncancelled debits are outstanding without verifying.
 7. **`interest_amount` column** exists on `transaction_type = 0` rows but is NOT visible in INFORMATION_SCHEMA (it's in the underlying table, not the view definition) — always query it directly. This is accrued interest not yet posted. **Posted interest** = separate `reason_id = 10` transaction entries.
 8. **`due_date` NULL** = some debits (non-order entries) don't carry a due date. Handle NULL before computing WCP/OCP.
 9. **reason code lookup** = `wallet_reason` table (`id` → `explanation`). Join as: `JOIN prod_db_views.wallet_reason wr ON wr.id = t.reason_id`.
+10. **Payment mode: use `reference_sub_type` first, NOT `description` parsing.** `reference_sub_type = 'RAZORPAY_QR_CODE'` and `'PAY_BY_PRODUCT_GROUP'` are more reliable than LIKE patterns on `description`. Always check `reference_sub_type` before falling back to `description`.
+11. **VAN identification requires a metadata join**, not `reference_type`. The old `reference_type IN ('VAN', 'FINBOXVANPAYMENT')` is stale. True VAN = credit where a real human unholded it: `wallet_creditwallettransactionmetadata.unhold_by IS NOT NULL AND unhold_by NOT IN ('537940')`.
+12. **`wallet_creditwallettransactionmetadata` has multiple rows per transaction** — always `DISTINCT` on `transaction_id` when joining, otherwise you will double-count collection amounts.
+13. **`is_usable` flag**: `0` = credit is on hold, waiting for manual settlement choice. `1` = credit has been unholded and applied. **For collection totals: do NOT filter on `is_usable`** — the money is received regardless of hold status. Filter `is_usable = 1` only for settlement/application analysis.
+14. **`537940` = permanent system auto-process user constant.** If `unhold_by = '537940'` or NULL → auto-processed (not VAN). If a real human ID → VAN payment. This constant does not change.
+15. **Payment mode classification priority order:** `reference_sub_type` → VAN metadata check → `description` LIKE patterns. Never use `reference_type` alone to classify payment modes.
 
 ---
 
