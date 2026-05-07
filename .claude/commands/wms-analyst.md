@@ -229,6 +229,8 @@ ORDER BY 2, invoiced_gmv DESC
 
 Always use the view `pick_line` to get complete picking history.
 
+**One row = one serial = one physical item.** Use `COUNT(serial)` to count items picked — not `SUM(qty_picked)`.
+
 | Field | Type | Notes |
 |-------|------|-------|
 | `pick_no` | STRING | FK → `pick_header.pick_no` |
@@ -237,31 +239,56 @@ Always use the view `pick_line` to get complete picking history.
 | `order_type` | STRING | B2B or B2C |
 | `bincode` | STRING | Bin picked from |
 | `pick_zone` | STRING | Zone |
-| `barcode` | STRING | Item barcode scanned |
+| `barcode` | STRING | Item barcode / SKU barcode |
+| `serial` | STRING | **Item's unique serial number** — one per row, one per physical unit |
+| `box_no` | STRING | **Box scan field** — populated if this serial was credited via box scan (not individual scan). One box scan creates multiple rows sharing the same `box_no`, one per serial inside. NULL = picker scanned individual serial directly |
 | `qty_ordered` | INTEGER | Quantity to pick |
 | `qty_picked` | INTEGER | Quantity actually picked |
 | `pick_status` | STRING | PENDING, PICKED, SHORT, CANCELLED |
-| `picked_date` | TIMESTAMP | When pick was completed |
+| `picked_date` | TIMESTAMP | When this serial was actually scanned — NULL until scanned. Use `MIN/MAX` across pick_no for first/last scan times |
 | `oqc_good_qty` | INTEGER | Outbound QC — good units |
 | `oqc_bad_qty` | INTEGER | Outbound QC — bad/rejected units |
 | `expiry_date` | DATE | Batch expiry |
 | `mrp` | FLOAT | MRP at time of pick |
 
+**Pick scanning modes:**
+
+| `box_no` | Scanning mode | Meaning |
+|----------|--------------|---------|
+| `NULL` | Individual serial scan | Picker scanned each item's serial barcode |
+| populated | Box scan | Picker scanned box barcode; system credited all serials inside that box |
+
+**Pick TAT — two distinct phases:**
+
+| Phase | Formula | What it measures |
+|-------|---------|-----------------|
+| **Start lag** | `MIN(picked_date) - ph.created_on` (minutes) | How long from job assigned to first scan — idle/travel time |
+| **Execution time** | `MAX(picked_date) - MIN(picked_date)` (minutes) | Actual picking speed from first to last scan |
+
 ```sql
--- Picker productivity: picks completed per user per day
+-- Picker productivity: correct serial-level count with both TAT phases
 SELECT
   ph.assign_user,
-  DATE(pl.picked_date) AS pick_date,
   ph.location_code,
-  COUNT(DISTINCT ph.pick_no) AS pick_jobs,
-  SUM(pl.qty_picked) AS units_picked,
-  COUNTIF(pl.pick_status = 'SHORT') AS short_picks
+  ph.work_type AS channel,
+  DATE(MIN(pl.picked_date)) AS pick_date,
+  COUNT(DISTINCT ph.pick_no)                                             AS pick_jobs,
+  COUNT(pl.serial)                                                       AS total_serials_picked,
+  COUNTIF(pl.box_no IS NOT NULL)                                         AS via_box_scan,
+  COUNTIF(pl.box_no IS NULL)                                             AS via_serial_scan,
+  ROUND(AVG(DATETIME_DIFF(pf.first_scan, ph.created_on, MINUTE)), 1)    AS avg_start_lag_mins,
+  ROUND(AVG(DATETIME_DIFF(pf.last_scan, pf.first_scan, MINUTE)), 1)     AS avg_execution_mins
 FROM `agrostar-data.pristine_wms_views.pick_line` pl
 JOIN `agrostar-data.pristine_wms_views.pick_header` ph ON ph.pick_no = pl.pick_no
+JOIN (
+  SELECT pick_no, MIN(picked_date) AS first_scan, MAX(picked_date) AS last_scan
+  FROM `agrostar-data.pristine_wms_views.pick_line`
+  GROUP BY pick_no
+) pf ON pf.pick_no = pl.pick_no
 WHERE DATE(pl.picked_date) BETWEEN @start_date AND @end_date
-  AND pl.pick_status IN ('PICKED', 'SHORT')
+  AND pl.pick_status = 'PICKED'
 GROUP BY 1, 2, 3
-ORDER BY 2, units_picked DESC
+ORDER BY total_serials_picked DESC
 ```
 
 ---
