@@ -641,6 +641,75 @@ ORDER BY unreconciled_orders DESC
 
 ---
 
+### 9. DVS Routing Logic Validation — Distance Cap + Fallback Go-Live Audit
+
+**Analysis name:** DVS Distance Logic Go-Live Audit
+**Purpose:** Validate that a routing logic change (e.g., distance cap change, fallback logic addition) is working correctly on go-live day.
+
+**Routing logic as of May 12, 2026:**
+- **Primary:** Route to DVS store if distance ≤ 50 KM (changed from ≤90 KM)
+- **Fallback:** If primary finds no store → check any store within ≤15 KM regardless of servingTaluka
+
+**How to identify fallback orders:**
+There is no dedicated tag in `PromisedTAT` for fallback. Proxy signal:
+- `fulfillment_type = STORE`
+- `taluka_check = TALUKA_MISMATCH` (farmer's taluka NOT in store's `servingTaluka`)
+- `distance_km ≤ 15`
+→ These are confirmed fallback captures
+
+**Key data caveats for this analysis:**
+1. `csr_shippingaddress.latitude/longitude` is **99.5% NULL** — never use it for distance calculation
+2. Use `static_tables.csr_villageaddress` (with `is_archived = 0`) for farmer lat/lon via village+district+taluka match
+3. `RADIANS()` is not available in BigQuery — use inline conversion: `x * 3.14159265358979 / 180`
+4. `LEAST(1.0, ...)` inside `ACOS()` is mandatory to guard against floating-point errors
+5. Exclude `order_type = 'OFFLINE-ORDER'` from B2C demand (distinct from CANCELLED/FUTURE ORDER exclusions)
+6. `csr_shippingaddress.village` is free-text typed by CSR — fuzzy matches will cause ~2% lat/lon lookup failures
+
+**B2C demand filter for this analysis (adds offline exclusion):**
+```sql
+WHERE DATE(o.created_on) = CURRENT_DATE('Asia/Kolkata')  -- or date range
+  AND LOWER(o.initiating_source) NOT LIKE 'b2b%'
+  AND o.unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+  AND o.status NOT IN ('MOB_APP_UNVERIFIED')
+  AND o.status NOT LIKE 'edited%'
+  AND o.unicommerce_status NOT LIKE 'edited%'
+  AND LOWER(COALESCE(o.order_type, '')) NOT LIKE '%offline%'  -- NEW: exclude OFFLINE-ORDER
+```
+
+**Farmer lat/lon lookup pattern (village master):**
+```sql
+village_latlon AS (
+  SELECT
+    LOWER(TRIM(village)) AS village,
+    LOWER(TRIM(district)) AS district,
+    LOWER(TRIM(taluka)) AS taluka,
+    AVG(latitude) AS lat,
+    AVG(longitude) AS lon
+  FROM `agrostar-data.static_tables.csr_villageaddress`
+  WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND is_archived = 0
+  GROUP BY 1, 2, 3
+)
+-- Join: LOWER(TRIM(sa.village)) = vl.village AND district AND taluka
+```
+
+**Haversine aerial distance (BigQuery-safe):**
+```sql
+ROUND(6371 * ACOS(LEAST(1.0,
+  COS(farmer_lat * 3.14159265358979 / 180) * COS(store_lat * 3.14159265358979 / 180) *
+  COS((store_lon - farmer_lon) * 3.14159265358979 / 180) +
+  SIN(farmer_lat * 3.14159265358979 / 180) * SIN(store_lat * 3.14159265358979 / 180)
+)), 2) AS distance_km
+```
+
+**Validated results (May 12, 2026 go-live):**
+- Total B2C demand: 1,418 orders
+- Store fulfilled: 977 (68.9%) | FC fulfilled: 441 (31.1%)
+- 0–15 KM store orders: 654 | 15–50 KM: 298 | **50–90 KM: 0 ✅ | >90 KM: 0 ✅**
+- Fallback fired (taluka mismatch + ≤15 KM): **75 orders confirmed**
+- No `no_distance` FC rejections yet — TAT records lag same-day; re-run end of day
+
+---
+
 ### 8. Store Ledger Settlement — Has the retail store been paid?
 After delivery + LMD reconciliation, Agrostar credits the retail store's ledger.
 
@@ -732,6 +801,9 @@ These were discovered through live testing — not in any schema documentation:
 | `auto_restock_logs.error_codes` format | Field is stored as `[CC17, FC19]` — must strip brackets and spaces with `REGEXP_REPLACE(error_codes, r'[\[\] ]', '')` before splitting on `,`. |
 | `PENDING` status in orderhistorymeta | Intermediate status between order assignment and first action. Source = `USER_ACTION`, updated_by = `PARTNER`. Means store has seen the order but not yet acted. Not previously documented in schema. |
 | `order_management_ordermetadata` timestamps | `order_delivery_date`, `ready_to_ship_time`, `order_cut_off_time` are Unix milliseconds — convert with `TIMESTAMP_MILLIS(field)`. Join: `ordermetadata.order_id` = `order_management_order.sales_order_id`. |
+| `csr_shippingaddress.latitude/longitude` is NULL | These fields are populated for only ~0.5% of records. Never use them for distance calculations. Use `static_tables.csr_villageaddress` (filtered `is_archived = 0`) joined on village + district + taluka to get farmer coordinates. |
+| `RADIANS()` not available in BigQuery | BigQuery does not expose the `RADIANS()` function. Use inline conversion: `x * 3.14159265358979 / 180`. Also wrap `ACOS()` with `LEAST(1.0, ...)` to guard floating-point errors. |
+| `order_type = 'OFFLINE-ORDER'` in B2C demand | `order_type` can be `'OFFLINE-ORDER'` for offline/saathi-side orders. These must be excluded from B2C demand analysis with `LOWER(COALESCE(order_type, '')) NOT LIKE '%offline%'` — they are not captured by the standard `initiating_source` B2B/B2C filter alone. |
 
 ---
 
