@@ -781,6 +781,191 @@ Focus on **Pickups + Delivery + Returns + Reconciliation**:
 
 ---
 
+## Section 10: FC Leakage Deep-Dive — Reason Taxonomy & Partner Funnel
+
+### `dvsResolutionReason` Raw Format
+
+The field format is `{resolution_part}:{geocoding_method}`. Examples:
+- `resolved-yes:latlong-village` → resolved yes, farmer geocoded via village lat/lon
+- `latlong-village:resolved_no_dehlivery` → geocoded via village, no LMD
+- `resolved-yes_nearest:latlong-village` → resolved via 15KM fallback (nearest), village geocoding
+- `:latlong-village` → engine geocoded OK but **resolution part is EMPTY** (see Coverage Gap below)
+- `latlong-village` → only geocoding tag, no resolution → same as above
+
+Geocoding method can also be `latlong-pincode` when village lat/lon not found and engine falls back to pincode.
+
+---
+
+### Full FC Leakage Reason Taxonomy
+
+When an order is FC-fulfilled, classify the reason by checking in this order:
+
+| Bucket | Detection logic | Business label | Owner |
+|---|---|---|---|
+| **Partner SLA Miss** | `reroutinglogs.reason_for_routing = 'Waiting for partner approval older than 24 hours'` AND `partner_id = this partner` | Store didn't act in 24hrs, pulled to FC | Ground Ops |
+| **Partner OCP Block** | `reroutinglogs.reason_for_routing LIKE '%OCP%'` AND `partner_id = this partner` | Store credit exhausted, can't receive order | Finance/Credit |
+| **Resolved Yes, Other Partner Missed** | `dvsResolutionReason LIKE '%resolved-yes%'` AND `rerouted_partner_id != this partner` | Different partner was assigned & missed | Ground Ops |
+| **No LMD** | `dvsResolutionReason LIKE '%no_dehlivery%'` | No LMD partner available in area | Central Ops |
+| **No License** | `dvsResolutionReason LIKE '%no_license%'` | Partner lacks required product license | Sales/Catalog |
+| **Distance Exceeded** | `dvsResolutionReason LIKE '%no_distance%'` | Farmer >50KM (primary) and >15KM (fallback) | Engineering/Policy |
+| **Taluka Mismatch** | `dvsResolutionReason LIKE '%no_taluka%'` | Farmer taluka not in any partner's serving list | Central Ops |
+| **Restricted SKU** | `dvsResolutionReason LIKE '%no_restrict%'` | SKU on DVS restricted list | Product/Catalog |
+| **Clearance SKU** | `dvsResolutionReason LIKE '%no_clear%'` | Clearance sale item — policy block | Product |
+| **Coverage Gap** | `dvsResolutionReason IN (':latlong-village','latlong-village',':latlong-pincode')` | Engine found coords but no partner match — split into two sub-types below | Central Ops / Sales |
+| **No TAT Record** | `dvsResolutionReason IS NULL` | Order never went through DVS routing engine | Product/Engineering |
+
+**Coverage Gap — two sub-types (check district-level partner count):**
+- **Coverage Gap (partner exists in district)** — 162 orders on May 12. Partners are in the district but their `servingTaluka` doesn't include the farmer's specific taluka. Fix: expand partner's territory config.
+- **No DVS Coverage (zero partners in district)** — 51 orders on May 12. Genuine white space — no active DVS partner onboarded. Action: new partner enrollment.
+
+**Validated split (May 12, 2026):**
+
+| Reason | Orders | % |
+|---|---|---|
+| Partner SLA Miss (>24 hrs no action) | 186 | 75% of resolved-yes FC |
+| OCP / Credit Block | 60 | 24% of resolved-yes FC |
+| Coverage Gap (partners exist, taluka unserved) | 162 | — |
+| No DVS Coverage (zero partners) | 51 | — |
+| No LMD | 113 | — |
+| No License | 48 | — |
+| Clearance / Restricted SKU | 38 | — |
+| Distance Exceeded | 23 | — |
+
+---
+
+### Restricted SKUs — What's Actually Blocked
+
+`fc_restricted_sku` = `dvsResolutionReason LIKE '%no_restricted_skus_for_dvs_resolution%'`
+
+Three types of SKUs are on the DVS restricted list (validated May 2026):
+
+| Type | Example SKUs | Why restricted |
+|---|---|---|
+| **Agrostar own-brand seeds** | AGS-S-2963 (Highrise Bajra), AGS-S-4135 (Ascent Bajra), AGS-S-4719 (Green Gram) | Largest volume (44 orders / ₹1.26L in 13 days). Policy: quality control & certified stock management |
+| **Welcome Kit / Advance** | AGS-AV-001 (AGRO+ ADVANCE WELCOME KIT) | Marketing/advance payment SKU — not a physical deliverable product. Correct to block. |
+| **Hardware & Organic Manure** | Tarpaulins, LED torches, bulk organic manure | Weight/bulk or non-agricultural category policy |
+
+**Note for analysts:** When a user asks why a high-demand order went to FC and restricted SKU is the reason, check if it's Agrostar's own-brand seed (AGS-S-XXXX). This is a policy decision — the business may want to revisit whether proprietary seeds can be fulfilled via DVS Saathi stores.
+
+---
+
+### Partner-Level Demand Funnel — Production Query
+
+Use this query to build a partner × serving_taluka funnel with GMV. One row per partner per serving taluka.
+
+**Key join logic:**
+- Match orders to partners: `farmer_taluka = serving_taluka` + `state match` (NOT district — partners can serve adjacent district talukas)
+- GMV: pre-aggregate `SUM(order_management_orderitem.total_price)` per order before joining
+- FC reason split: `rerouted_partner_id = CAST(partner_id AS STRING)` identifies orders where **this specific partner** was assigned and missed
+
+```sql
+WITH
+partners AS (
+  SELECT
+    reference_customer_id AS partner_id,
+    name AS partner_name,
+    address_state AS partner_state,
+    address_district AS partner_district,
+    address_taluka AS partner_taluka,
+    LOWER(TRIM(serving_part)) AS serving_taluka
+  FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
+    FROM `agrostar-data.galaxy_views.institution`
+    WHERE isDeliveryViaStoreEnabled = TRUE AND status = 'ACTIVE'
+      AND archive = FALSE AND LOWER(ancestor_institutions_name) LIKE '%sathi%'
+      AND servingTaluka IS NOT NULL AND TRIM(servingTaluka) != ''
+  )
+  CROSS JOIN UNNEST(SPLIT(LOWER(TRIM(servingTaluka)), ',')) AS serving_part
+  WHERE rn = 1 AND TRIM(serving_part) != ''
+),
+order_gmv AS (
+  SELECT order_id, ROUND(SUM(total_price), 0) AS gmv
+  FROM `agrostar-data.prod_db_views.order_management_orderitem`
+  GROUP BY order_id
+),
+b2c_orders AS (
+  SELECT
+    o.sales_order_id, o.cart_id,
+    TRIM(o.retail_store_code) AS retail_store_code,
+    LOWER(TRIM(a.taluka)) AS farmer_taluka,
+    LOWER(TRIM(a.state))  AS farmer_state,
+    COALESCE(g.gmv, 0)    AS order_gmv
+  FROM `agrostar-data.prod_db_views.order_management_order` o
+  JOIN `agrostar-data.prod_db_views.csr_shippingaddress` a ON a.id = o.shipping_address_id
+  LEFT JOIN order_gmv g ON g.order_id = o.sales_order_id
+  WHERE DATE(o.created_on) BETWEEN @start_date AND @end_date
+    AND LOWER(o.initiating_source) NOT LIKE 'b2b%'
+    AND o.unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS', 'ERROR')
+    AND o.status NOT IN ('MOB_APP_UNVERIFIED')
+    AND o.status NOT LIKE 'edited%' AND o.unicommerce_status NOT LIKE 'edited%'
+    AND LOWER(COALESCE(o.order_type, '')) NOT LIKE '%offline%'
+),
+tat AS (
+  SELECT cartId, dvsResolutionReason
+  FROM `agrostar-data.prod_db_views.PromisedTAT`
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY cartId ORDER BY createdOn DESC) = 1
+),
+reroute AS (
+  SELECT order_id, CAST(partner_id AS STRING) AS rerouted_partner_id, reason_for_routing
+  FROM `agrostar-data.prod_db_views.order_management_orderreroutinglogs`
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY id DESC) = 1
+),
+enriched AS (
+  SELECT
+    o.sales_order_id, o.retail_store_code, o.farmer_taluka, o.farmer_state, o.order_gmv,
+    o.cart_id, t.dvsResolutionReason, rr.rerouted_partner_id, rr.reason_for_routing,
+    CASE WHEN o.retail_store_code IS NULL OR o.retail_store_code = '' THEN 'FC' ELSE 'STORE' END AS fulfillment_type
+  FROM b2c_orders o
+  LEFT JOIN tat t ON t.cartId = o.cart_id
+  LEFT JOIN reroute rr ON rr.order_id = o.sales_order_id
+)
+SELECT
+  p.partner_id, p.partner_name, p.partner_state, p.partner_district, p.partner_taluka, p.serving_taluka,
+  -- Demand
+  COUNT(DISTINCT e.sales_order_id)                                                              AS total_demand_orders,
+  ROUND(SUM(e.order_gmv), 0)                                                                    AS total_demand_gmv,
+  -- Store fulfilled by THIS partner
+  COUNT(DISTINCT CASE WHEN e.retail_store_code = CAST(p.partner_id AS STRING)                  THEN e.sales_order_id END) AS store_fulfilled_orders,
+  ROUND(SUM(CASE WHEN e.retail_store_code = CAST(p.partner_id AS STRING)                       THEN e.order_gmv END), 0)  AS store_fulfilled_gmv,
+  -- Store fulfilled by another partner (same taluka)
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'STORE' AND e.retail_store_code != CAST(p.partner_id AS STRING) THEN e.sales_order_id END) AS other_partner_fulfilled_orders,
+  -- FC total
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC'                                            THEN e.sales_order_id END) AS fc_fulfilled_orders,
+  ROUND(SUM(CASE WHEN e.fulfillment_type = 'FC'                                                 THEN e.order_gmv END), 0)  AS fc_fulfilled_gmv,
+  -- FC reason breakdown
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC' AND e.rerouted_partner_id = CAST(p.partner_id AS STRING)
+    AND e.reason_for_routing = 'Waiting for partner approval older than 24 hours'              THEN e.sales_order_id END) AS fc_this_partner_sla_miss,
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC' AND e.rerouted_partner_id = CAST(p.partner_id AS STRING)
+    AND e.reason_for_routing LIKE '%OCP%'                                                      THEN e.sales_order_id END) AS fc_this_partner_ocp_block,
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC' AND e.dvsResolutionReason LIKE '%resolved-yes%'
+    AND (e.rerouted_partner_id IS NULL OR e.rerouted_partner_id != CAST(p.partner_id AS STRING)) THEN e.sales_order_id END) AS fc_resolved_yes_other_partner_missed,
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC' AND e.dvsResolutionReason LIKE '%no_dehlivery%'  THEN e.sales_order_id END) AS fc_no_lmd,
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC' AND e.dvsResolutionReason LIKE '%no_license%'    THEN e.sales_order_id END) AS fc_no_license,
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC' AND e.dvsResolutionReason LIKE '%no_distance%'   THEN e.sales_order_id END) AS fc_distance_exceeded,
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC' AND e.dvsResolutionReason LIKE '%no_restrict%'   THEN e.sales_order_id END) AS fc_restricted_sku,
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC' AND e.dvsResolutionReason LIKE '%no_clear%'      THEN e.sales_order_id END) AS fc_clearance_sku,
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC'
+    AND e.dvsResolutionReason IN (':latlong-village','latlong-village',':latlong-pincode')     THEN e.sales_order_id END) AS fc_coverage_gap,
+  COUNT(DISTINCT CASE WHEN e.fulfillment_type = 'FC' AND e.dvsResolutionReason IS NULL        THEN e.sales_order_id END) AS fc_no_tat_record
+FROM partners p
+JOIN enriched e
+  ON e.farmer_taluka = p.serving_taluka
+  AND LOWER(TRIM(e.farmer_state)) = LOWER(TRIM(p.partner_state))
+GROUP BY 1,2,3,4,5,6
+ORDER BY total_demand_gmv DESC
+```
+
+**Output schema (23 columns):**
+`partner_id | partner_name | partner_state | partner_district | partner_taluka | serving_taluka | total_demand_orders | total_demand_gmv | store_fulfilled_orders | store_fulfilled_gmv | other_partner_fulfilled_orders | fc_fulfilled_orders | fc_fulfilled_gmv | fc_this_partner_sla_miss | fc_this_partner_ocp_block | fc_resolved_yes_other_partner_missed | fc_no_lmd | fc_no_license | fc_distance_exceeded | fc_restricted_sku | fc_clearance_sku | fc_coverage_gap | fc_no_tat_record`
+
+**Important notes on output:**
+- `total_demand_orders/gmv` counts all B2C orders in that serving taluka — if multiple partners serve the same taluka, the same order appears in each partner's row (correct: each partner sees their full territory potential)
+- `store_fulfilled_orders` = only orders where `retail_store_code = this partner` — captures this partner's actual fulfillment
+- `other_partner_fulfilled_orders` = same taluka, different DVS partner fulfilled — shows competitive overlap
+- Scan cost: ~4 GB for a 2-week window. Use tight date ranges.
+
+---
+
 ## Known Data Caveats
 
 These were discovered through live testing — not in any schema documentation:
