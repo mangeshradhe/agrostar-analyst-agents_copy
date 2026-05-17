@@ -735,6 +735,137 @@ These were discovered through live testing — not in any schema documentation:
 
 ---
 
+## Order Lookup: FC vs DVS Fulfillment
+
+Given a **farmer mobile number** or **order ID**, identify fulfillment type, FC reason, or DVS partner.
+
+### Step 1 — Resolve input to order(s)
+
+**If mobile number given:** look up via `prod_db.order_management_order.notification_mobile` (unencrypted in prod_db, encrypted in prod_db_views — always use prod_db for mobile lookup):
+```sql
+SELECT sales_order_id, cart_id, created_on, status, unicommerce_status,
+  retail_store_code, grand_total, initiating_source
+FROM `agrostar-data.prod_db.order_management_order`
+WHERE notification_mobile = '<mobile>'
+  AND LOWER(initiating_source) NOT LIKE 'b2b%'
+  AND unicommerce_status NOT IN ('FUTURE ORDER','CANCELLED','DISPUTED_ADDRESS')
+  AND status NOT IN ('MOB_APP_UNVERIFIED')
+  AND status NOT LIKE 'edited%'
+  AND unicommerce_status NOT LIKE 'edited%'
+ORDER BY created_on DESC
+LIMIT 10
+```
+
+**If order ID given:** use directly — `WHERE sales_order_id = <id>` on `prod_db_views.order_management_order`.
+
+---
+
+### Step 2 — Determine fulfillment type
+
+```sql
+CASE
+  WHEN retail_store_code IS NULL OR retail_store_code = '' THEN 'FC'
+  ELSE 'DVS'
+END AS fulfillment_type
+```
+
+---
+
+### Step 3a — If FC: find DVS routing reason from PromisedTAT
+
+```sql
+SELECT
+  o.sales_order_id,
+  DATE(o.created_on) AS order_date,
+  o.status,
+  o.unicommerce_status,
+  o.grand_total,
+  'FC' AS fulfillment_type,
+  COALESCE(t.dvsResolutionReason, 'NO_TAT_RECORD') AS dvs_routing_reason,
+  t.shippingAddress_taluka,
+  t.shippingAddress_district,
+  t.shippingAddress_state,
+  r.partner_id AS rerouted_from_store,
+  r.reason_for_routing AS reroute_reason
+FROM `agrostar-data.prod_db_views.order_management_order` o
+LEFT JOIN (
+  SELECT cartId, dvsResolutionReason, shippingAddress_taluka,
+    shippingAddress_district, shippingAddress_state,
+    ROW_NUMBER() OVER (PARTITION BY cartId ORDER BY createdOn DESC) AS rn
+  FROM `agrostar-data.prod_db_views.PromisedTAT`
+) t ON t.cartId = o.cart_id AND t.rn = 1
+LEFT JOIN (
+  SELECT order_id, partner_id, reason_for_routing,
+    ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY id DESC) AS rn
+  FROM `agrostar-data.prod_db_views.order_management_orderreroutinglogs`
+) r ON r.order_id = o.sales_order_id AND r.rn = 1
+WHERE o.sales_order_id IN (<order_ids>)
+  AND (o.retail_store_code IS NULL OR o.retail_store_code = '')
+```
+
+**Decode `dvsResolutionReason`:**
+
+| Pattern in reason | Meaning |
+|---|---|
+| `resolved-yes` | System pushed to DVS but store re-routed to FC — check `rerouted_from_store` |
+| `resolved-no_restricted_skus_for_dvs_resolution` | SKUs in this order are flagged as DVS-ineligible |
+| `resolved-no_clearance_sales_applied` | Order contains clearance sale items |
+| `no_dehlivery` | No LMD partner available for this area |
+| `no_license` | No DVS partner with required product license |
+| `no_distance` | Farmer too far from nearest DVS store |
+| `no_taluka` | Farmer's taluka not in any partner's serving area |
+| `NO_TAT_RECORD` | Order bypassed DVS routing engine (CRM/support orders) — ~37% of B2C demand |
+
+---
+
+### Step 3b — If DVS: find fulfilling partner name
+
+```sql
+WITH store_info AS (
+  SELECT reference_customer_id, name AS store_name, partner_name,
+    address_state, address_district, address_taluka,
+    ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
+  FROM `agrostar-data.galaxy_views.institution`
+)
+SELECT
+  o.sales_order_id,
+  DATE(o.created_on) AS order_date,
+  o.status,
+  o.unicommerce_status,
+  o.retail_store_code,
+  s.store_name,
+  s.partner_name,
+  s.address_state,
+  s.address_district,
+  s.address_taluka,
+  o.grand_total
+FROM `agrostar-data.prod_db_views.order_management_order` o
+LEFT JOIN store_info s
+  ON CAST(o.retail_store_code AS INTEGER) = s.reference_customer_id AND s.rn = 1
+WHERE o.sales_order_id IN (<order_ids>)
+  AND o.retail_store_code IS NOT NULL AND o.retail_store_code != ''
+```
+
+---
+
+### Output format for order lookup
+
+Always present as a single table per order:
+
+| Field | Value |
+|---|---|
+| Order ID | `<id>` |
+| Date | `<date>` |
+| Status | `<status>` |
+| GMV | `₹<amount>` |
+| Fulfillment | FC / DVS |
+| Reason (if FC) | Decoded reason from table above |
+| Partner (if DVS) | Store name + partner name + taluka |
+
+Then a one-line "So what?" — is this expected behavior or worth escalating?
+
+---
+
 ## Response Format
 
 **Be concise. Every word should earn its place.**
