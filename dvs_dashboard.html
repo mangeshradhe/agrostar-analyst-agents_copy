@@ -293,6 +293,143 @@
     </div>
   </div>
 
+  <!-- DVS Order Status Breakdown -->
+  <div class="card">
+    <div class="section-header">
+      <div>
+        <div class="section-title">DVS Order Status Breakdown — Where are the 22,456 orders right now?</div>
+        <div class="section-sub">Every DVS order classified by its latest status · 01 Apr – 20 May 2026</div>
+      </div>
+    </div>
+
+    <!-- Summary stacked bar -->
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;gap:0;height:32px;border-radius:6px;overflow:hidden;width:100%;">
+        <div style="width:52.2%;background:#16a34a;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;">✅ Delivered 11,719</div>
+        <div style="width:15.2%;background:#dc2626;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;">❌ RTO 3,404</div>
+        <div style="width:2.1%;background:#f97316;"></div>
+        <div style="width:6.6%;background:#2563eb;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;">🚚 1,494</div>
+        <div style="width:8.4%;background:#d97706;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;">📦 1,885</div>
+        <div style="width:5.1%;background:#b45309;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;">⛔ 1,150</div>
+        <div style="width:7.9%;background:#ef4444;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;">⚠️ 1,780</div>
+        <div style="width:3.1%;background:#94a3b8;"></div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:10.5px;">
+        <span><span style="display:inline-block;width:10px;height:10px;background:#16a34a;border-radius:2px;margin-right:4px;"></span>Delivered</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#dc2626;border-radius:2px;margin-right:4px;"></span>Returned (RTO)</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:2px;margin-right:4px;"></span>Return in Transit</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:2px;margin-right:4px;"></span>Picked — In Transit</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#d97706;border-radius:2px;margin-right:4px;"></span>Packed — Awaiting Pickup</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#b45309;border-radius:2px;margin-right:4px;"></span>Hold by LMD</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:4px;"></span>On Hold (No Inventory)</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#94a3b8;border-radius:2px;margin-right:4px;"></span>Pending 1st Action / Cancelled</span>
+      </div>
+    </div>
+
+    <!-- State-wise table -->
+    <table>
+      <thead>
+        <tr>
+          <th>State</th>
+          <th>DVS Orders</th>
+          <th style="color:#16a34a;">✅ Delivered</th>
+          <th style="color:#dc2626;">❌ Returned (RTO)</th>
+          <th style="color:#f97316;">↩ Return in Transit</th>
+          <th style="color:#2563eb;">🚚 Picked (In Transit)</th>
+          <th style="color:#d97706;">📦 Packed (Awaiting Pickup)</th>
+          <th style="color:#b45309;">⛔ Hold by LMD</th>
+          <th style="color:#ef4444;">⚠️ On Hold (No Stock)</th>
+          <th style="color:#94a3b8;">⏳ Pending 1st Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-state="Maharashtra">
+          <td>Maharashtra</td>
+          <td style="text-align:center;font-weight:700;">6,383 + 32</td>
+          <td style="text-align:center;"><span class="badge badge-green">2,618 (41.0%)</span></td>
+          <td style="text-align:center;"><span class="badge badge-red">1,108 (17.3%)</span></td>
+          <td style="text-align:center;">191</td>
+          <td style="text-align:center;">349</td>
+          <td style="text-align:center;"><span class="badge badge-amber">507</span></td>
+          <td style="text-align:center;"><span class="badge badge-red">342</span></td>
+          <td style="text-align:center;"><span class="badge badge-red">921</span></td>
+          <td style="text-align:center;">378</td>
+        </tr>
+        <tr data-state="Gujarat">
+          <td>Gujarat</td>
+          <td style="text-align:center;font-weight:700;">6,218</td>
+          <td style="text-align:center;"><span class="badge badge-green">3,680 (59.2%)</span></td>
+          <td style="text-align:center;"><span class="badge badge-amber">924 (14.9%)</span></td>
+          <td style="text-align:center;">179</td>
+          <td style="text-align:center;">630</td>
+          <td style="text-align:center;"><span class="badge badge-amber">447</span></td>
+          <td style="text-align:center;">95</td>
+          <td style="text-align:center;"><span class="badge badge-amber">194</span></td>
+          <td style="text-align:center;">69</td>
+        </tr>
+        <tr data-state="Rajasthan">
+          <td>Rajasthan</td>
+          <td style="text-align:center;font-weight:700;">4,128</td>
+          <td style="text-align:center;"><span class="badge badge-green">2,157 (52.3%)</span></td>
+          <td style="text-align:center;"><span class="badge badge-red">642 (15.5%)</span></td>
+          <td style="text-align:center;">59</td>
+          <td style="text-align:center;">284</td>
+          <td style="text-align:center;"><span class="badge badge-amber">438</span></td>
+          <td style="text-align:center;"><span class="badge badge-red">308</span></td>
+          <td style="text-align:center;">162</td>
+          <td style="text-align:center;">78</td>
+        </tr>
+        <tr data-state="Uttar Pradesh">
+          <td>Uttar Pradesh</td>
+          <td style="text-align:center;font-weight:700;">3,821</td>
+          <td style="text-align:center;"><span class="badge badge-green">1,956 (51.2%)</span></td>
+          <td style="text-align:center;"><span class="badge badge-red">555 (14.5%)</span></td>
+          <td style="text-align:center;">40</td>
+          <td style="text-align:center;">193</td>
+          <td style="text-align:center;"><span class="badge badge-amber">394</span></td>
+          <td style="text-align:center;"><span class="badge badge-red">339</span></td>
+          <td style="text-align:center;"><span class="badge badge-amber">241</span></td>
+          <td style="text-align:center;">103</td>
+        </tr>
+        <tr data-state="Madhya Pradesh">
+          <td>Madhya Pradesh</td>
+          <td style="text-align:center;font-weight:700;">2,015</td>
+          <td style="text-align:center;"><span class="badge badge-green">1,308 (64.9%)</span></td>
+          <td style="text-align:center;"><span class="badge badge-green">175 (8.7%)</span></td>
+          <td style="text-align:center;">6</td>
+          <td style="text-align:center;">38</td>
+          <td style="text-align:center;">99</td>
+          <td style="text-align:center;">66</td>
+          <td style="text-align:center;"><span class="badge badge-red">262</span></td>
+          <td style="text-align:center;">61</td>
+        </tr>
+        <tr style="font-weight:700;background:#f8fafc;">
+          <td>TOTAL</td>
+          <td style="text-align:center;">22,565</td>
+          <td style="text-align:center;color:#15803d;">11,719 (52.0%)</td>
+          <td style="text-align:center;color:#991b1b;">3,404 (15.1%)</td>
+          <td style="text-align:center;">475</td>
+          <td style="text-align:center;">1,494</td>
+          <td style="text-align:center;">1,885</td>
+          <td style="text-align:center;color:#9a3412;">1,150</td>
+          <td style="text-align:center;color:#991b1b;">1,780</td>
+          <td style="text-align:center;">686</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div class="insight-box" style="margin-top:0;">
+        ✅ <strong>52% delivered</strong> (11,719) — MP leads at 64.9%, GJ at 59.2%. MH lowest at 41%.
+      </div>
+      <div class="warning-box" style="margin-top:0;">
+        📦 <strong>4,529 orders are stuck</strong> — 1,885 packed awaiting pickup + 1,150 held by LMD + 1,494 picked but not delivered. Active intervention needed.
+      </div>
+      <div class="danger-box" style="margin-top:0;">
+        ⚠️ <strong>1,780 On Hold</strong> = store accepted but has no stock. MH (921) is the worst — indicates systemic inventory visibility gap.
+      </div>
+    </div>
+  </div>
+
   <div class="two-col">
     <div class="card">
       <div class="section-header">
