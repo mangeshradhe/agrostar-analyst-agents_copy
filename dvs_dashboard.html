@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DVS Dashboard — Agrostar FY27</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #1a1a2e; font-size: 13px; }
+
+    .header { background: #1a1a2e; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 17px; font-weight: 700; }
+    .header h1 span { color: #4ade80; }
+    .header-meta { font-size: 11px; color: #94a3b8; text-align: right; line-height: 1.7; }
+
+    .tab-bar { background: #fff; border-bottom: 2px solid #e2e8f0; display: flex; padding: 0 24px; gap: 0; }
+    .tab { padding: 12px 20px; cursor: pointer; font-size: 13px; font-weight: 600; color: #64748b; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.15s; white-space: nowrap; }
+    .tab:hover { color: #1a1a2e; }
+    .tab.active { color: #16a34a; border-bottom-color: #16a34a; }
+
+    .view { display: none; padding: 20px 24px; }
+    .view.active { display: block; }
+
+    .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+    .kpi-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    .kpi-card { background: #fff; border-radius: 8px; padding: 14px 16px; border-left: 4px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+    .kpi-card.green  { border-left-color: #16a34a; }
+    .kpi-card.blue   { border-left-color: #2563eb; }
+    .kpi-card.amber  { border-left-color: #d97706; }
+    .kpi-card.red    { border-left-color: #dc2626; }
+    .kpi-card.purple { border-left-color: #7c3aed; }
+    .kpi-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    .kpi-value { font-size: 19px; font-weight: 700; color: #1a1a2e; }
+    .kpi-sub   { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+    .kpi-delta { font-size: 11px; margin-top: 4px; }
+    .kpi-delta.up   { color: #16a34a; }
+    .kpi-delta.down { color: #dc2626; }
+
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .section-title  { font-size: 13px; font-weight: 700; color: #1a1a2e; }
+    .section-sub    { font-size: 11px; color: #94a3b8; }
+
+    .card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05); margin-bottom: 16px; }
+    .two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { background: #f8fafc; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 10.5px; letter-spacing: .4px; padding: 8px 10px; text-align: right; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    th:first-child { text-align: left; }
+    td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #1a1a2e; }
+    td:first-child { text-align: left; font-weight: 500; }
+    tr:hover td { background: #f8fafc; }
+    tr:last-child td { border-bottom: none; }
+
+    .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10.5px; font-weight: 600; }
+    .badge-green  { background: #dcfce7; color: #15803d; }
+    .badge-amber  { background: #fef3c7; color: #92400e; }
+    .badge-red    { background: #fee2e2; color: #991b1b; }
+    .badge-blue   { background: #dbeafe; color: #1d4ed8; }
+    .badge-gray   { background: #f1f5f9; color: #475569; }
+
+    .heat-0 { background: #dcfce7; color: #15803d; font-weight: 600; text-align: center; }
+    .heat-1 { background: #fef3c7; color: #92400e; font-weight: 600; text-align: center; }
+    .heat-2 { background: #fed7aa; color: #9a3412; font-weight: 600; text-align: center; }
+    .heat-3 { background: #fee2e2; color: #991b1b; font-weight: 600; text-align: center; }
+
+    .funnel-stage { display: flex; align-items: center; margin-bottom: 8px; gap: 10px; }
+    .funnel-label { width: 180px; font-size: 11px; color: #475569; flex-shrink: 0; }
+    .funnel-bar-wrap { flex: 1; background: #f1f5f9; border-radius: 4px; height: 22px; }
+    .funnel-bar { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 700; color: #fff; }
+    .funnel-bar.green  { background: #16a34a; }
+    .funnel-bar.amber  { background: #d97706; }
+    .funnel-bar.red    { background: #dc2626; }
+    .funnel-bar.blue   { background: #2563eb; }
+    .funnel-bar.gray   { background: #64748b; }
+    .funnel-meta  { width: 80px; font-size: 11px; color: #64748b; text-align: right; flex-shrink: 0; }
+    .funnel-sla   { width: 110px; font-size: 10px; text-align: center; flex-shrink: 0; }
+
+    .dist-bar-wrap { flex: 1; background: #f1f5f9; border-radius: 3px; height: 16px; display: flex; overflow: hidden; }
+    .dist-seg { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; min-width: 20px; }
+
+    .table-scroll { max-height: 340px; overflow-y: auto; }
+    .table-scroll table thead th { position: sticky; top: 0; z-index: 1; }
+
+    .state-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    .state-btn { padding: 4px 10px; border-radius: 12px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; font-size: 11px; color: #475569; }
+    .state-btn.active { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+
+    .insight-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 14px; font-size: 11.5px; color: #166534; margin-top: 10px; line-height: 1.6; }
+    .warning-box  { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 10px 14px; font-size: 11.5px; color: #9a3412; margin-top: 10px; line-height: 1.6; }
+    .danger-box   { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 10px 14px; font-size: 11.5px; color: #991b1b; margin-top: 10px; line-height: 1.6; }
+
+    .scan-note { font-size: 10px; color: #94a3b8; font-style: italic; margin-top: 6px; }
+    .footer { text-align: center; padding: 14px; font-size: 10.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>DVS Operations Dashboard — <span>Agrostar FY27</span></h1>
+    <div style="font-size:11px;color:#94a3b8;margin-top:3px;">Direct from Village Store · FY27 Live Data · Top 5 States</div>
+  </div>
+  <div class="header-meta">
+    <div>Data window: <strong style="color:#fff;">01 Apr 2026 – 20 May 2026</strong> (50 days)</div>
+    <div>Last refreshed: 20 May 2026, 11:45 AM IST</div>
+    <div style="margin-top:4px;">
+      <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;">● LIVE</span>
+      <span style="background:#475569;color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;margin-left:4px;">Maharashtra · Gujarat · Rajasthan · UP · MP</span>
+    </div>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="switchTab('sales',this)">📊 Sales View</div>
+  <div class="tab" onclick="switchTab('ops',this)">⚙️ Operations View</div>
+  <div class="tab" onclick="switchTab('delivery',this)">🚚 Delivery Performance</div>
+  <div class="tab" onclick="switchTab('distance',this)">📍 Farmer → Store Distance</div>
+  <div class="tab" onclick="switchTab('lmd',this)">🤝 LMD Scorecard</div>
+</div>
+
+
+<!-- ═══════════════ SALES VIEW ═══════════════ -->
+<div id="view-sales" class="view active">
+
+  <div class="kpi-row">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Total B2C GMV</div>
+      <div class="kpi-value">₹19,70,22,838</div>
+      <div class="kpi-sub">56,795 orders · 5 states</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">DVS GMV</div>
+      <div class="kpi-value">₹8,12,00,050</div>
+      <div class="kpi-sub">22,456 orders fulfilled by store</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">DVS Fulfilment %</div>
+      <div class="kpi-value">39.5%</div>
+      <div class="kpi-sub">22,456 of 56,795 B2C orders</div>
+      <div class="kpi-delta down">↓ Gujarat best @ 64.2%</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Stores with DVS Activity</div>
+      <div class="kpi-value">1,084</div>
+      <div class="kpi-sub">Stores fulfilled ≥1 DVS order</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Re-routed to FC</div>
+      <div class="kpi-value">10,956</div>
+      <div class="kpi-sub">Store assigned → pulled back to FC</div>
+      <div class="kpi-delta down">MH alone: 6,038 re-routes</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-header">
+      <div>
+        <div class="section-title">State-wise Summary — FY27 (01 Apr – 20 May 2026)</div>
+        <div class="section-sub">All GMV in actual ₹ (Indian format) · No rounding to lacs/crores</div>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>State</th>
+          <th>B2C Orders</th>
+          <th>B2C GMV (₹)</th>
+          <th>DVS Orders</th>
+          <th>DVS GMV (₹)</th>
+          <th>DVS %</th>
+          <th>Stores Active</th>
+          <th>Re-routed</th>
+          <th>Packed</th>
+          <th>Picked</th>
+          <th>Delivered</th>
+          <th>RTO</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Maharashtra</td>
+          <td>17,013</td><td>₹5,63,47,761</td>
+          <td>6,383</td><td>₹2,25,04,793</td>
+          <td><span class="badge badge-amber">37.5%</span></td>
+          <td>327</td>
+          <td><span class="badge badge-red">6,038</span></td>
+          <td>5,038</td><td>4,181</td><td>2,617</td>
+          <td><span class="badge badge-red">1,101 (17.2%)</span></td>
+        </tr>
+        <tr>
+          <td>Gujarat</td>
+          <td>9,611</td><td>₹3,55,92,069</td>
+          <td>6,170</td><td>₹2,35,88,219</td>
+          <td><span class="badge badge-green">64.2%</span></td>
+          <td>195</td>
+          <td><span class="badge badge-green">1,074</span></td>
+          <td>5,932</td><td>5,373</td><td>3,665</td>
+          <td><span class="badge badge-amber">861 (13.9%)</span></td>
+        </tr>
+        <tr>
+          <td>Rajasthan</td>
+          <td>10,077</td><td>₹4,15,60,547</td>
+          <td>4,097</td><td>₹1,65,10,951</td>
+          <td><span class="badge badge-amber">40.7%</span></td>
+          <td>184</td>
+          <td><span class="badge badge-amber">1,254</span></td>
+          <td>3,873</td><td>3,095</td><td>2,153</td>
+          <td><span class="badge badge-red">635 (15.5%)</span></td>
+        </tr>
+        <tr>
+          <td>Uttar Pradesh</td>
+          <td>12,434</td><td>₹3,57,05,590</td>
+          <td>3,801</td><td>₹1,10,14,256</td>
+          <td><span class="badge badge-red">30.6%</span></td>
+          <td>206</td>
+          <td><span class="badge badge-amber">1,597</span></td>
+          <td>3,419</td><td>2,695</td><td>1,933</td>
+          <td><span class="badge badge-red">549 (14.4%)</span></td>
+        </tr>
+        <tr>
+          <td>Madhya Pradesh</td>
+          <td>7,660</td><td>₹2,78,16,871</td>
+          <td>2,005</td><td>₹75,81,831</td>
+          <td><span class="badge badge-red">26.2%</span></td>
+          <td>172</td>
+          <td><span class="badge badge-amber">993</span></td>
+          <td>1,683</td><td>1,498</td><td>1,305</td>
+          <td><span class="badge badge-green">175 (8.7%)</span></td>
+        </tr>
+        <tr style="font-weight:700;background:#f8fafc;">
+          <td>TOTAL</td>
+          <td>56,795</td><td>₹19,70,22,838</td>
+          <td>22,456</td><td>₹8,12,00,050</td>
+          <td><span class="badge badge-amber">39.5%</span></td>
+          <td>1,084</td>
+          <td><span class="badge badge-red">10,956</span></td>
+          <td>19,945</td><td>16,842</td><td>11,673</td>
+          <td><span class="badge badge-red">3,321 (14.8%)</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="danger-box">
+      🔴 <strong>RTO rate of 14.8%</strong> is 3× the program target of &lt;5%. 3,321 orders returned by LMD — each represents a wasted store-pack + LMD trip + return leg.
+      Maharashtra leads both volume (1,101 RTOs) and rate (17.2%). MP is the only state near-acceptable at 8.7%.
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="section-header">
+        <div class="section-title">DVS Demand Funnel — All States Combined</div>
+        <div class="section-sub">01 Apr – 20 May 2026 · 22,456 DVS orders</div>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="funnel-stage">
+          <div class="funnel-label">Total DVS Orders</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar blue" style="width:100%">22,456</div></div>
+          <div class="funnel-meta">100%</div>
+          <div class="funnel-sla"></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label">First Action ≤ 1 hr</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar amber" style="width:40.3%">9,041</div></div>
+          <div class="funnel-meta">40.3%</div>
+          <div class="funnel-sla"><span class="badge badge-red">Target: 100%</span></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label">Ever Packed</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar green" style="width:88.8%">19,945</div></div>
+          <div class="funnel-meta">88.8%</div>
+          <div class="funnel-sla"><span class="badge badge-green">Good</span></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label">Ever Picked by LMD</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar amber" style="width:75.0%">16,842</div></div>
+          <div class="funnel-meta">75.0%</div>
+          <div class="funnel-sla"><span class="badge badge-amber">Target: 85%</span></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label">Delivered</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar green" style="width:52.0%">11,673</div></div>
+          <div class="funnel-meta">52.0%</div>
+          <div class="funnel-sla"><span class="badge badge-amber">In-flight</span></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label">RTO (Returned by LMD)</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar red" style="width:14.8%">3,321</div></div>
+          <div class="funnel-meta">14.8%</div>
+          <div class="funnel-sla"><span class="badge badge-red">Target: &lt;5%</span></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label">Cancelled</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar gray" style="width:0.05%"></div></div>
+          <div class="funnel-meta">11 orders</div>
+          <div class="funnel-sla"></div>
+        </div>
+      </div>
+      <div class="warning-box">
+        ⚠️ Only <strong>40.3%</strong> of orders get first action within the 1-hr SLA. Over <strong>13,415 orders</strong> missed this SLA — biggest single lever to improve E2E TAT.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <div class="section-title">DVS % by State — B2C Orders Captured</div>
+        <div class="section-sub">How much of B2C demand is fulfilled via DVS stores</div>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="funnel-stage">
+          <div class="funnel-label">Gujarat</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar green" style="width:64.2%">6,170 of 9,611</div></div>
+          <div class="funnel-meta">64.2%</div>
+          <div class="funnel-sla"><span class="badge badge-green">Best</span></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label">Rajasthan</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar amber" style="width:40.7%">4,097 of 10,077</div></div>
+          <div class="funnel-meta">40.7%</div>
+          <div class="funnel-sla"><span class="badge badge-amber">Mid</span></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label">Maharashtra</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar amber" style="width:37.5%">6,383 of 17,013</div></div>
+          <div class="funnel-meta">37.5%</div>
+          <div class="funnel-sla"><span class="badge badge-amber">Mid</span></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label">Uttar Pradesh</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar red" style="width:30.6%">3,801 of 12,434</div></div>
+          <div class="funnel-meta">30.6%</div>
+          <div class="funnel-sla"><span class="badge badge-red">Low</span></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label">Madhya Pradesh</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar red" style="width:26.2%">2,005 of 7,660</div></div>
+          <div class="funnel-meta">26.2%</div>
+          <div class="funnel-sla"><span class="badge badge-red">Lowest</span></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="funnel-label" style="font-weight:700;">TOTAL</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar blue" style="width:39.5%">22,456 of 56,795</div></div>
+          <div class="funnel-meta" style="font-weight:700;">39.5%</div>
+          <div class="funnel-sla"><span class="badge badge-red">Target: 70%</span></div>
+        </div>
+      </div>
+      <div class="insight-box">
+        💡 Gujarat at 64.2% shows what's achievable. UP (30.6%) and MP (26.2%) have the largest upside — closing the gap to Gujarat's level would add <strong>~8,500 DVS orders</strong> and ~<strong>₹2.5Cr DVS GMV</strong> per 50-day period.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════════════ OPERATIONS VIEW ═══════════════ -->
+<div id="view-ops" class="view">
+
+  <div class="kpi-row">
+    <div class="kpi-card red">
+      <div class="kpi-label">Currently Packed (Stuck)</div>
+      <div class="kpi-value">1,812</div>
+      <div class="kpi-sub">Packed but LMD not picked up yet</div>
+      <div class="kpi-delta down">Avg 128 hrs stuck in MH</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Currently Picked (In Transit)</div>
+      <div class="kpi-value">1,484</div>
+      <div class="kpi-sub">LMD has order, not delivered</div>
+      <div class="kpi-delta down">Avg 120 hrs in GJ</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Total Stuck In-flight</div>
+      <div class="kpi-value">3,296</div>
+      <div class="kpi-sub">Packed + In-transit, all states</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Total Re-routed to FC</div>
+      <div class="kpi-value">10,956</div>
+      <div class="kpi-sub">Period total · MH = 6,038</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Returned (All Period)</div>
+      <div class="kpi-value">3,321</div>
+      <div class="kpi-sub">Avg lifecycle 300–413 hrs</div>
+    </div>
+  </div>
+
+  <!-- Order Age Heatmap -->
+  <div class="card">
+    <div class="section-header">
+      <div class="section-title">Order Age Snapshot — Avg Hours in Current Status · by State</div>
+      <div class="section-sub">PACKED/PICKED = time since entering status. RETURNED = full lifecycle. DELIVERED TODAY = E2E TAT. SLA: Packed→Picked ≤ 24hrs</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>State</th>
+          <th>Stuck in PACKED · Count</th>
+          <th>Avg Age · Median · P90 (hrs)</th>
+          <th>Stuck in PICKED · Count</th>
+          <th>Avg Age · Median · P90 (hrs)</th>
+          <th>RETURNED · Count</th>
+          <th>Avg Lifecycle (hrs)</th>
+          <th>Delivered Today · Count</th>
+          <th>Avg E2E TAT (hrs)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Maharashtra</td>
+          <td style="text-align:center;font-weight:600;">463</td>
+          <td class="heat-3">128.2 · 92.1 · 327.1</td>
+          <td style="text-align:center;font-weight:600;">349</td>
+          <td class="heat-3">128.6 · 100.3 · 261.7</td>
+          <td style="text-align:center;">1,095</td>
+          <td class="heat-3">381.0</td>
+          <td style="text-align:center;">32</td>
+          <td class="heat-3">161.9</td>
+        </tr>
+        <tr>
+          <td>Gujarat</td>
+          <td style="text-align:center;font-weight:600;">433</td>
+          <td class="heat-3">81.1 · 41.9 · 204.5</td>
+          <td style="text-align:center;font-weight:600;">641</td>
+          <td class="heat-3">119.9 · 94.3 · 263.5</td>
+          <td style="text-align:center;">860</td>
+          <td class="heat-3">413.3</td>
+          <td style="text-align:center;">62</td>
+          <td class="heat-3">195.8</td>
+        </tr>
+        <tr>
+          <td>Rajasthan</td>
+          <td style="text-align:center;font-weight:600;">464</td>
+          <td class="heat-3">166.1 · 113.8 · 395.4</td>
+          <td style="text-align:center;font-weight:600;">267</td>
+          <td class="heat-3">104.3 · 69.3 · 255.9</td>
+          <td style="text-align:center;">635</td>
+          <td class="heat-3">352.7</td>
+          <td style="text-align:center;">14</td>
+          <td class="heat-3">200.1</td>
+        </tr>
+        <tr>
+          <td>Uttar Pradesh</td>
+          <td style="text-align:center;font-weight:600;">373</td>
+          <td class="heat-3">105.4 · 43.4 · 349.8</td>
+          <td style="text-align:center;font-weight:600;">191</td>
+          <td class="heat-3">86.3 · 61.1 · 216.3</td>
+          <td style="text-align:center;">547</td>
+          <td class="heat-3">319.2</td>
+          <td style="text-align:center;">15</td>
+          <td class="heat-2">95.7</td>
+        </tr>
+        <tr>
+          <td>Madhya Pradesh</td>
+          <td style="text-align:center;font-weight:600;">79</td>
+          <td class="heat-3">71.1 · 20.6 · 207.3</td>
+          <td style="text-align:center;font-weight:600;">36</td>
+          <td class="heat-3">69.2 · 38.8 · 183.0</td>
+          <td style="text-align:center;">175</td>
+          <td class="heat-2">300.2</td>
+          <td style="text-align:center;">6</td>
+          <td class="heat-3">233.0</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="danger-box">
+      🚨 Every state is <strong>deep red</strong> for PACKED stuck orders. Rajasthan has orders stuck an avg 166 hrs (7 days!) in PACKED state vs a 24-hr pickup SLA.
+      Gujarat's PICKED orders average 120 hrs (5 days) in transit — farmer is waiting for delivery well beyond the 72-hr E2E SLA.
+    </div>
+  </div>
+
+  <!-- FC Leakage -->
+  <div class="card">
+    <div class="section-header">
+      <div class="section-title">FC Leakage — B2C Orders That Went to FC Instead of DVS · by State & Reason</div>
+      <div class="section-sub">GMV in actual ₹ · Multiple reasons can apply per order — counts are not mutually exclusive</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>State</th>
+          <th>FC Orders</th>
+          <th>FC GMV (₹)</th>
+          <th>Partner SLA Miss</th>
+          <th>OCP Block</th>
+          <th>No LMD</th>
+          <th>No License</th>
+          <th>Distance &gt;50km</th>
+          <th>Taluka Mismatch</th>
+          <th>Coverage Gap</th>
+          <th>Restricted SKU</th>
+          <th>Clearance SKU</th>
+          <th>No TAT Record</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Maharashtra</td>
+          <td><strong>10,629</strong></td><td>₹3,38,42,968</td>
+          <td><span class="badge badge-red">3,118</span></td>
+          <td><span class="badge badge-amber">914</span></td>
+          <td>0</td>
+          <td>78</td>
+          <td>192</td>
+          <td><span class="badge badge-red">3,444</span></td>
+          <td>445</td>
+          <td>0</td>
+          <td>623</td>
+          <td>109</td>
+        </tr>
+        <tr>
+          <td>Uttar Pradesh</td>
+          <td><strong>8,633</strong></td><td>₹2,46,91,334</td>
+          <td>861</td>
+          <td><span class="badge badge-amber">486</span></td>
+          <td><span class="badge badge-red">2,178</span></td>
+          <td>492</td>
+          <td>720</td>
+          <td><span class="badge badge-red">2,369</span></td>
+          <td>657</td>
+          <td>0</td>
+          <td>339</td>
+          <td>125</td>
+        </tr>
+        <tr>
+          <td>Rajasthan</td>
+          <td><strong>5,980</strong></td><td>₹2,50,49,596</td>
+          <td>542</td>
+          <td><span class="badge badge-amber">412</span></td>
+          <td>0</td>
+          <td>108</td>
+          <td>218</td>
+          <td><span class="badge badge-red">2,639</span></td>
+          <td>478</td>
+          <td><span class="badge badge-amber">946</span></td>
+          <td>185</td>
+          <td>60</td>
+        </tr>
+        <tr>
+          <td>Madhya Pradesh</td>
+          <td><strong>5,655</strong></td><td>₹2,02,35,040</td>
+          <td>491</td>
+          <td><span class="badge badge-amber">343</span></td>
+          <td><span class="badge badge-red">1,704</span></td>
+          <td>732</td>
+          <td>61</td>
+          <td><span class="badge badge-amber">1,215</span></td>
+          <td>489</td>
+          <td>0</td>
+          <td>243</td>
+          <td>96</td>
+        </tr>
+        <tr>
+          <td>Gujarat</td>
+          <td>3,441</td><td>₹1,20,03,850</td>
+          <td><span class="badge badge-amber">456</span></td>
+          <td><span class="badge badge-amber">407</span></td>
+          <td>226</td>
+          <td>16</td>
+          <td>69</td>
+          <td><span class="badge badge-amber">1,465</span></td>
+          <td>336</td>
+          <td>4</td>
+          <td>166</td>
+          <td>54</td>
+        </tr>
+        <tr style="font-weight:700;background:#f8fafc;">
+          <td>TOTAL</td>
+          <td>34,338</td><td>₹11,58,22,788</td>
+          <td>5,468</td><td>2,562</td><td>4,108</td><td>1,426</td><td>1,260</td>
+          <td><strong style="color:#991b1b;">11,132</strong></td>
+          <td>2,405</td><td>950</td><td>1,556</td><td>444</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="danger-box">
+      🔴 <strong>Taluka mismatch is the #1 FC leakage driver</strong> — 11,132 orders went to FC because the farmer's taluka wasn't in any partner's serving area.
+      This is a <strong>config fix</strong>, not a capacity fix — expanding <code>servingTaluka</code> for existing partners could recover a significant chunk of this demand.
+      No LMD (4,108 orders) is the #2 issue — structural gap in UP and MP that requires new LMD partner onboarding.
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════════════ DELIVERY PERFORMANCE ═══════════════ -->
+<div id="view-delivery" class="view">
+
+  <div class="kpi-row">
+    <div class="kpi-card green">
+      <div class="kpi-label">Total Delivered</div>
+      <div class="kpi-value">11,673</div>
+      <div class="kpi-sub">52.0% of 22,456 DVS orders</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">E2E TAT — P50 / P90</div>
+      <div class="kpi-value">100 / 317 hrs</div>
+      <div class="kpi-sub">SLA: ≤ 72 hrs end-to-end</div>
+      <div class="kpi-delta down">P50 worst: MH/GJ/RJ @ 121hrs</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">RTO Rate</div>
+      <div class="kpi-value">14.8%</div>
+      <div class="kpi-sub">3,321 returns · Target &lt;5%</div>
+      <div class="kpi-delta down">MH: 17.2% · MP best: 8.7%</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">E2E SLA Breach</div>
+      <div class="kpi-value">~70%</div>
+      <div class="kpi-sub">Of delivered orders &gt;72 hrs</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">1st Action ≤ 1hr</div>
+      <div class="kpi-value">40.3%</div>
+      <div class="kpi-sub">9,041 of 22,456 orders</div>
+      <div class="kpi-delta down">GJ best: 48.8% · MH worst: 27.6%</div>
+    </div>
+  </div>
+
+  <!-- Stage TAT by State -->
+  <div class="card">
+    <div class="section-header">
+      <div class="section-title">Stage TAT by State — P50 (P90) in Hours + SLA Breach Count</div>
+      <div class="section-sub">All values converted from minutes. SLAs: 1st Action ≤ 1hr · Packed→Picked ≤ 24hrs · E2E ≤ 72hrs</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>State</th>
+          <th>DVS Orders</th>
+          <th>1st Action P50 (P90)</th>
+          <th>Breach Count</th>
+          <th>Packed→Picked P50 (P90)</th>
+          <th>Breach Count</th>
+          <th>Picked→Delivered P50 (P90)</th>
+          <th>E2E P50 (P90)</th>
+          <th>E2E Breach Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Maharashtra</td>
+          <td style="text-align:center;">6,383</td>
+          <td class="heat-2">2.8 hrs (23.6 hrs)</td>
+          <td><span class="badge badge-red">4,155 / 6,383</span></td>
+          <td class="heat-3">52.1 hrs (201.9 hrs)</td>
+          <td><span class="badge badge-red">2,992 / 4,181</span></td>
+          <td class="heat-3">22.2 hrs (137.2 hrs)</td>
+          <td class="heat-3">121 hrs (292 hrs)</td>
+          <td><span class="badge badge-red">1,907 / 2,617</span></td>
+        </tr>
+        <tr>
+          <td>Gujarat</td>
+          <td style="text-align:center;">6,170</td>
+          <td class="heat-1">1.0 hr (15.7 hrs)</td>
+          <td><span class="badge badge-red">3,095 / 6,170</span></td>
+          <td class="heat-3">46.7 hrs (189.5 hrs)</td>
+          <td><span class="badge badge-red">3,448 / 5,373</span></td>
+          <td class="heat-3">22.2 hrs (181.3 hrs)</td>
+          <td class="heat-3">121 hrs (317 hrs)</td>
+          <td><span class="badge badge-red">2,666 / 3,665</span></td>
+        </tr>
+        <tr>
+          <td>Rajasthan</td>
+          <td style="text-align:center;">4,097</td>
+          <td class="heat-1">1.3 hrs (15.9 hrs)</td>
+          <td><span class="badge badge-red">2,250 / 4,097</span></td>
+          <td class="heat-3">68.4 hrs (218.7 hrs)</td>
+          <td><span class="badge badge-red">2,423 / 3,095</span></td>
+          <td class="heat-3">21.7 hrs (125.7 hrs)</td>
+          <td class="heat-3">121 hrs (293 hrs)</td>
+          <td><span class="badge badge-red">1,555 / 2,153</span></td>
+        </tr>
+        <tr>
+          <td>Uttar Pradesh</td>
+          <td style="text-align:center;">3,801</td>
+          <td class="heat-1">1.2 hrs (16.5 hrs)</td>
+          <td><span class="badge badge-red">1,978 / 3,801</span></td>
+          <td class="heat-3">67.1 hrs (209.4 hrs)</td>
+          <td><span class="badge badge-red">2,142 / 2,695</span></td>
+          <td class="heat-1">5.9 hrs (82.0 hrs)</td>
+          <td class="heat-3">100 hrs (249 hrs)</td>
+          <td><span class="badge badge-red">1,291 / 1,933</span></td>
+        </tr>
+        <tr>
+          <td>Madhya Pradesh</td>
+          <td style="text-align:center;">2,005</td>
+          <td class="heat-1">1.5 hrs (18.3 hrs)</td>
+          <td><span class="badge badge-red">1,137 / 2,005</span></td>
+          <td class="heat-3">43.4 hrs (121.5 hrs)</td>
+          <td><span class="badge badge-red">976 / 1,498</span></td>
+          <td class="heat-0">5.1 hrs (47.6 hrs)</td>
+          <td class="heat-3">81 hrs (212 hrs)</td>
+          <td><span class="badge badge-red">741 / 1,305</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="danger-box">
+      🚨 <strong>Packed → Picked is the critical bottleneck.</strong> P50 ranges from 43–68 hrs vs a 24-hr SLA. This one stage alone is pushing every state over the 72-hr E2E target.
+      UP and MP have notably faster Picked→Delivered (5–6 hrs P50) vs MH/GJ/RJ (22 hrs P50) — LMD last-mile is faster in those states once pickup happens.
+    </div>
+  </div>
+
+  <!-- Funnel by State -->
+  <div class="card">
+    <div class="section-header">
+      <div class="section-title">Delivery Funnel by State — % of DVS Orders Reaching Each Stage</div>
+      <div class="section-sub">Based on order cohort created 01 Apr – 20 May 2026</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>State</th>
+          <th>DVS Orders</th>
+          <th>1st Action ≤1hr</th>
+          <th>Ever Packed</th>
+          <th>Ever Picked</th>
+          <th>Delivered</th>
+          <th>RTO</th>
+          <th>Cancelled</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Maharashtra</td>
+          <td style="text-align:center;">6,383</td>
+          <td><span class="badge badge-red">27.6% (1,761)</span></td>
+          <td><span class="badge badge-amber">78.9% (5,038)</span></td>
+          <td><span class="badge badge-amber">65.5% (4,181)</span></td>
+          <td>2,617 (41.0%)</td>
+          <td><span class="badge badge-red">17.2% (1,101)</span></td>
+          <td>4</td>
+        </tr>
+        <tr>
+          <td>Gujarat</td>
+          <td style="text-align:center;">6,170</td>
+          <td><span class="badge badge-amber">48.8% (3,011)</span></td>
+          <td><span class="badge badge-green">96.1% (5,932)</span></td>
+          <td><span class="badge badge-green">87.1% (5,373)</span></td>
+          <td>3,665 (59.4%)</td>
+          <td><span class="badge badge-amber">13.9% (861)</span></td>
+          <td>2</td>
+        </tr>
+        <tr>
+          <td>Rajasthan</td>
+          <td style="text-align:center;">4,097</td>
+          <td><span class="badge badge-amber">43.6% (1,786)</span></td>
+          <td><span class="badge badge-green">94.5% (3,873)</span></td>
+          <td><span class="badge badge-amber">75.5% (3,095)</span></td>
+          <td>2,153 (52.5%)</td>
+          <td><span class="badge badge-red">15.5% (635)</span></td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td>Uttar Pradesh</td>
+          <td style="text-align:center;">3,801</td>
+          <td><span class="badge badge-amber">44.6% (1,695)</span></td>
+          <td><span class="badge badge-green">90.0% (3,419)</span></td>
+          <td><span class="badge badge-amber">70.9% (2,695)</span></td>
+          <td>1,933 (50.9%)</td>
+          <td><span class="badge badge-red">14.4% (549)</span></td>
+          <td>3</td>
+        </tr>
+        <tr>
+          <td>Madhya Pradesh</td>
+          <td style="text-align:center;">2,005</td>
+          <td><span class="badge badge-amber">39.3% (788)</span></td>
+          <td><span class="badge badge-amber">83.9% (1,683)</span></td>
+          <td><span class="badge badge-amber">74.7% (1,498)</span></td>
+          <td>1,305 (65.1%)</td>
+          <td><span class="badge badge-green">8.7% (175)</span></td>
+          <td>1</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="insight-box">
+      💡 Gujarat's 96.1% pack rate and 87.1% pick rate vs Maharashtra's 78.9%/65.5% shows that store quality and LMD density matter more than geography.
+      MP's low RTO (8.7%) despite mid-tier pack/pick rates suggests farmers in MP are more committed buyers — worth investigating what's different about that customer cohort.
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════════════ DISTANCE TAB ═══════════════ -->
+<div id="view-distance" class="view">
+
+  <div style="margin-bottom:16px;">
+    <div class="section-title">Farmer → Saathi Store Distance Distribution — FY27</div>
+    <div class="section-sub" style="margin-top:4px;">
+      Haversine aerial distance · Farmer geocoded via village+district+taluka → csr_villageaddress master ·
+      17,559 of 22,456 DVS orders geocoded (78.2% hit rate) · ~21.8% unmatched due to free-text village entry
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-header">
+      <div class="section-title">Distance Bucket Distribution by State</div>
+      <div class="section-sub">Count (% of geocoded DVS orders per state)</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>State</th>
+          <th>Geocoded Orders</th>
+          <th>&lt; 10 KM</th>
+          <th>10 – 25 KM</th>
+          <th>25 – 50 KM</th>
+          <th>50+ KM</th>
+          <th>Avg Distance</th>
+          <th>Median Distance</th>
+          <th>Distribution</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Maharashtra</td>
+          <td style="text-align:center;">5,671</td>
+          <td><span class="badge badge-green">2,379 (42.0%)</span></td>
+          <td><span class="badge badge-blue">2,680 (47.3%)</span></td>
+          <td><span class="badge badge-amber">586 (10.3%)</span></td>
+          <td><span class="badge badge-gray">26 (0.5%)</span></td>
+          <td style="text-align:center;">13.5 km</td>
+          <td style="text-align:center;">11.7 km</td>
+          <td>
+            <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;min-width:120px;">
+              <div style="width:42%;background:#16a34a;"></div>
+              <div style="width:47.3%;background:#2563eb;"></div>
+              <div style="width:10.3%;background:#d97706;"></div>
+              <div style="width:0.5%;background:#94a3b8;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>Gujarat</td>
+          <td style="text-align:center;">4,365</td>
+          <td><span class="badge badge-green">2,080 (47.7%)</span></td>
+          <td><span class="badge badge-blue">1,971 (45.2%)</span></td>
+          <td><span class="badge badge-amber">297 (6.8%)</span></td>
+          <td><span class="badge badge-gray">17 (0.4%)</span></td>
+          <td style="text-align:center;">12.1 km</td>
+          <td style="text-align:center;">10.5 km</td>
+          <td>
+            <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;min-width:120px;">
+              <div style="width:47.7%;background:#16a34a;"></div>
+              <div style="width:45.2%;background:#2563eb;"></div>
+              <div style="width:6.8%;background:#d97706;"></div>
+              <div style="width:0.4%;background:#94a3b8;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>Rajasthan</td>
+          <td style="text-align:center;">3,047</td>
+          <td><span class="badge badge-green">1,246 (40.9%)</span></td>
+          <td><span class="badge badge-blue">1,355 (44.5%)</span></td>
+          <td><span class="badge badge-amber">427 (14.0%)</span></td>
+          <td><span class="badge badge-gray">19 (0.6%)</span></td>
+          <td style="text-align:center;">14.1 km</td>
+          <td style="text-align:center;">11.9 km</td>
+          <td>
+            <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;min-width:120px;">
+              <div style="width:40.9%;background:#16a34a;"></div>
+              <div style="width:44.5%;background:#2563eb;"></div>
+              <div style="width:14.0%;background:#d97706;"></div>
+              <div style="width:0.6%;background:#94a3b8;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>Uttar Pradesh</td>
+          <td style="text-align:center;">2,975</td>
+          <td><span class="badge badge-green">1,179 (39.6%)</span></td>
+          <td><span class="badge badge-blue">1,413 (47.5%)</span></td>
+          <td><span class="badge badge-amber">377 (12.7%)</span></td>
+          <td><span class="badge badge-gray">6 (0.2%)</span></td>
+          <td style="text-align:center;">14.1 km</td>
+          <td style="text-align:center;">12.3 km</td>
+          <td>
+            <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;min-width:120px;">
+              <div style="width:39.6%;background:#16a34a;"></div>
+              <div style="width:47.5%;background:#2563eb;"></div>
+              <div style="width:12.7%;background:#d97706;"></div>
+              <div style="width:0.2%;background:#94a3b8;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>Madhya Pradesh</td>
+          <td style="text-align:center;">1,501</td>
+          <td><span class="badge badge-green">655 (43.6%)</span></td>
+          <td><span class="badge badge-blue">650 (43.3%)</span></td>
+          <td><span class="badge badge-amber">178 (11.9%)</span></td>
+          <td><span class="badge badge-gray">18 (1.2%)</span></td>
+          <td style="text-align:center;">14.3 km</td>
+          <td style="text-align:center;">11.5 km</td>
+          <td>
+            <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;min-width:120px;">
+              <div style="width:43.6%;background:#16a34a;"></div>
+              <div style="width:43.3%;background:#2563eb;"></div>
+              <div style="width:11.9%;background:#d97706;"></div>
+              <div style="width:1.2%;background:#94a3b8;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr style="font-weight:700;background:#f8fafc;">
+          <td>TOTAL</td>
+          <td style="text-align:center;">17,559</td>
+          <td>7,539 (42.9%)</td>
+          <td>8,069 (45.9%)</td>
+          <td>1,865 (10.6%)</td>
+          <td>86 (0.5%)</td>
+          <td style="text-align:center;">13.6 km</td>
+          <td style="text-align:center;">11.6 km</td>
+          <td>
+            <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;min-width:120px;">
+              <div style="width:42.9%;background:#16a34a;"></div>
+              <div style="width:45.9%;background:#2563eb;"></div>
+              <div style="width:10.6%;background:#d97706;"></div>
+              <div style="width:0.5%;background:#94a3b8;"></div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:8px;font-size:11px;display:flex;gap:16px;">
+      <span><span style="display:inline-block;width:12px;height:12px;background:#16a34a;border-radius:2px;margin-right:4px;"></span>&lt;10km</span>
+      <span><span style="display:inline-block;width:12px;height:12px;background:#2563eb;border-radius:2px;margin-right:4px;"></span>10–25km</span>
+      <span><span style="display:inline-block;width:12px;height:12px;background:#d97706;border-radius:2px;margin-right:4px;"></span>25–50km</span>
+      <span><span style="display:inline-block;width:12px;height:12px;background:#94a3b8;border-radius:2px;margin-right:4px;"></span>50+km</span>
+    </div>
+    <div class="insight-box">
+      ✅ <strong>88.8% of deliverable DVS orders have a Farmer→Store distance &lt;25 km</strong> — confirms the 50km cap is not causing significant demand loss.
+      Median across all states: 11.6 km. Rajasthan has the highest 25–50km bucket at 14.0%, suggesting store density is thinner in some districts.
+      Only 86 orders (0.5%) are &gt;50km — these are likely fallback captures from the 15km fallback routing logic.
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════════════ LMD SCORECARD ═══════════════ -->
+<div id="view-lmd" class="view">
+
+  <div class="kpi-row-4">
+    <div class="kpi-card blue">
+      <div class="kpi-label">LMD Partners in Scorecard</div>
+      <div class="kpi-value">30</div>
+      <div class="kpi-sub">Top 30 by assigned orders (≥20)</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">HOLD_BY_LMD &gt; 50%</div>
+      <div class="kpi-value">7</div>
+      <div class="kpi-sub">Partners holding more than they pick</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Highest RTO Partner</div>
+      <div class="kpi-value">32.6%</div>
+      <div class="kpi-sub">Tijon Devi · 47 RTOs / 144 orders</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Worst Pickup Delay P50</div>
+      <div class="kpi-value">172 hrs</div>
+      <div class="kpi-sub">DINESH SARVAIYA · 10,344 min P50</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-header">
+      <div class="section-title">LMD Partner Scorecard — Top 30 by Assigned Orders</div>
+      <div class="section-sub">
+        FY27 · 01 Apr – 20 May 2026 · Sorted by assigned orders ·
+        <span style="color:#dc2626;font-weight:600;">Recon 100% across all partners — reconciliation likely not synced for FY27 period yet</span>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>LMD Partner</th>
+            <th>Assigned Orders</th>
+            <th>HOLD_BY_LMD Count</th>
+            <th>HOLD %</th>
+            <th>RTO Count</th>
+            <th>RTO %</th>
+            <th>Pickup Delay P50 (hrs)</th>
+            <th>Pickup Delay P90 (hrs)</th>
+            <th>Risk</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="text-align:center;">1</td><td>Mahipatsinh rathod</td><td style="text-align:center;">379</td><td style="text-align:center;">64</td><td class="heat-1">16.9%</td><td style="text-align:center;">57</td><td class="heat-2">15.0%</td><td style="text-align:center;">50.4</td><td style="text-align:center;">120.5</td><td><span class="badge badge-amber">MEDIUM</span></td></tr>
+          <tr><td style="text-align:center;">2</td><td>Tushar Bhesaniya</td><td style="text-align:center;">289</td><td style="text-align:center;">102</td><td class="heat-3">35.3%</td><td style="text-align:center;">44</td><td class="heat-2">15.2%</td><td style="text-align:center;">53.4</td><td style="text-align:center;">168.4</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">3</td><td>Tejabhai Paraliya</td><td style="text-align:center;">279</td><td style="text-align:center;">80</td><td class="heat-3">28.7%</td><td style="text-align:center;">53</td><td class="heat-2">19.0%</td><td style="text-align:center;">66.7</td><td style="text-align:center;">197.3</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">4</td><td>Raza Enterprice</td><td style="text-align:center;">253</td><td style="text-align:center;">44</td><td class="heat-2">17.4%</td><td style="text-align:center;">33</td><td class="heat-1">13.0%</td><td style="text-align:center;">65.7</td><td style="text-align:center;">149.4</td><td><span class="badge badge-amber">MEDIUM</span></td></tr>
+          <tr><td style="text-align:center;">5</td><td>Kuldip Algotar</td><td style="text-align:center;">240</td><td style="text-align:center;">54</td><td class="heat-2">22.5%</td><td style="text-align:center;">37</td><td class="heat-1">15.4%</td><td style="text-align:center;">77.2</td><td style="text-align:center;">200.5</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">6</td><td>Vishal Solanki</td><td style="text-align:center;">222</td><td style="text-align:center;">61</td><td class="heat-2">27.5%</td><td style="text-align:center;">4</td><td class="heat-0">1.8%</td><td style="text-align:center;">67.9</td><td style="text-align:center;">185.3</td><td><span class="badge badge-amber">MEDIUM</span></td></tr>
+          <tr><td style="text-align:center;">7</td><td>dharmendrasinh tank</td><td style="text-align:center;">208</td><td style="text-align:center;">15</td><td class="heat-0">7.2%</td><td style="text-align:center;">20</td><td class="heat-1">9.6%</td><td style="text-align:center;">27.0</td><td style="text-align:center;">94.9</td><td><span class="badge badge-green">LOW</span></td></tr>
+          <tr><td style="text-align:center;">8</td><td>Jignesh Jani</td><td style="text-align:center;">199</td><td style="text-align:center;">66</td><td class="heat-3">33.2%</td><td style="text-align:center;">20</td><td class="heat-1">10.1%</td><td style="text-align:center;">46.9</td><td style="text-align:center;">171.3</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">9</td><td>Mukesh Alwar</td><td style="text-align:center;">194</td><td style="text-align:center;">76</td><td class="heat-3">39.2%</td><td style="text-align:center;">42</td><td class="heat-2">21.6%</td><td style="text-align:center;">73.2</td><td style="text-align:center;">273.5</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">10</td><td>Ravikaran Singh</td><td style="text-align:center;">192</td><td style="text-align:center;">127</td><td class="heat-3" style="color:#991b1b;font-size:12px;"><strong>66.1%</strong></td><td style="text-align:center;">21</td><td class="heat-1">10.9%</td><td style="text-align:center;">115.3</td><td style="text-align:center;">257.0</td><td><span class="badge badge-red">CRITICAL</span></td></tr>
+          <tr><td style="text-align:center;">11</td><td>Chavda laljibhai</td><td style="text-align:center;">189</td><td style="text-align:center;">33</td><td class="heat-1">17.5%</td><td style="text-align:center;">23</td><td class="heat-1">12.2%</td><td style="text-align:center;">24.5</td><td style="text-align:center;">117.6</td><td><span class="badge badge-amber">MEDIUM</span></td></tr>
+          <tr><td style="text-align:center;">12</td><td>Sachin Mothe</td><td style="text-align:center;">186</td><td style="text-align:center;">62</td><td class="heat-3">33.3%</td><td style="text-align:center;">43</td><td class="heat-2">23.1%</td><td style="text-align:center;">61.2</td><td style="text-align:center;">195.6</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">13</td><td>Sumer Singh</td><td style="text-align:center;">186</td><td style="text-align:center;">100</td><td class="heat-3" style="color:#991b1b;"><strong>53.8%</strong></td><td style="text-align:center;">0</td><td class="heat-0">0.0%</td><td style="text-align:center;">69.6</td><td style="text-align:center;">218.0</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">14</td><td>Vikash Kumar Singh</td><td style="text-align:center;">184</td><td style="text-align:center;">111</td><td class="heat-3" style="color:#991b1b;"><strong>60.3%</strong></td><td style="text-align:center;">33</td><td class="heat-2">17.9%</td><td style="text-align:center;">81.6</td><td style="text-align:center;">263.4</td><td><span class="badge badge-red">CRITICAL</span></td></tr>
+          <tr><td style="text-align:center;">15</td><td>Dinesh mali</td><td style="text-align:center;">181</td><td style="text-align:center;">115</td><td class="heat-3" style="color:#991b1b;"><strong>63.5%</strong></td><td style="text-align:center;">3</td><td class="heat-0">1.7%</td><td style="text-align:center;">95.1</td><td style="text-align:center;">219.5</td><td><span class="badge badge-red">CRITICAL</span></td></tr>
+          <tr><td style="text-align:center;">16</td><td>Manish Kumar</td><td style="text-align:center;">178</td><td style="text-align:center;">108</td><td class="heat-3" style="color:#991b1b;"><strong>60.7%</strong></td><td style="text-align:center;">33</td><td class="heat-2">18.5%</td><td style="text-align:center;">73.1</td><td style="text-align:center;">200.0</td><td><span class="badge badge-red">CRITICAL</span></td></tr>
+          <tr><td style="text-align:center;">17</td><td>Hargovanji thakor</td><td style="text-align:center;">175</td><td style="text-align:center;">64</td><td class="heat-3">36.6%</td><td style="text-align:center;">17</td><td class="heat-1">9.7%</td><td style="text-align:center;">84.8</td><td style="text-align:center;">209.0</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">18</td><td>Himanshu Chauhan</td><td style="text-align:center;">174</td><td style="text-align:center;">96</td><td class="heat-3" style="color:#991b1b;"><strong>55.2%</strong></td><td style="text-align:center;">26</td><td class="heat-2">14.9%</td><td style="text-align:center;">70.1</td><td style="text-align:center;">188.3</td><td><span class="badge badge-red">CRITICAL</span></td></tr>
+          <tr><td style="text-align:center;">19</td><td>PRAVINBHAI PARMAR</td><td style="text-align:center;">174</td><td style="text-align:center;">12</td><td class="heat-0">6.9%</td><td style="text-align:center;">27</td><td class="heat-2">15.5%</td><td style="text-align:center;">2.4</td><td style="text-align:center;">50.7</td><td><span class="badge badge-amber">MEDIUM</span></td></tr>
+          <tr><td style="text-align:center;">20</td><td>Laxman Ram</td><td style="text-align:center;">165</td><td style="text-align:center;">30</td><td class="heat-1">18.2%</td><td style="text-align:center;">19</td><td class="heat-1">11.5%</td><td style="text-align:center;">26.9</td><td style="text-align:center;">77.8</td><td><span class="badge badge-amber">MEDIUM</span></td></tr>
+          <tr><td style="text-align:center;">21</td><td>Kantilal Patel</td><td style="text-align:center;">165</td><td style="text-align:center;">60</td><td class="heat-3">36.4%</td><td style="text-align:center;">32</td><td class="heat-2">19.4%</td><td style="text-align:center;">94.6</td><td style="text-align:center;">285.4</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">22</td><td>Dajiraj Parmer</td><td style="text-align:center;">162</td><td style="text-align:center;">1</td><td class="heat-0">0.6%</td><td style="text-align:center;">17</td><td class="heat-1">10.5%</td><td style="text-align:center;">0.6</td><td style="text-align:center;">15.7</td><td><span class="badge badge-green">BEST</span></td></tr>
+          <tr><td style="text-align:center;">23</td><td>Durveen Singh</td><td style="text-align:center;">157</td><td style="text-align:center;">50</td><td class="heat-3">31.8%</td><td style="text-align:center;">24</td><td class="heat-2">15.3%</td><td style="text-align:center;">51.4</td><td style="text-align:center;">160.9</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">24</td><td>DINESH SARVAIYA</td><td style="text-align:center;">154</td><td style="text-align:center;">68</td><td class="heat-3">44.2%</td><td style="text-align:center;">24</td><td class="heat-2">15.6%</td><td style="text-align:center;color:#991b1b;font-weight:700;">172.4 hrs</td><td style="text-align:center;color:#991b1b;font-weight:700;">358.9 hrs</td><td><span class="badge badge-red">CRITICAL</span></td></tr>
+          <tr><td style="text-align:center;">25</td><td>Arvendra Hasanpur</td><td style="text-align:center;">151</td><td style="text-align:center;">19</td><td class="heat-1">12.6%</td><td style="text-align:center;">22</td><td class="heat-1">14.6%</td><td style="text-align:center;">43.7</td><td style="text-align:center;">111.9</td><td><span class="badge badge-amber">MEDIUM</span></td></tr>
+          <tr><td style="text-align:center;">26</td><td>Tikam mali</td><td style="text-align:center;">151</td><td style="text-align:center;">85</td><td class="heat-3" style="color:#991b1b;"><strong>56.3%</strong></td><td style="text-align:center;">8</td><td class="heat-0">5.3%</td><td style="text-align:center;">78.2</td><td style="text-align:center;">223.3</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">27</td><td>Tijon Devi</td><td style="text-align:center;">144</td><td style="text-align:center;">21</td><td class="heat-1">14.6%</td><td style="text-align:center;">47</td><td class="heat-3" style="color:#991b1b;font-weight:700;">32.6%</td><td style="text-align:center;">47.9</td><td style="text-align:center;">136.7</td><td><span class="badge badge-red">HIGH</span></td></tr>
+          <tr><td style="text-align:center;">28</td><td>Balaji Pandit</td><td style="text-align:center;">142</td><td style="text-align:center;">92</td><td class="heat-3" style="color:#991b1b;"><strong>64.8%</strong></td><td style="text-align:center;">34</td><td class="heat-2">23.9%</td><td style="text-align:center;">62.8</td><td style="text-align:center;">163.3</td><td><span class="badge badge-red">CRITICAL</span></td></tr>
+          <tr><td style="text-align:center;">29</td><td>ravikumar kumar</td><td style="text-align:center;">142</td><td style="text-align:center;">86</td><td class="heat-3" style="color:#991b1b;"><strong>60.6%</strong></td><td style="text-align:center;">25</td><td class="heat-2">17.6%</td><td style="text-align:center;">116.9</td><td style="text-align:center;">283.7</td><td><span class="badge badge-red">CRITICAL</span></td></tr>
+          <tr><td style="text-align:center;">30</td><td>Sanga Danabhai</td><td style="text-align:center;">141</td><td style="text-align:center;">4</td><td class="heat-0">2.8%</td><td style="text-align:center;">18</td><td class="heat-1">12.8%</td><td style="text-align:center;">26.3</td><td style="text-align:center;">90.9</td><td><span class="badge badge-green">LOW</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="danger-box">
+      🚨 <strong>9 partners are CRITICAL</strong> (HOLD_BY_LMD &gt;50% or extreme TAT): Ravikaran Singh (66.1%), Balaji Pandit (64.8%), Dinesh mali (63.5%), ravikumar kumar (60.6%), Manish Kumar (60.7%), Vikash Kumar Singh (60.3%), Himanshu Chauhan (55.2%), Tikam mali (56.3%), Sumer Singh (53.8%).
+      DINESH SARVAIYA has a pickup P50 of <strong>172 hours</strong> — farmers wait 7 days from pack to pickup. This partner needs immediate review or replacement.
+      Dajiraj Parmer is the benchmark: 0.6% HOLD, 0.6hr pickup P50 — Ground Ops should use him as the model for partner SLA conversations.
+    </div>
+    <div class="scan-note" style="margin-top:8px;">
+      Note: Reconciliation data shows 100% unreconciled across all partners — this is expected for FY27 data (&lt;50 days old). Reconciliation cycle may lag 30–60 days.
+    </div>
+  </div>
+
+</div>
+
+
+<div class="footer">
+  DVS Operations Dashboard · Agrostar FY27 · Source: agrostar-data BigQuery ·
+  All GMV in actual ₹ (Indian comma format) — no rounding to lacs/crores ·
+  Scan cost: ~10 GB across 5 queries · 5 states · 01 Apr – 20 May 2026
+</div>
+
+<script>
+  function switchTab(name, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('view-' + name).classList.add('active');
+  }
+</script>
+</body>
+</html>
