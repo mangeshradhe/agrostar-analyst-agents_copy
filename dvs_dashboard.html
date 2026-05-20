@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>DVS Dashboard — Agrostar FY27</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #1a1a2e; font-size: 13px; }
@@ -92,6 +93,25 @@
 
     .scan-note { font-size: 10px; color: #94a3b8; font-style: italic; margin-top: 6px; }
     .footer { text-align: center; padding: 14px; font-size: 10.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; margin-top: 8px; }
+
+    /* ── Filter Bar ── */
+    .filter-bar { background:#fff; border-bottom:1px solid #e2e8f0; padding:8px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+    .filter-group { display:flex; align-items:center; gap:6px; }
+    .filter-label { font-size:11px; font-weight:600; color:#64748b; white-space:nowrap; }
+    .state-pill { padding:4px 12px; border-radius:12px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-size:11px; font-weight:600; color:#475569; transition:all 0.1s; }
+    .state-pill:hover { border-color:#94a3b8; }
+    .state-pill.active { background:#1a1a2e; color:#fff; border-color:#1a1a2e; }
+    .date-input { padding:4px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:11px; color:#1a1a2e; cursor:pointer; }
+    .date-input:focus { outline:none; border-color:#16a34a; }
+    .load-btn { padding:5px 14px; background:#16a34a; color:#fff; border:none; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; transition:background 0.15s; }
+    .load-btn:hover { background:#15803d; }
+    .load-btn:disabled { background:#94a3b8; cursor:not-allowed; }
+    .auth-btn { padding:5px 14px; background:#2563eb; color:#fff; border:none; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; }
+    .auth-btn.connected { background:#16a34a; }
+    .filter-sep { width:1px; height:20px; background:#e2e8f0; }
+    .loading-overlay { display:none; position:fixed; inset:0; background:rgba(255,255,255,0.7); z-index:100; align-items:center; justify-content:center; }
+    .loading-overlay.show { display:flex; }
+    .loading-spinner { font-size:14px; font-weight:700; color:#1a1a2e; background:#fff; padding:16px 24px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.15); }
   </style>
 </head>
 <body>
@@ -117,6 +137,33 @@
   <div class="tab" onclick="switchTab('delivery',this)">🚚 Delivery Performance</div>
   <div class="tab" onclick="switchTab('distance',this)">📍 Farmer → Store Distance</div>
   <div class="tab" onclick="switchTab('lmd',this)">🤝 LMD Scorecard</div>
+</div>
+
+<div class="filter-bar">
+  <div class="filter-group">
+    <span class="filter-label">STATE</span>
+    <span class="state-pill active" onclick="filterState('ALL',this)">All States</span>
+    <span class="state-pill" onclick="filterState('Maharashtra',this)">MH</span>
+    <span class="state-pill" onclick="filterState('Gujarat',this)">GJ</span>
+    <span class="state-pill" onclick="filterState('Rajasthan',this)">RJ</span>
+    <span class="state-pill" onclick="filterState('Uttar Pradesh',this)">UP</span>
+    <span class="state-pill" onclick="filterState('Madhya Pradesh',this)">MP</span>
+  </div>
+  <div class="filter-sep"></div>
+  <div class="filter-group">
+    <span class="filter-label">FROM</span>
+    <input type="date" id="start-date" class="date-input"/>
+    <span class="filter-label">TO</span>
+    <input type="date" id="end-date" class="date-input"/>
+  </div>
+  <button class="load-btn" id="load-btn" onclick="loadData()" disabled>⟳ Load Data</button>
+  <div class="filter-sep"></div>
+  <button class="auth-btn" id="auth-btn" onclick="signIn()">🔑 Connect Google</button>
+  <span id="query-status" style="font-size:10.5px;color:#94a3b8;"></span>
+</div>
+
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner" id="loading-msg">⟳ Running queries on BigQuery…</div>
 </div>
 
 
@@ -178,7 +225,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr>
+        <tr data-state="Maharashtra">
           <td>Maharashtra</td>
           <td>17,013</td><td>₹5,63,47,761</td>
           <td>6,383</td><td>₹2,25,04,793</td>
@@ -188,7 +235,7 @@
           <td>5,038</td><td>4,181</td><td>2,617</td>
           <td><span class="badge badge-red">1,101 (17.2%)</span></td>
         </tr>
-        <tr>
+        <tr data-state="Gujarat">
           <td>Gujarat</td>
           <td>9,611</td><td>₹3,55,92,069</td>
           <td>6,170</td><td>₹2,35,88,219</td>
@@ -198,7 +245,7 @@
           <td>5,932</td><td>5,373</td><td>3,665</td>
           <td><span class="badge badge-amber">861 (13.9%)</span></td>
         </tr>
-        <tr>
+        <tr data-state="Rajasthan">
           <td>Rajasthan</td>
           <td>10,077</td><td>₹4,15,60,547</td>
           <td>4,097</td><td>₹1,65,10,951</td>
@@ -208,7 +255,7 @@
           <td>3,873</td><td>3,095</td><td>2,153</td>
           <td><span class="badge badge-red">635 (15.5%)</span></td>
         </tr>
-        <tr>
+        <tr data-state="Uttar Pradesh">
           <td>Uttar Pradesh</td>
           <td>12,434</td><td>₹3,57,05,590</td>
           <td>3,801</td><td>₹1,10,14,256</td>
@@ -218,7 +265,7 @@
           <td>3,419</td><td>2,695</td><td>1,933</td>
           <td><span class="badge badge-red">549 (14.4%)</span></td>
         </tr>
-        <tr>
+        <tr data-state="Madhya Pradesh">
           <td>Madhya Pradesh</td>
           <td>7,660</td><td>₹2,78,16,871</td>
           <td>2,005</td><td>₹75,81,831</td>
@@ -307,31 +354,31 @@
         <div class="section-sub">How much of B2C demand is fulfilled via DVS stores</div>
       </div>
       <div style="margin-top:12px;">
-        <div class="funnel-stage">
+        <div class="funnel-stage" data-state="Gujarat">
           <div class="funnel-label">Gujarat</div>
           <div class="funnel-bar-wrap"><div class="funnel-bar green" style="width:64.2%">6,170 of 9,611</div></div>
           <div class="funnel-meta">64.2%</div>
           <div class="funnel-sla"><span class="badge badge-green">Best</span></div>
         </div>
-        <div class="funnel-stage">
+        <div class="funnel-stage" data-state="Rajasthan">
           <div class="funnel-label">Rajasthan</div>
           <div class="funnel-bar-wrap"><div class="funnel-bar amber" style="width:40.7%">4,097 of 10,077</div></div>
           <div class="funnel-meta">40.7%</div>
           <div class="funnel-sla"><span class="badge badge-amber">Mid</span></div>
         </div>
-        <div class="funnel-stage">
+        <div class="funnel-stage" data-state="Maharashtra">
           <div class="funnel-label">Maharashtra</div>
           <div class="funnel-bar-wrap"><div class="funnel-bar amber" style="width:37.5%">6,383 of 17,013</div></div>
           <div class="funnel-meta">37.5%</div>
           <div class="funnel-sla"><span class="badge badge-amber">Mid</span></div>
         </div>
-        <div class="funnel-stage">
+        <div class="funnel-stage" data-state="Uttar Pradesh">
           <div class="funnel-label">Uttar Pradesh</div>
           <div class="funnel-bar-wrap"><div class="funnel-bar red" style="width:30.6%">3,801 of 12,434</div></div>
           <div class="funnel-meta">30.6%</div>
           <div class="funnel-sla"><span class="badge badge-red">Low</span></div>
         </div>
-        <div class="funnel-stage">
+        <div class="funnel-stage" data-state="Madhya Pradesh">
           <div class="funnel-label">Madhya Pradesh</div>
           <div class="funnel-bar-wrap"><div class="funnel-bar red" style="width:26.2%">2,005 of 7,660</div></div>
           <div class="funnel-meta">26.2%</div>
@@ -407,7 +454,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr>
+        <tr data-state="Maharashtra">
           <td>Maharashtra</td>
           <td style="text-align:center;font-weight:600;">463</td>
           <td class="heat-3">128.2 · 92.1 · 327.1</td>
@@ -418,7 +465,7 @@
           <td style="text-align:center;">32</td>
           <td class="heat-3">161.9</td>
         </tr>
-        <tr>
+        <tr data-state="Gujarat">
           <td>Gujarat</td>
           <td style="text-align:center;font-weight:600;">433</td>
           <td class="heat-3">81.1 · 41.9 · 204.5</td>
@@ -429,7 +476,7 @@
           <td style="text-align:center;">62</td>
           <td class="heat-3">195.8</td>
         </tr>
-        <tr>
+        <tr data-state="Rajasthan">
           <td>Rajasthan</td>
           <td style="text-align:center;font-weight:600;">464</td>
           <td class="heat-3">166.1 · 113.8 · 395.4</td>
@@ -440,7 +487,7 @@
           <td style="text-align:center;">14</td>
           <td class="heat-3">200.1</td>
         </tr>
-        <tr>
+        <tr data-state="Uttar Pradesh">
           <td>Uttar Pradesh</td>
           <td style="text-align:center;font-weight:600;">373</td>
           <td class="heat-3">105.4 · 43.4 · 349.8</td>
@@ -451,7 +498,7 @@
           <td style="text-align:center;">15</td>
           <td class="heat-2">95.7</td>
         </tr>
-        <tr>
+        <tr data-state="Madhya Pradesh">
           <td>Madhya Pradesh</td>
           <td style="text-align:center;font-weight:600;">79</td>
           <td class="heat-3">71.1 · 20.6 · 207.3</td>
@@ -1044,12 +1091,365 @@
 </div>
 
 <script>
-  function switchTab(name, el) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById('view-' + name).classList.add('active');
+// ─── CONFIG ──────────────────────────────────────────────────────────
+const GCP_PROJECT = 'agrostar-data';
+const BQ_URL = `https://bigquery.googleapis.com/bigquery/v2/projects/${GCP_PROJECT}`;
+// Paste your OAuth 2.0 Web Client ID from console.cloud.google.com
+const OAUTH_CLIENT_ID = 'YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com';
+
+let accessToken = null;
+let tokenExpiry = 0;
+let currentState = 'ALL';
+
+// ─── INIT ─────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  // Default dates: yesterday
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = yesterday.toISOString().split('T')[0];
+  document.getElementById('start-date').value = yStr;
+  document.getElementById('end-date').value   = yStr;
+
+  // Auto-tag all state rows in every table using first-cell text
+  const STATES = ['Maharashtra','Gujarat','Rajasthan','Uttar Pradesh','Madhya Pradesh'];
+  document.querySelectorAll('tbody tr').forEach(tr => {
+    const firstCell = tr.querySelector('td');
+    if (firstCell && STATES.includes(firstCell.textContent.trim())) {
+      tr.dataset.state = firstCell.textContent.trim();
+    }
+  });
+});
+
+// ─── TAB SWITCHING ────────────────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('view-' + name).classList.add('active');
+}
+
+// ─── STATE FILTER ─────────────────────────────────────────────────────
+function filterState(state, el) {
+  currentState = state;
+  document.querySelectorAll('.state-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+
+  // Filter table rows
+  document.querySelectorAll('tr[data-state]').forEach(tr => {
+    tr.style.display = (state === 'ALL' || tr.dataset.state === state) ? '' : 'none';
+  });
+  // Filter funnel-stage bars (DVS % by state)
+  document.querySelectorAll('.funnel-stage[data-state]').forEach(fs => {
+    fs.style.display = (state === 'ALL' || fs.dataset.state === state) ? '' : 'none';
+  });
+}
+
+// ─── OAUTH ────────────────────────────────────────────────────────────
+let tokenClient = null;
+
+function signIn() {
+  if (!window.google) { alert('Google GSI not loaded yet — try again in a second.'); return; }
+  if (!tokenClient) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: OAUTH_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/bigquery.readonly',
+      callback: (resp) => {
+        if (resp.error) { setStatus('Auth error: ' + resp.error, true); return; }
+        accessToken = resp.access_token;
+        tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
+        const btn = document.getElementById('auth-btn');
+        btn.textContent = '✓ Connected';
+        btn.className = 'auth-btn connected';
+        document.getElementById('load-btn').disabled = false;
+        setStatus('Authenticated. Ready to load data.');
+      }
+    });
   }
+  tokenClient.requestAccessToken();
+}
+
+function ensureToken() {
+  if (Date.now() > tokenExpiry) tokenClient.requestAccessToken({ prompt: '' });
+}
+
+// ─── BQ RUNNER ────────────────────────────────────────────────────────
+async function runQuery(sql) {
+  ensureToken();
+  const res = await fetch(`${BQ_URL}/jobs`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ configuration: { query: { query: sql, useLegacySql: false } } })
+  });
+  const job = await res.json();
+  if (!job.jobReference) throw new Error(JSON.stringify(job.error));
+  return pollJob(job.jobReference.jobId);
+}
+
+async function pollJob(jobId) {
+  for (;;) {
+    const res = await fetch(`${BQ_URL}/jobs/${jobId}`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    const job = await res.json();
+    if (job.status.state === 'DONE') {
+      if (job.status.errorResult) throw new Error(job.status.errorResult.message);
+      return fetchAllRows(jobId);
+    }
+    await new Promise(r => setTimeout(r, 1200));
+  }
+}
+
+async function fetchAllRows(jobId, pageToken, acc = []) {
+  const url = `${BQ_URL}/jobs/${jobId}/queryResults?maxResults=5000` + (pageToken ? `&pageToken=${pageToken}` : '');
+  const res  = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+  const data = await res.json();
+  const rows = (data.rows || []).map(r => r.f.map(f => f.v));
+  acc.push(...rows);
+  return data.pageToken ? fetchAllRows(jobId, data.pageToken, acc) : acc;
+}
+
+// ─── QUERIES ──────────────────────────────────────────────────────────
+function buildStateFilter() {
+  if (currentState === 'ALL') return '';
+  return `AND sa.state = '${currentState}'`;
+}
+
+function getStateSummarySQL(s, e) {
+  return `
+WITH orders AS (
+  SELECT o.sales_order_id, o.retail_store_code, o.unicommerce_id,
+    sa.state,
+    CASE WHEN o.retail_store_code IS NOT NULL AND o.retail_store_code != '' THEN 'DVS' ELSE 'FC' END AS fulfillment,
+    SUM(oi.total_price) AS gmv
+  FROM \`agrostar-data.prod_db_views.order_management_order\` o
+  JOIN \`agrostar-data.prod_db_views.csr_shippingaddress\` sa ON sa.id = o.shipping_address_id
+  JOIN \`agrostar-data.prod_db_views.order_management_orderitem\` oi ON oi.order_id = o.sales_order_id
+  WHERE DATE(o.created_on) BETWEEN '${s}' AND '${e}'
+    AND LOWER(o.initiating_source) NOT LIKE 'b2b%'
+    AND o.unicommerce_status NOT IN ('FUTURE ORDER','CANCELLED','DISPUTED_ADDRESS')
+    AND o.status NOT IN ('MOB_APP_UNVERIFIED')
+    AND o.status NOT LIKE 'edited%'
+    AND o.unicommerce_status NOT LIKE 'edited%'
+    AND LOWER(COALESCE(o.order_type,'')) NOT LIKE '%offline%'
+    ${buildStateFilter()}
+  GROUP BY 1,2,3,4,5
+),
+hist AS (
+  SELECT h.order_id,
+    MAX(CASE WHEN h.status='PACKED'        THEN 1 END) AS packed,
+    MAX(CASE WHEN h.status='PICKED_BY_LMD' THEN 1 END) AS picked,
+    MAX(CASE WHEN h.status='DELIVERED'     THEN 1 END) AS delivered,
+    MAX(CASE WHEN h.status IN ('RETURNED_BY_LMD','RETURNED') THEN 1 END) AS rto
+  FROM \`agrostar-data.prod_db_views.order_management_orderhistorymeta\` h
+  JOIN orders o ON o.sales_order_id = h.order_id AND o.fulfillment = 'DVS'
+  GROUP BY 1
+),
+reroute AS (
+  SELECT r.order_id, COUNT(*) AS cnt
+  FROM \`agrostar-data.prod_db_views.order_management_orderreroutinglogs\` r
+  JOIN orders o ON o.sales_order_id = r.order_id
+  WHERE o.fulfillment = 'FC'
+  GROUP BY 1
+),
+stores AS (
+  SELECT state, COUNT(DISTINCT retail_store_code) AS active_stores
+  FROM orders WHERE fulfillment='DVS' GROUP BY 1
+)
+SELECT
+  o.state,
+  COUNT(DISTINCT o.sales_order_id) AS b2c_orders,
+  CAST(SUM(o.gmv) AS INT64) AS b2c_gmv,
+  COUNTIF(o.fulfillment='DVS') AS dvs_orders,
+  CAST(SUM(CASE WHEN o.fulfillment='DVS' THEN o.gmv ELSE 0 END) AS INT64) AS dvs_gmv,
+  ROUND(COUNTIF(o.fulfillment='DVS')*100.0/COUNT(*),1) AS dvs_pct,
+  MAX(st.active_stores) AS active_stores,
+  COUNTIF(rr.cnt IS NOT NULL) AS rerouted,
+  COUNTIF(h.packed=1) AS packed_cnt,
+  COUNTIF(h.picked=1) AS picked_cnt,
+  COUNTIF(h.delivered=1) AS delivered_cnt,
+  COUNTIF(h.rto=1) AS rto_cnt,
+  ROUND(COUNTIF(h.rto=1)*100.0/NULLIF(COUNTIF(o.fulfillment='DVS'),0),1) AS rto_pct
+FROM orders o
+LEFT JOIN hist h ON h.order_id = o.sales_order_id
+LEFT JOIN reroute rr ON rr.order_id = o.sales_order_id
+LEFT JOIN stores st ON st.state = o.state
+GROUP BY 1
+ORDER BY dvs_orders DESC`;
+}
+
+function getDeliveryTATSQL(s, e) {
+  return `
+WITH dvs AS (
+  SELECT o.sales_order_id, o.created_on AS order_ts, sa.state
+  FROM \`agrostar-data.prod_db_views.order_management_order\` o
+  JOIN \`agrostar-data.prod_db_views.csr_shippingaddress\` sa ON sa.id = o.shipping_address_id
+  WHERE DATE(o.created_on) BETWEEN '${s}' AND '${e}'
+    AND LOWER(o.initiating_source) NOT LIKE 'b2b%'
+    AND o.retail_store_code IS NOT NULL AND o.retail_store_code != ''
+    AND o.unicommerce_status NOT IN ('FUTURE ORDER','CANCELLED','DISPUTED_ADDRESS')
+    AND o.status NOT IN ('MOB_APP_UNVERIFIED')
+    AND o.status NOT LIKE 'edited%'
+    AND o.unicommerce_status NOT LIKE 'edited%'
+    ${buildStateFilter()}
+),
+milestones AS (
+  SELECT h.order_id,
+    MIN(CASE WHEN h.status IN ('PACKED','ON_HOLD') THEN h.created_on END) AS first_action_ts,
+    MIN(CASE WHEN h.status='PACKED'        THEN h.created_on END) AS packed_ts,
+    MIN(CASE WHEN h.status='PICKED_BY_LMD' THEN h.created_on END) AS picked_ts,
+    MIN(CASE WHEN h.status='DELIVERED'     THEN h.created_on END) AS delivered_ts
+  FROM \`agrostar-data.prod_db_views.order_management_orderhistorymeta\` h
+  JOIN dvs d ON d.sales_order_id = h.order_id
+  GROUP BY 1
+)
+SELECT
+  d.state,
+  COUNT(*) AS dvs_orders,
+  CAST(APPROX_QUANTILES(TIMESTAMP_DIFF(m.first_action_ts,d.order_ts,MINUTE),100)[OFFSET(50)] / 60.0 AS NUMERIC) AS p50_first_action_hrs,
+  CAST(APPROX_QUANTILES(TIMESTAMP_DIFF(m.first_action_ts,d.order_ts,MINUTE),100)[OFFSET(90)] / 60.0 AS NUMERIC) AS p90_first_action_hrs,
+  COUNTIF(TIMESTAMP_DIFF(m.first_action_ts,d.order_ts,MINUTE) > 60) AS first_action_breaches,
+  CAST(APPROX_QUANTILES(TIMESTAMP_DIFF(m.picked_ts,m.packed_ts,MINUTE),100)[OFFSET(50)] / 60.0 AS NUMERIC) AS p50_packed_picked_hrs,
+  CAST(APPROX_QUANTILES(TIMESTAMP_DIFF(m.picked_ts,m.packed_ts,MINUTE),100)[OFFSET(90)] / 60.0 AS NUMERIC) AS p90_packed_picked_hrs,
+  COUNTIF(TIMESTAMP_DIFF(m.picked_ts,m.packed_ts,MINUTE) > 1440) AS packed_picked_breaches,
+  CAST(APPROX_QUANTILES(TIMESTAMP_DIFF(m.delivered_ts,d.order_ts,MINUTE),100)[OFFSET(50)] / 60.0 AS NUMERIC) AS p50_e2e_hrs,
+  CAST(APPROX_QUANTILES(TIMESTAMP_DIFF(m.delivered_ts,d.order_ts,MINUTE),100)[OFFSET(90)] / 60.0 AS NUMERIC) AS p90_e2e_hrs,
+  COUNTIF(TIMESTAMP_DIFF(m.delivered_ts,d.order_ts,HOUR) > 72) AS e2e_breaches,
+  COUNTIF(m.delivered_ts IS NOT NULL) AS delivered_cnt
+FROM dvs d JOIN milestones m ON m.order_id = d.sales_order_id
+GROUP BY 1 ORDER BY dvs_orders DESC`;
+}
+
+// ─── LOAD DATA ────────────────────────────────────────────────────────
+async function loadData() {
+  const s = document.getElementById('start-date').value;
+  const e = document.getElementById('end-date').value;
+  if (!s || !e) { alert('Select a date range first.'); return; }
+  if (!accessToken) { alert('Connect Google first.'); return; }
+
+  showLoading('Running Query 1/2 — State Summary…');
+  try {
+    const [sumRows, tatRows] = await Promise.all([
+      runQuery(getStateSummarySQL(s, e)),
+      runQuery(getDeliveryTATSQL(s, e))
+    ]);
+
+    setStatus(`Loaded ${s} → ${e} · ${sumRows.length} states`);
+    renderStateSummary(sumRows);
+    renderDeliveryTAT(tatRows);
+    updateHeaderDate(s, e);
+  } catch(err) {
+    setStatus('Error: ' + err.message, true);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ─── RENDER HELPERS ───────────────────────────────────────────────────
+function fmt(n) {
+  return Number(n).toLocaleString('en-IN');
+}
+function heatClass(val, sla, thresholds) {
+  // thresholds = [1x, 2x, 3x] multiples of SLA
+  if (val <= sla) return 'heat-0';
+  if (val <= sla * thresholds[0]) return 'heat-1';
+  if (val <= sla * thresholds[1]) return 'heat-2';
+  return 'heat-3';
+}
+
+function renderStateSummary(rows) {
+  const tbody = document.querySelector('#view-sales .card table tbody');
+  if (!tbody) return;
+  // Keep TOTAL row, replace state rows
+  const totalRow = tbody.querySelector('tr[style]');
+  tbody.innerHTML = '';
+  let totB2c=0, totGmv=0, totDvs=0, totDvsGmv=0, totStores=0, totRe=0, totPk=0, totPi=0, totDl=0, totRto=0;
+
+  rows.forEach(r => {
+    const [state, b2c, gmv, dvs, dvsGmv, dvsPct, stores, rerouted, packed, picked, delivered, rto, rtoPct] = r;
+    totB2c+=+b2c; totGmv+=+gmv; totDvs+=+dvs; totDvsGmv+=+dvsGmv;
+    totStores+=+stores; totRe+=+rerouted; totPk+=+packed; totPi+=+picked; totDl+=+delivered; totRto+=+rto;
+
+    const dvsPctN = parseFloat(dvsPct);
+    const rtoPctN = parseFloat(rtoPct);
+    const dvsBadge = dvsPctN >= 55 ? 'badge-green' : dvsPctN >= 35 ? 'badge-amber' : 'badge-red';
+    const rtoBadge = rtoPctN <= 8 ? 'badge-green' : rtoPctN <= 14 ? 'badge-amber' : 'badge-red';
+    const reBadge  = +rerouted < 500 ? 'badge-green' : +rerouted < 1500 ? 'badge-amber' : 'badge-red';
+
+    const tr = document.createElement('tr');
+    tr.dataset.state = state;
+    tr.innerHTML = `
+      <td>${state}</td>
+      <td>${fmt(b2c)}</td><td>₹${fmt(gmv)}</td>
+      <td>${fmt(dvs)}</td><td>₹${fmt(dvsGmv)}</td>
+      <td><span class="badge ${dvsBadge}">${dvsPct}%</span></td>
+      <td>${fmt(stores)}</td>
+      <td><span class="badge ${reBadge}">${fmt(rerouted)}</span></td>
+      <td>${fmt(packed)}</td><td>${fmt(picked)}</td><td>${fmt(delivered)}</td>
+      <td><span class="badge ${rtoBadge}">${fmt(rto)} (${rtoPct}%)</span></td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Totals row
+  const totDvsPct = (totDvs*100/totB2c).toFixed(1);
+  const totRtoPct = (totRto*100/totDvs).toFixed(1);
+  const tr = document.createElement('tr');
+  tr.style.fontWeight='700'; tr.style.background='#f8fafc';
+  tr.innerHTML = `
+    <td>TOTAL</td>
+    <td>${fmt(totB2c)}</td><td>₹${fmt(totGmv)}</td>
+    <td>${fmt(totDvs)}</td><td>₹${fmt(totDvsGmv)}</td>
+    <td><span class="badge badge-amber">${totDvsPct}%</span></td>
+    <td>${fmt(totStores)}</td>
+    <td><span class="badge badge-red">${fmt(totRe)}</span></td>
+    <td>${fmt(totPk)}</td><td>${fmt(totPi)}</td><td>${fmt(totDl)}</td>
+    <td><span class="badge badge-red">${fmt(totRto)} (${totRtoPct}%)</span></td>`;
+  tbody.appendChild(tr);
+
+  // Re-apply state filter
+  if (currentState !== 'ALL') filterState(currentState, document.querySelector('.state-pill.active'));
+}
+
+function renderDeliveryTAT(rows) {
+  const tbody = document.querySelector('#view-delivery .card:first-of-type table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  rows.forEach(r => {
+    const [state, dvs, p50fa, p90fa, faB, p50pp, p90pp, ppB, p50e2e, p90e2e, e2eB, dlCnt] = r;
+    const tr = document.createElement('tr');
+    tr.dataset.state = state;
+    tr.innerHTML = `
+      <td>${state}</td>
+      <td style="text-align:center">${fmt(dvs)}</td>
+      <td class="${heatClass(+p50fa,1,[2,3,5])}">${(+p50fa).toFixed(1)} hrs (${(+p90fa).toFixed(1)} hrs)</td>
+      <td><span class="badge badge-red">${fmt(faB)} / ${fmt(dvs)}</span></td>
+      <td class="${heatClass(+p50pp,24,[1.5,2.5,4])}">${(+p50pp).toFixed(1)} hrs (${(+p90pp).toFixed(1)} hrs)</td>
+      <td><span class="badge badge-red">${fmt(ppB)} / ${fmt(dlCnt)}</span></td>
+      <td>—</td>
+      <td class="${heatClass(+p50e2e,72,[1.2,1.8,3])}">${(+p50e2e).toFixed(0)} hrs (${(+p90e2e).toFixed(0)} hrs)</td>
+      <td><span class="badge badge-red">${fmt(e2eB)} / ${fmt(dlCnt)}</span></td>`;
+    tbody.appendChild(tr);
+  });
+  if (currentState !== 'ALL') filterState(currentState, document.querySelector('.state-pill.active'));
+}
+
+function updateHeaderDate(s, e) {
+  const el = document.querySelector('.header-meta div:first-child strong');
+  if (el) el.textContent = `${s} – ${e}`;
+}
+
+// ─── STATUS / LOADING ─────────────────────────────────────────────────
+function setStatus(msg, isError=false) {
+  const el = document.getElementById('query-status');
+  el.textContent = msg;
+  el.style.color = isError ? '#dc2626' : '#94a3b8';
+}
+function showLoading(msg) {
+  document.getElementById('loading-msg').textContent = msg;
+  document.getElementById('loading-overlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('show');
+}
 </script>
 </body>
 </html>
