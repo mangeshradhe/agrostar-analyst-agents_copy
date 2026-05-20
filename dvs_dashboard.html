@@ -188,9 +188,10 @@
       <div class="kpi-delta down">↓ Gujarat best @ 64.2%</div>
     </div>
     <div class="kpi-card purple">
-      <div class="kpi-label">Stores with DVS Activity</div>
-      <div class="kpi-value">1,084</div>
-      <div class="kpi-sub">Stores fulfilled ≥1 DVS order</div>
+      <div class="kpi-label">Active DVS Partners</div>
+      <div class="kpi-value">1,233</div>
+      <div class="kpi-sub">Configured &amp; enabled across 5 states</div>
+      <div class="kpi-delta down">↓ 1,084 got ≥1 order this period</div>
     </div>
     <div class="kpi-card red">
       <div class="kpi-label">Re-routed to FC</div>
@@ -463,55 +464,161 @@
   <div class="two-col">
     <div class="card">
       <div class="section-header">
-        <div class="section-title">DVS Demand Funnel — All States Combined</div>
-        <div class="section-sub">01 Apr – 20 May 2026 · 22,456 DVS orders</div>
-      </div>
-      <div style="margin-top:12px;">
-        <div class="funnel-stage">
-          <div class="funnel-label">Total DVS Orders</div>
-          <div class="funnel-bar-wrap"><div class="funnel-bar blue" style="width:100%">22,456</div></div>
-          <div class="funnel-meta">100%</div>
-          <div class="funnel-sla"></div>
-        </div>
-        <div class="funnel-stage">
-          <div class="funnel-label">First Action ≤ 1 hr</div>
-          <div class="funnel-bar-wrap"><div class="funnel-bar amber" style="width:40.3%">9,041</div></div>
-          <div class="funnel-meta">40.3%</div>
-          <div class="funnel-sla"><span class="badge badge-red">Target: 100%</span></div>
-        </div>
-        <div class="funnel-stage">
-          <div class="funnel-label">Ever Packed</div>
-          <div class="funnel-bar-wrap"><div class="funnel-bar green" style="width:88.8%">19,945</div></div>
-          <div class="funnel-meta">88.8%</div>
-          <div class="funnel-sla"><span class="badge badge-green">Good</span></div>
-        </div>
-        <div class="funnel-stage">
-          <div class="funnel-label">Ever Picked by LMD</div>
-          <div class="funnel-bar-wrap"><div class="funnel-bar amber" style="width:75.0%">16,842</div></div>
-          <div class="funnel-meta">75.0%</div>
-          <div class="funnel-sla"><span class="badge badge-amber">Target: 85%</span></div>
-        </div>
-        <div class="funnel-stage">
-          <div class="funnel-label">Delivered</div>
-          <div class="funnel-bar-wrap"><div class="funnel-bar green" style="width:52.0%">11,673</div></div>
-          <div class="funnel-meta">52.0%</div>
-          <div class="funnel-sla"><span class="badge badge-amber">In-flight</span></div>
-        </div>
-        <div class="funnel-stage">
-          <div class="funnel-label">RTO (Returned by LMD)</div>
-          <div class="funnel-bar-wrap"><div class="funnel-bar red" style="width:14.8%">3,321</div></div>
-          <div class="funnel-meta">14.8%</div>
-          <div class="funnel-sla"><span class="badge badge-red">Target: &lt;5%</span></div>
-        </div>
-        <div class="funnel-stage">
-          <div class="funnel-label">Cancelled</div>
-          <div class="funnel-bar-wrap"><div class="funnel-bar gray" style="width:0.05%"></div></div>
-          <div class="funnel-meta">11 orders</div>
-          <div class="funnel-sla"></div>
+        <div>
+          <div class="section-title">DVS Demand Funnel — B2C Demand to Delivery</div>
+          <div class="section-sub">01 Apr – 20 May 2026 · Starting from total B2C demand, showing where orders flow and leak at each stage</div>
         </div>
       </div>
-      <div class="warning-box">
-        ⚠️ Only <strong>40.3%</strong> of orders get first action within the 1-hr SLA. Over <strong>13,415 orders</strong> missed this SLA — biggest single lever to improve E2E TAT.
+      <div style="margin-top:14px;">
+
+        <!-- Stage 1: B2C Demand -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <div style="width:200px;font-size:11px;font-weight:700;color:#1a1a2e;">🛒 Total B2C Demand</div>
+          <div style="flex:1;background:#2563eb;border-radius:4px;height:28px;display:flex;align-items:center;padding-left:10px;">
+            <span style="color:#fff;font-size:12px;font-weight:700;">57,296 orders</span>
+          </div>
+          <div style="width:60px;font-size:11px;font-weight:700;text-align:right;">100%</div>
+          <div style="width:120px;"></div>
+        </div>
+
+        <!-- Leak 1: Never reached DVS -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;margin-left:200px;">
+          <div style="width:16px;border-left:2px dashed #94a3b8;border-bottom:2px dashed #94a3b8;height:18px;"></div>
+          <div style="font-size:10.5px;color:#dc2626;">⛔ 23,549 never reached DVS — no partner coverage in farmer's taluka (direct to FC)</div>
+        </div>
+
+        <!-- Stage 2: DVS Attempted -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <div style="width:200px;font-size:11px;font-weight:700;color:#1a1a2e;">🏪 Routing → DVS Store</div>
+          <div style="flex:1;background:#d97706;border-radius:4px;height:28px;display:flex;align-items:center;padding-left:10px;width:58.9%;">
+            <span style="color:#fff;font-size:12px;font-weight:700;">33,747 assigned to a store</span>
+          </div>
+          <div style="width:60px;font-size:11px;font-weight:700;text-align:right;color:#d97706;">58.9%</div>
+          <div style="width:120px;font-size:10px;color:#94a3b8;">of B2C demand</div>
+        </div>
+
+        <!-- Leak 2: Re-routed -->
+        <div style="display:flex;gap:10px;margin-bottom:4px;margin-left:200px;align-items:flex-start;">
+          <div style="width:16px;border-left:2px dashed #94a3b8;border-bottom:2px dashed #94a3b8;height:18px;flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:10.5px;color:#dc2626;margin-bottom:3px;">⛔ 11,117 re-routed back to FC after store assignment</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <span class="badge badge-red">Partner SLA Miss 5,602</span>
+              <span class="badge badge-amber">OCP Block 2,596</span>
+              <span class="badge badge-red">No Partner Response 2,073</span>
+              <span class="badge badge-gray">Shop Closed 721</span>
+              <span class="badge badge-gray">Other 125</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stage 3: DVS Fulfilled -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <div style="width:200px;font-size:11px;font-weight:700;color:#1a1a2e;">✅ DVS Fulfilled</div>
+          <div style="flex:1;background:#16a34a;border-radius:4px;height:28px;display:flex;align-items:center;padding-left:10px;width:39.5%;">
+            <span style="color:#fff;font-size:12px;font-weight:700;">22,630 orders (39.5% DVS rate)</span>
+          </div>
+          <div style="width:60px;font-size:11px;font-weight:700;text-align:right;color:#16a34a;">39.5%</div>
+          <div style="width:120px;font-size:10px;color:#94a3b8;">of B2C demand</div>
+        </div>
+
+        <!-- Leak 3: Not yet delivered -->
+        <div style="display:flex;gap:10px;margin-bottom:4px;margin-left:200px;align-items:flex-start;">
+          <div style="width:16px;border-left:2px dashed #94a3b8;border-bottom:2px dashed #94a3b8;height:18px;flex-shrink:0;"></div>
+          <div style="font-size:10.5px;color:#d97706;">
+            ⏳ 10,862 in pipeline or returned — RTO 3,404 (15.1%) · Picked in transit 1,494 · Packed waiting 1,885 · Hold LMD 1,150 · On Hold 1,780 · Pending 686 · Return transit 475
+          </div>
+        </div>
+
+        <!-- Stage 4: Delivered -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <div style="width:200px;font-size:11px;font-weight:700;color:#1a1a2e;">🚜 Delivered to Farmer</div>
+          <div style="flex:1;background:#15803d;border-radius:4px;height:28px;display:flex;align-items:center;padding-left:10px;width:20.5%;">
+            <span style="color:#fff;font-size:12px;font-weight:700;">11,768 delivered</span>
+          </div>
+          <div style="width:60px;font-size:11px;font-weight:700;text-align:right;color:#15803d;">52.0%</div>
+          <div style="width:120px;font-size:10px;color:#94a3b8;">of DVS fulfilled</div>
+        </div>
+
+        <!-- State breakdown table -->
+        <div style="margin-top:16px;">
+          <table>
+            <thead>
+              <tr>
+                <th>State</th>
+                <th>Active Partners</th>
+                <th>B2C Demand</th>
+                <th>DVS Attempted</th>
+                <th>Attempt Rate</th>
+                <th>Re-routed</th>
+                <th>DVS Fulfilled</th>
+                <th>DVS Rate</th>
+                <th>Delivered</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-state="Maharashtra">
+                <td>Maharashtra</td><td style="text-align:center;">371</td>
+                <td>17,187</td><td>12,546</td>
+                <td><span class="badge badge-green">73.0%</span></td>
+                <td><span class="badge badge-red">6,113</span></td>
+                <td>6,433</td>
+                <td><span class="badge badge-amber">37.4%</span></td>
+                <td>2,640</td>
+              </tr>
+              <tr data-state="Gujarat">
+                <td>Gujarat</td><td style="text-align:center;">195</td>
+                <td>9,693</td><td>7,306</td>
+                <td><span class="badge badge-green">75.4%</span></td>
+                <td><span class="badge badge-amber">1,082</span></td>
+                <td>6,224</td>
+                <td><span class="badge badge-green">64.2%</span></td>
+                <td>3,696</td>
+              </tr>
+              <tr data-state="Rajasthan">
+                <td>Rajasthan</td><td style="text-align:center;">213</td>
+                <td>10,159</td><td>5,404</td>
+                <td><span class="badge badge-amber">53.2%</span></td>
+                <td><span class="badge badge-amber">1,274</span></td>
+                <td>4,130</td>
+                <td><span class="badge badge-amber">40.7%</span></td>
+                <td>2,167</td>
+              </tr>
+              <tr data-state="Uttar Pradesh">
+                <td>Uttar Pradesh</td><td style="text-align:center;">226</td>
+                <td>12,533</td><td>5,463</td>
+                <td><span class="badge badge-red">43.6%</span></td>
+                <td><span class="badge badge-amber">1,635</span></td>
+                <td>3,828</td>
+                <td><span class="badge badge-red">30.5%</span></td>
+                <td>1,956</td>
+              </tr>
+              <tr data-state="Madhya Pradesh">
+                <td>Madhya Pradesh</td><td style="text-align:center;">228</td>
+                <td>7,724</td><td>3,028</td>
+                <td><span class="badge badge-red">39.2%</span></td>
+                <td><span class="badge badge-amber">1,013</span></td>
+                <td>2,015</td>
+                <td><span class="badge badge-red">26.1%</span></td>
+                <td>1,309</td>
+              </tr>
+              <tr style="font-weight:700;background:#f8fafc;">
+                <td>TOTAL</td><td style="text-align:center;">1,233</td>
+                <td>57,296</td><td>33,747</td>
+                <td style="text-align:center;">58.9%</td>
+                <td style="text-align:center;color:#991b1b;">11,117</td>
+                <td>22,630</td>
+                <td style="text-align:center;color:#d97706;">39.5%</td>
+                <td>11,768</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="insight-box" style="margin-top:10px;">
+        💡 <strong>Gujarat at 75.4% attempt rate + 64.2% DVS rate</strong> shows the model works when LMD coverage + partner response is strong.
+        UP and MP have the worst attempt rates (43–39%) — meaning the routing engine couldn't even find a suitable partner for 57–61% of B2C demand. This is a <strong>coverage gap</strong>, not a performance gap.
+        MH has good attempt rate (73%) but high re-routes (6,113) — there the problem is <strong>partner SLA compliance</strong>.
       </div>
     </div>
 
