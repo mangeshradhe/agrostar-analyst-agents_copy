@@ -1014,7 +1014,7 @@ const STATIC_DATA = {
     ['GOVIND KRUSHI KENDRA',                   'maharashtra',    'gadchiroli',     21, 'SLA Miss',    43152,  12910, 0],
     ['JAGDAMBA KRISHI KENDRA',                 'maharashtra',    'chandrapur',     16, 'SLA Miss',        0,      0, 1],
     ['JAI JAGNNATH KRUSHI SEWA KENDRA WARORA', 'maharashtra',    'chandrapur',     15, 'SLA Miss',    20273,      0, 1],
-    ['M/S RAMI TRADERS',                       'madhya pradesh', 'agarmalwa',      14, 'OCP Block',  313770, 102960, 1],
+    ['M/S RAMI TRADERS',                       'madhya pradesh', 'agarmalwa',      14, 'OCP Block',   52825, 102960, 1],
     ['PUNDALIK BABA AGRO TECH',                'maharashtra',    'amravati',       14, 'SLA Miss',   186434,      0, 1],
     ['SHRI RAM KRASHI SEVA KENDRA',            'madhya pradesh', 'bhind',          13, 'SLA Miss',   287681, 287553, 1],
     ['ADARSH BUSINESS CENTER DEODAR',          'gujarat',        'banaskantha',    13, 'SLA Miss',    70658,  42450, 1],
@@ -1049,16 +1049,16 @@ const STATIC_DATA = {
     ['MAURYA PESTICIDE',                       'uttar pradesh',  'barabanki',       4, 'SLA Miss',     4818,      0, 0],
     ['GURJAR KRISHI SEWA KENDRA',              'madhya pradesh', 'shajapur',        4, 'SLA Miss',    74448,  14294, 1],
     ['New maa Narmada sewa Kendra',            'madhya pradesh', 'dewas',           4, 'SLA Miss',        0,      0, 1],
-    ['M/S SIYARAM TRADERS',                    'madhya pradesh', 'dewas',           4, 'OCP Block',   36726,   6602, 1],
-    ['Sarthak krishi seva Kendra',             'madhya pradesh', 'shajapur',        4, 'OCP Block',  128855,  49852, 1],
+    ['M/S SIYARAM TRADERS',                    'madhya pradesh', 'dewas',           4, 'OCP Block',   29246,   6602, 1],
+    ['Sarthak krishi seva Kendra',             'madhya pradesh', 'shajapur',        4, 'OCP Block',  126299,  49852, 1],
     ['VEER TEJA KHAD BEEJ BHANDAR',            'rajasthan',      'jodhpur',         3, 'SLA Miss',        0,      0, 1],
     ['Mahadev ev krishi sewa kendra',          'uttar pradesh',  'ghazipur',        3, 'SLA Miss',    25914,  12668, 1],
     ['JAMIDARA PESTICIDE',                     'rajasthan',      'bikaner',         3, 'SLA Miss',     3763,   3763, 0],
     ['M/S GURU JI KHAD BEEJ BHANDAR',          'uttar pradesh',  'aligarh',         3, 'SLA Miss',   316325, 169836, 1],
     ['SARVADNYA AGRO CENTER',                  'maharashtra',    'washim',          3, 'SLA Miss',        0,      0, 1],
-    ['SRI VEER TEJA JI PESTICIDES',            'rajasthan',      'sri ganganagar',  3, 'OCP Block',  119309,  18896, 1],
+    ['SRI VEER TEJA JI PESTICIDES',            'rajasthan',      'sri ganganagar',  3, 'OCP Block',  118141,  18896, 1],
     ['SHARMA ENTERPRISES',                     'madhya pradesh', 'dewas',           3, 'SLA Miss',    35028,  35028, 1],
-    ['mongali krashi sewa kendra',             'madhya pradesh', 'seoni',           2, 'OCP Block',    4406,      0, 1],
+    ['mongali krashi sewa kendra',             'madhya pradesh', 'seoni',           2, 'OCP Block',       0,      0, 1],
     ['SHRIRAM AGRITECH',                       'madhya pradesh', 'indore',          2, 'SLA Miss',    35315,  10593, 1],
     ['BHARAT KRISHI SEWA KENDRA',              'madhya pradesh', 'mandla',          2, 'SLA Miss',     2160,    324, 1],
     ['SHRI DEV KRISHI SEVA KENDRA',            'madhya pradesh', 'shajapur',        2, 'SLA Miss',   478586, 388868, 1],
@@ -1118,9 +1118,13 @@ window.addEventListener('load', () => {
   renderDeeperTab();
   document.getElementById('last-refreshed').innerHTML =
     `Snapshot: ${fmtDate(STATIC_DATA.snapshotFrom)} → ${fmtDate(STATIC_DATA.snapshotTo)}<br>
-     <span style="color:#4ade80;font-size:10px">● Static · Connect BQ to refresh live</span>`;
-  setStatus('Showing snapshot data. Connect BigQuery to refresh.');
+     <span style="color:#f59e0b;font-size:10px">● Static · connecting to proxy…</span>`;
+  setStatus('Showing snapshot. Connecting to proxy…');
   restoreActiveTab();
+
+  // Auto-load live data if proxy is running; re-check every 30 min
+  loadDashboard();
+  setInterval(loadDashboard, 30 * 60 * 1000);
 });
 
 // ══════════════════════════════════════════════════════════
@@ -1341,24 +1345,52 @@ async function loadDashboard() {
   const to   = document.getElementById('date-to').value;
   if (!from || !to) { setStatus('Pick a date range first.', true); return; }
 
-  showOverlay(true, 'Running BigQuery…', '2 queries · ~5–15 seconds');
-  setStatus('Querying BigQuery…');
+  const stamp = () => {
+    const now = new Date();
+    return `Live: ${now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} · ${now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})} IST · ${fmtDate(from)} → ${fmtDate(to)}`;
+  };
 
+  const applyRows = (summaryRows, trendRows) => {
+    renderAll(summaryRows, trendRows);
+    ({funnel:renderFunnelTab,partner:renderPartnerTab,ops:renderOpsTab,lmd:renderLmdTab,sys:renderSysTab,deeper:renderDeeperTab})[_activeTab]?.();
+  };
+
+  // ── Try local proxy first ──────────────────────────────
+  showOverlay(true, 'Fetching live data…', 'Connecting to local proxy');
+  try {
+    const res = await fetch(`http://localhost:8080/api/refresh?from=${from}&to=${to}`,
+      { signal: AbortSignal.timeout(90000) });
+    if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Proxy error');
+    applyRows(data.summary, data.trend);
+    document.getElementById('last-refreshed').innerHTML =
+      `${stamp()}<br><span style="color:#4ade80;font-size:10px">● Proxy · auto-refreshes every 30 min</span>`;
+    setStatus('Live data loaded ✓');
+    showOverlay(false);
+    return;
+  } catch(proxyErr) {
+    // proxy not running or errored — fall through to OAuth
+    console.warn('Proxy unavailable:', proxyErr.message);
+  }
+
+  // ── OAuth fallback ─────────────────────────────────────
+  if (!token) {
+    setStatus('Proxy offline. Click Connect BigQuery for manual refresh.', true);
+    showOverlay(false);
+    return;
+  }
+  overlayMsg('Running BigQuery…', '2 queries · ~5–15 seconds');
+  setStatus('Querying BigQuery…');
   try {
     overlayMsg('Running summary query…', 'State × funnel breakdown');
     const [summaryRows, trendRows] = await Promise.all([
       runQuery(buildSummaryQuery(from, to)),
       runQuery(buildTrendQuery(from, to))
     ]);
-
-    renderAll(summaryRows, trendRows);
-    // Re-render whatever tab the user is currently on
-    ({funnel:renderFunnelTab,partner:renderPartnerTab,ops:renderOpsTab,lmd:renderLmdTab,sys:renderSysTab,deeper:renderDeeperTab})[_activeTab]?.();
-
-    const now = new Date();
+    applyRows(summaryRows, trendRows);
     document.getElementById('last-refreshed').innerHTML =
-      `Live refresh: ${now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} · ${now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})} IST<br>
-       Range: ${fmtDate(from)} → ${fmtDate(to)}`;
+      `${stamp()}<br><span style="color:#60a5fa;font-size:10px">● OAuth · manual refresh</span>`;
     setStatus('Loaded successfully ✓');
   } catch(e) {
     setStatus('Error: ' + e.message, true);
