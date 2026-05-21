@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "dvs-charts",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "7891", "--directory", "/Users/darpan/Documents/claude code/DVS Analysis"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "7891", "/Users/darpan/Documents/claude code/DVS Analysis"],
       "port": 7891
     }
   ]
