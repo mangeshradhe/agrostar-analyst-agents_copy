@@ -691,6 +691,15 @@ const STATIC_DATA = {
     { label: 'Mapping Issue',              count:   31, color: '#cbd5e1' },
     { label: 'Other',                      count:   21, color: '#e2e8f0' }
   ],
+  // Leak 3 per-state re-route reason breakdown (BQ: order_management_orderreroutinglogs, Apr1–May21)
+  // Keys are lowercase state names; counts are from exclusive CASE-WHEN categorisation (sums = total ✓)
+  leak3ByState: {
+    'maharashtra':    { total:6264, sla:4572, ocp:959,  shopClosed:719, backfill:13, mapping:1,  other:0  },
+    'gujarat':        { total:1101, sla: 665, ocp:413,  shopClosed:  0, backfill: 2, mapping:0,  other:21 },
+    'rajasthan':      { total:1308, sla: 783, ocp:442,  shopClosed:  0, backfill:53, mapping:30, other:0  },
+    'uttar pradesh':  { total:1683, sla:1174, ocp:506,  shopClosed:  0, backfill: 3, mapping:0,  other:0  },
+    'madhya pradesh': { total:1032, sla: 674, ocp:356,  shopClosed:  0, backfill: 2, mapping:0,  other:0  }
+  },
 
   // Tab 4 — Operations & SLA
   opsOrderStatus: [
@@ -1589,14 +1598,22 @@ function renderFunnelTab() {
   document.getElementById('leak2-reasons').innerHTML = c2;
 
   // ── Leak 3: re-route reasons bars ──
-  const maxL3 = Math.max(...d.leak3Reasons.map(r => r.count));
-  const totL3 = d.leak3Reasons.reduce((a,r)=>a+r.count,0);
-  let r3 = (state !== 'ALL'
-    ? `<div style="padding:5px 10px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;font-size:10.5px;color:#1e40af;margin-bottom:10px">
-        📊 <strong>All-India aggregate</strong> — re-route reason breakdown is not split by state in this snapshot.
-       </div>`
-    : '') + '<div style="display:flex;flex-direction:column;gap:10px">';
-  d.leak3Reasons.forEach(r => {
+  // Use per-state breakdown when available, else all-India
+  const l3State = state !== 'ALL' ? d.leak3ByState[state.toLowerCase()] : null;
+  const leak3Reasons = l3State
+    ? [
+        { label:'SLA Miss (>24hr no action)', count: l3State.sla,        color:'#dc2626' },
+        { label:'OCP Block (credit hold)',    count: l3State.ocp,        color:'#d97706' },
+        { label:'Shop Closed / Strike',       count: l3State.shopClosed, color:'#f59e0b' },
+        { label:'Backfill Failure',           count: l3State.backfill,   color:'#94a3b8' },
+        { label:'Mapping Issue',              count: l3State.mapping,    color:'#cbd5e1' },
+        { label:'Other',                      count: l3State.other,      color:'#e2e8f0' }
+      ].filter(r => r.count > 0)
+    : d.leak3Reasons;
+  const maxL3 = Math.max(...leak3Reasons.map(r => r.count));
+  const totL3 = leak3Reasons.reduce((a,r)=>a+r.count, 0);
+  let r3 = '<div style="display:flex;flex-direction:column;gap:10px">';
+  leak3Reasons.forEach(r => {
     const barW = (r.count / maxL3 * 100).toFixed(1);
     const pct  = (r.count / totL3 * 100).toFixed(1);
     r3 += `
