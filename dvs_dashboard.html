@@ -1449,10 +1449,32 @@ function renderInsight(rows) {
 //  TAB 2 — DEMAND FUNNEL RENDERS
 // ══════════════════════════════════════════════════════════
 function renderFunnelTab() {
-  const d = STATIC_DATA;
+  const d     = STATIC_DATA;
+  const state = filters.state;
+
+  // ── Compute funnel stages (state-filtered or all-India) ──
+  // summary cols: [state(0), b2c(1), dvs_fulfilled(2), dvs_rerouted(3), gmv(4), delivered(5), stores(6)]
+  let stages;
+  if (state === 'ALL') {
+    stages = d.funnelStages;
+  } else {
+    const sRow  = d.summary.find(r => r[0].toLowerCase() === state.toLowerCase()) || [state,0,0,0,0,0,0];
+    const l1Row = d.leak1ByState.find(r => r[0].toLowerCase() === state.toLowerCase()) || [state,0,0];
+    const b2c       = sRow[1];
+    const fulfilled = sRow[2];
+    const rerouted  = sRow[3];
+    const attempted = fulfilled + rerouted;
+    const inTalukas = Math.max(0, b2c - l1Row[1]);
+    const leak2     = Math.max(0, inTalukas - attempted);
+    stages = [
+      { label:'Total B2C Demand',       val: b2c,       color:'#2563eb', leak: l1Row[1], leakLabel:'Leak 1 — No DVS coverage (no partner or no franchise LMD in non-DVS taluka)', leakColor:'#dc2626' },
+      { label:'In DVS-Covered Talukas', val: inTalukas, color:'#16a34a', leak: leak2,    leakLabel:'Leak 2 — Routing engine could not assign to a store',                          leakColor:'#d97706' },
+      { label:'DVS Attempted',          val: attempted, color:'#15803d', leak: rerouted, leakLabel:'Leak 3 — Partner assigned but re-routed to FC',                                leakColor:'#ea580c' },
+      { label:'DVS Fulfilled ✅',        val: fulfilled, color:'#166534', leak: null,     leakLabel: null,                                                                            leakColor: null }
+    ];
+  }
 
   // ── Big 4-stage funnel ──
-  const stages  = d.funnelStages;
   const b2c     = stages[0].val;
   let html = '<div style="display:flex;flex-direction:column;gap:0;padding:8px 0">';
 
@@ -1532,8 +1554,13 @@ function renderFunnelTab() {
   // ── Leak 2: root cause breakdown (source: PromisedTAT.dvsResolutionReason) ──
   const maxL2 = Math.max(...d.leak2RootCauses.map(r => r.count));
   const totL2 = d.leak2RootCauses.reduce((a,r) => a + r.count, 0);
+  const aggBanner = state !== 'ALL'
+    ? `<div style="padding:5px 10px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;font-size:10.5px;color:#1e40af;margin-bottom:10px">
+        📊 <strong>All-India aggregate</strong> — root cause breakdown is not split by state in this snapshot.
+       </div>`
+    : '';
 
-  let c2 = `<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px">
+  let c2 = aggBanner + `<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px">
     Root Cause Breakdown <span style="font-weight:400;color:#94a3b8;text-transform:none">(${fmt(totL2)} orders · source: PromisedTAT routing decisions)</span>
   </div>`;
   c2 += '<div style="display:flex;flex-direction:column;gap:10px">';
@@ -1564,7 +1591,11 @@ function renderFunnelTab() {
   // ── Leak 3: re-route reasons bars ──
   const maxL3 = Math.max(...d.leak3Reasons.map(r => r.count));
   const totL3 = d.leak3Reasons.reduce((a,r)=>a+r.count,0);
-  let r3 = '<div style="display:flex;flex-direction:column;gap:10px">';
+  let r3 = (state !== 'ALL'
+    ? `<div style="padding:5px 10px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;font-size:10.5px;color:#1e40af;margin-bottom:10px">
+        📊 <strong>All-India aggregate</strong> — re-route reason breakdown is not split by state in this snapshot.
+       </div>`
+    : '') + '<div style="display:flex;flex-direction:column;gap:10px">';
   d.leak3Reasons.forEach(r => {
     const barW = (r.count / maxL3 * 100).toFixed(1);
     const pct  = (r.count / totL3 * 100).toFixed(1);
@@ -1900,11 +1931,35 @@ function filterPartnerDetail() {
 }
 
 function renderSysTab() {
-  const d  = STATIC_DATA;
-  const rh = d.sysRoutingHealth;
-  const pc = filters.state === 'ALL' ? d.sysPartnerConfig
-    : d.sysPartnerConfig.filter(r => r[0].toLowerCase() === filters.state.toLowerCase());
+  const d     = STATIC_DATA;
+  const state = filters.state;
+  const rh    = d.sysRoutingHealth;
+  const pc    = state === 'ALL' ? d.sysPartnerConfig
+    : d.sysPartnerConfig.filter(r => r[0].toLowerCase() === state.toLowerCase());
   const bl = d.sysBlockers;
+
+  // Derive per-state KPIs when state filter is active
+  // sysPartnerConfig cols: [state(0), configured(1), missing_taluka(2), ocp_blocked(3), no_tat(4)]
+  // summary cols: [state(0), b2c(1), dvs_fulfilled(2), dvs_rerouted(3), gmv(4), delivered(5), stores(6)]
+  let tatCoverage, resolutionRate, resolutionLabel, ocpBlocked, noTatRec;
+  if (state === 'ALL') {
+    tatCoverage     = `${rh.tatCoverage}%`;
+    resolutionRate  = `${rh.resolutionRate}%`;
+    resolutionLabel = `${fmt(rh.resolved)} orders pushed to a DVS partner`;
+    ocpBlocked      = rh.ocpBlockedOrders;
+    noTatRec        = rh.noTatRecord;
+  } else {
+    const sRow   = d.summary.find(r => r[0].toLowerCase() === state.toLowerCase()) || [state,0,0,0,0,0,0];
+    const pcRow  = pc[0] || [state,0,0,0,0];
+    const b2c      = sRow[1];
+    const attempted = sRow[2] + sRow[3];
+    const resRate   = b2c > 0 ? (attempted / b2c * 100).toFixed(1) : '0.0';
+    tatCoverage     = `${rh.tatCoverage}%`; // no per-state TAT coverage data
+    resolutionRate  = `${resRate}%`;
+    resolutionLabel = `${fmt(attempted)} of ${fmt(b2c)} B2C orders attempted via DVS`;
+    ocpBlocked      = pcRow[3];
+    noTatRec        = pcRow[4];
+  }
 
   function kpi(id, label, val, sub, color) {
     document.getElementById(id).innerHTML = `
@@ -1912,10 +1967,10 @@ function renderSysTab() {
       <div style="font-size:24px;font-weight:800;color:${color};line-height:1.1">${val}</div>
       <div style="font-size:11px;color:#64748b;margin-top:4px">${sub}</div>`;
   }
-  kpi('sys-kpi-tat',        'PromisedTAT Coverage', `${rh.tatCoverage}%`,      `${fmt(rh.hasTat)} of ${fmt(rh.totalB2c)} B2C orders routed`,    '#16a34a');
-  kpi('sys-kpi-resolution', 'DVS Resolution Rate',  `${rh.resolutionRate}%`,   `${fmt(rh.resolved)} orders pushed to a DVS partner`,             '#2563eb');
-  kpi('sys-kpi-ocp',        'OCP Blocked Orders',   fmt(rh.ocpBlockedOrders),  'partner credit hold — re-routed to FC',                          '#dc2626');
-  kpi('sys-kpi-gap',        'No Routing Record',    fmt(rh.noTatRecord),       'orders with no PromisedTAT entry — pipeline gap',                '#d97706');
+  kpi('sys-kpi-tat',        'PromisedTAT Coverage', tatCoverage,     `${state !== 'ALL' ? '⚠️ All-India — no state split available' : fmt(rh.hasTat) + ' of ' + fmt(rh.totalB2c) + ' B2C orders routed'}`, '#16a34a');
+  kpi('sys-kpi-resolution', 'DVS Resolution Rate',  resolutionRate,  resolutionLabel,   '#2563eb');
+  kpi('sys-kpi-ocp',        'OCP Blocked Orders',   fmt(ocpBlocked), 'partner credit hold — re-routed to FC',   '#dc2626');
+  kpi('sys-kpi-gap',        'No Routing Record',    fmt(noTatRec),   'orders with no PromisedTAT entry — pipeline gap', '#d97706');
 
   // ── Config health table ──
   const totConf  = pc.reduce((a,r)=>a+r[1],0);
@@ -1956,7 +2011,11 @@ function renderSysTab() {
   const catColor = { 'Operational':'#dc2626', 'Config':'#d97706', 'System Rule':'#94a3b8', 'Data Pipeline':'#64748b' };
   const totOrders = bl.reduce((a,r)=>a+r[1],0);
   const maxB = bl[0][1];
-  let bh = '<div style="display:flex;flex-direction:column;gap:9px">';
+  let bh = (state !== 'ALL'
+    ? `<div style="padding:5px 10px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;font-size:10.5px;color:#1e40af;margin-bottom:10px">
+        📊 <strong>All-India aggregate</strong> — blocker counts are not split by state in this snapshot.
+       </div>`
+    : '') + '<div style="display:flex;flex-direction:column;gap:9px">';
   bl.forEach(r => {
     const bw  = (r[1]/maxB*100).toFixed(1);
     const pct = (r[1]/rh.totalB2c*100).toFixed(1);
@@ -2121,10 +2180,20 @@ function renderLmdTab() {
 }
 
 function renderOpsTab() {
-  const d = STATIC_DATA;
+  const d     = STATIC_DATA;
+  const state = filters.state;
 
-  const totFulfilled = 22970;
-  const totRerouted  = d.leak3Reasons.reduce((a,r)=>a+r.count,0);
+  // Derive fulfilled & rerouted from summary when state filter is active
+  // summary cols: [state(0), b2c(1), dvs_fulfilled(2), dvs_rerouted(3), gmv(4), delivered(5), stores(6)]
+  let totFulfilled, totRerouted;
+  if (state === 'ALL') {
+    totFulfilled = 22970;
+    totRerouted  = d.leak3Reasons.reduce((a,r)=>a+r.count, 0);
+  } else {
+    const sRow   = d.summary.find(r => r[0].toLowerCase() === state.toLowerCase()) || [state,0,0,0,0,0,0];
+    totFulfilled = sRow[2];
+    totRerouted  = sRow[3];
+  }
   const onHold       = d.opsOrderStatus.find(r=>r.label==='On Hold (Restock)').count;
   const slaBreaches  = d.opsSlaStages[0][4];
   const slaBreachPct = d.opsSlaStages[0][3];
@@ -2142,8 +2211,13 @@ function renderOpsTab() {
   kpi('ops-kpi-onhold',    'On Hold (Restock)',      fmt(onHold),                'store marked no-inventory at first action',  '#7c3aed');
 
   // ── Re-route root causes ──
+  const opsAggNote = state !== 'ALL'
+    ? `<div style="padding:5px 10px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;font-size:10.5px;color:#1e40af;margin-bottom:10px">
+        📊 <strong>All-India aggregate</strong> — re-route reasons, order status &amp; SLA data below are not split by state in this snapshot.
+       </div>`
+    : '';
   const maxR = Math.max(...d.leak3Reasons.map(r=>r.count));
-  let rr = '<div style="display:flex;flex-direction:column;gap:10px">';
+  let rr = opsAggNote + '<div style="display:flex;flex-direction:column;gap:10px">';
   d.leak3Reasons.forEach(r => {
     const bw  = (r.count/maxR*100).toFixed(1);
     const pct = (r.count/totRerouted*100).toFixed(1);
@@ -2228,6 +2302,16 @@ function switchTab(name, el) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('view-' + name).classList.add('active');
+  // Re-render the newly visible tab so the current filter is always applied
+  const renderers = {
+    exec:    () => renderAll(STATIC_DATA.summary, STATIC_DATA.trend),
+    funnel:  renderFunnelTab,
+    partner: renderPartnerTab,
+    ops:     renderOpsTab,
+    lmd:     renderLmdTab,
+    sys:     renderSysTab
+  };
+  if (renderers[name]) renderers[name]();
 }
 </script>
 </body>
