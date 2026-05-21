@@ -974,8 +974,13 @@ function setFilter(key, val, el) {
   filters[key] = val;
   el.closest('.filter-group').querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
-  // Re-render immediately using cached static data (no BQ call)
+  // Re-render all tabs immediately using cached static data (no BQ call)
   renderAll(STATIC_DATA.summary, STATIC_DATA.trend);
+  renderFunnelTab();
+  renderPartnerTab();
+  renderOpsTab();
+  renderLmdTab();
+  renderSysTab();
 }
 
 function setDatePreset(preset, el) {
@@ -1497,6 +1502,8 @@ function renderFunnelTab() {
 
   // ── Leak 1: state table ──
   const stateMap = { Maharashtra:'MH', 'Uttar Pradesh':'UP', Rajasthan:'RJ', 'Madhya Pradesh':'MP', Gujarat:'GJ' };
+  const l1Data  = filters.state === 'ALL' ? d.leak1ByState
+    : d.leak1ByState.filter(r => r[0].toLowerCase() === filters.state.toLowerCase());
   let t1 = `<table><thead><tr>
     <th style="text-align:left">State</th>
     <th>Uncovered</th>
@@ -1504,7 +1511,7 @@ function renderFunnelTab() {
     <th>Coverage</th>
   </tr></thead><tbody>`;
   // Sort by uncovered orders desc
-  const sorted1 = [...d.leak1ByState].sort((a,b) => b[1]-a[1]);
+  const sorted1 = [...l1Data].sort((a,b) => b[1]-a[1]);
   sorted1.forEach(([st, unc, b2cSt]) => {
     const covPct  = ((b2cSt - unc) / b2cSt * 100).toFixed(0);
     const uncPct  = (unc / b2cSt * 100).toFixed(1);
@@ -1516,8 +1523,8 @@ function renderFunnelTab() {
       <td><span class="rate-pill ${covColor}">${covPct}% covered</span></td>
     </tr>`;
   });
-  const totUnc = d.leak1ByState.reduce((a,r)=>a+r[1],0);
-  const totB2c = d.leak1ByState.reduce((a,r)=>a+r[2],0);
+  const totUnc = l1Data.reduce((a,r)=>a+r[1],0);
+  const totB2c = l1Data.reduce((a,r)=>a+r[2],0);
   t1 += `<tr><td>TOTAL</td><td>${fmt(totUnc)}</td><td style="color:#dc2626;font-weight:600">${(totUnc/totB2c*100).toFixed(1)}%</td><td></td></tr>`;
   t1 += '</tbody></table>';
   document.getElementById('leak1-table').innerHTML = t1;
@@ -1615,7 +1622,8 @@ function overlayMsg(msg, sub) {
 // ══════════════════════════════════════════════════════════
 function renderPartnerTab() {
   const d = STATIC_DATA;
-  const sh = d.partnerStateHealth;
+  const sh = filters.state === 'ALL' ? d.partnerStateHealth
+    : d.partnerStateHealth.filter(r => r[0].toLowerCase() === filters.state.toLowerCase());
 
   // Column map: [state(0), configured(1), got_demand(2), fulfilled(3),
   //              never_got_demand(4), demand_zero_fulfilled(5), orders(6),
@@ -1725,7 +1733,9 @@ function renderPartnerTab() {
         <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#64748b;font-weight:700">Orders</th>
         <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#64748b;font-weight:700">GMV (₹)</th>
       </tr></thead><tbody>`;
-  d.partnerLeaderboard.forEach((r, i) => {
+  const lbData = filters.state === 'ALL' ? d.partnerLeaderboard
+    : d.partnerLeaderboard.filter(r => r[2].toLowerCase() === filters.state.toLowerCase());
+  lbData.forEach((r, i) => {
     const medal = i===0?'🥇 ':i===1?'🥈 ':i===2?'🥉 ':'';
     lb += `<tr style="border-bottom:1px solid #f1f5f9">
       <td style="padding:5px 8px;color:#94a3b8;font-size:11px">${medal}${medal?'':i+1}</td>
@@ -1794,9 +1804,15 @@ function renderPartnerTab() {
   </tr></tbody></table>`;
   document.getElementById('ph-state-table').innerHTML = st;
 
-  // ── Partner detail table ──
-  renderPartnerDetailRows(d.partnerDetailTable);
-  document.getElementById('ph-detail-count').textContent = `Showing ${d.partnerDetailTable.length} partners`;
+  // ── Partner detail table — respect global state filter ──
+  const detailData = filters.state === 'ALL' ? d.partnerDetailTable
+    : d.partnerDetailTable.filter(r => r[1].toLowerCase() === filters.state.toLowerCase());
+  renderPartnerDetailRows(detailData);
+  document.getElementById('ph-detail-count').textContent =
+    `Showing ${detailData.length}${filters.state !== 'ALL' ? ' of ' + d.partnerDetailTable.length : ''} partners`;
+  // Sync the inline state dropdown with the global filter
+  const detailStateEl = document.getElementById('ph-detail-state');
+  if (detailStateEl) detailStateEl.value = filters.state === 'ALL' ? '' : filters.state.toLowerCase();
 }
 
 function renderPartnerDetailRows(rows) {
@@ -1870,12 +1886,14 @@ function renderPartnerDetailRows(rows) {
 }
 
 function filterPartnerDetail() {
-  const search = (document.getElementById('ph-detail-search').value||'').toLowerCase();
-  const state  = (document.getElementById('ph-detail-state').value||'').toLowerCase();
-  const all    = STATIC_DATA.partnerDetailTable;
+  const search      = (document.getElementById('ph-detail-search').value||'').toLowerCase();
+  const inlineState = (document.getElementById('ph-detail-state').value||'').toLowerCase();
+  // Inline dropdown takes priority; fall back to global state filter pill
+  const stateFilter = inlineState || (filters.state !== 'ALL' ? filters.state.toLowerCase() : '');
+  const all         = STATIC_DATA.partnerDetailTable;
   const filtered = all.filter(r =>
-    (!state  || r[1].toLowerCase() === state) &&
-    (!search || r[0].toLowerCase().includes(search) || r[2].toLowerCase().includes(search))
+    (!stateFilter || r[1].toLowerCase() === stateFilter) &&
+    (!search      || r[0].toLowerCase().includes(search) || r[2].toLowerCase().includes(search))
   );
   renderPartnerDetailRows(filtered);
   document.getElementById('ph-detail-count').textContent = `Showing ${filtered.length} of ${all.length} partners`;
@@ -1884,7 +1902,8 @@ function filterPartnerDetail() {
 function renderSysTab() {
   const d  = STATIC_DATA;
   const rh = d.sysRoutingHealth;
-  const pc = d.sysPartnerConfig;
+  const pc = filters.state === 'ALL' ? d.sysPartnerConfig
+    : d.sysPartnerConfig.filter(r => r[0].toLowerCase() === filters.state.toLowerCase());
   const bl = d.sysBlockers;
 
   function kpi(id, label, val, sub, color) {
@@ -1969,7 +1988,8 @@ function renderSysTab() {
 
 function renderLmdTab() {
   const d = STATIC_DATA;
-  const sc = d.lmdStateComparison;
+  const sc = filters.state === 'ALL' ? d.lmdStateComparison
+    : d.lmdStateComparison.filter(r => r[0].toLowerCase() === filters.state.toLowerCase());
   const lb = d.lmdLeaderboard;
 
   const totDvsPickups = sc.reduce((a,r)=>a+r[1],0);
