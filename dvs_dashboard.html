@@ -252,6 +252,7 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
   <div class="tab" onclick="switchTab('ops',this)">⚙️ Operations</div>
   <div class="tab" onclick="switchTab('lmd',this)">🚚 Last Mile</div>
   <div class="tab" onclick="switchTab('sys',this)">🔧 System Health</div>
+  <div class="tab" onclick="switchTab('deeper',this)">🔍 Deeper Analysis</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════ FILTER BAR -->
@@ -617,6 +618,59 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
 
 </div><!-- /view-sys -->
 
+<div id="view-deeper" class="view">
+
+  <!-- Local Filter Strip -->
+  <div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 28px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+    <div class="deeper-filter-group" style="display:flex;align-items:center;gap:6px">
+      <span class="filter-label">Root Cause</span>
+      <span class="pill active" onclick="setDeeperFilter('rootCause','ALL',this)">All</span>
+      <span class="pill" onclick="setDeeperFilter('rootCause','SLA Miss',this)">SLA Miss</span>
+      <span class="pill" onclick="setDeeperFilter('rootCause','OCP Block',this)">OCP Block</span>
+      <span class="pill" onclick="setDeeperFilter('rootCause','Shop Closed',this)">Shop Closed</span>
+    </div>
+    <div class="deeper-filter-group" style="display:flex;align-items:center;gap:6px">
+      <span class="filter-label">Priority</span>
+      <span class="pill active" onclick="setDeeperFilter('priority','ALL',this)">All</span>
+      <span class="pill" onclick="setDeeperFilter('priority','CRITICAL',this)">🔴 Critical 10+</span>
+      <span class="pill" onclick="setDeeperFilter('priority','HIGH',this)">🟠 High 5–9</span>
+      <span class="pill" onclick="setDeeperFilter('priority','MEDIUM',this)">🟡 Medium 1–4</span>
+    </div>
+    <div style="margin-left:auto;font-size:11px;color:#94a3b8">
+      These stores were <strong>assigned</strong> orders by the routing engine but fulfilled 0. Each is an activation opportunity.
+    </div>
+  </div>
+
+  <!-- KPI Row -->
+  <div id="deeper-kpis" style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;padding:16px 28px 0"></div>
+
+  <!-- State Chart + OCP Spotlight -->
+  <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:14px;padding:14px 28px 0">
+    <div class="card">
+      <div class="card-header">Orders Lost by State &amp; Root Cause</div>
+      <div id="deeper-state-chart" style="padding:8px 4px"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">⚡ OCP Block Spotlight — Self-Service Unlock via MPD</div>
+      <div id="deeper-ocp-spotlight" style="padding:4px 8px"></div>
+    </div>
+  </div>
+
+  <!-- Triage Table -->
+  <div style="padding:14px 28px 20px">
+    <div class="card">
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Dead Store Triage — <span id="deeper-table-count">85</span> Stores</span>
+        <input id="deeper-search" type="text" placeholder="Search store or district…"
+          oninput="renderDeeperTab()"
+          style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;font-size:11.5px;width:220px;outline:none">
+      </div>
+      <div id="deeper-triage-table"></div>
+    </div>
+  </div>
+
+</div><!-- /view-deeper -->
+
 <div class="footer">
   DVS Program Dashboard · Agrostar · Live BigQuery Connection · GMV in actual ₹ (Indian comma format)
 </div>
@@ -949,6 +1003,97 @@ const STATIC_DATA = {
     ['JAY MATAJI AGRITECH',                            'gujarat',        'rajkot',               1, 153, 55,  0,  1, 0,  0,  0,  0],
     ['MARUTI AGRO AGENCY',                             'rajasthan',      'jaisalmer',            2, 152, 92,  0,  4, 0,  2, 15,  0],
     ['BALAJI AGRO SALES Khara',                        'rajasthan',      'jodhpur',              2, 152,  9,  0,  4, 0,  2, 15, 13]
+  ],
+
+  // deadStores: [store_name, state, district, orders_lost, root_cause, ocp_outstanding, mpd_remaining, mpd_status]
+  // root_cause: 'SLA Miss' | 'OCP Block' | 'Shop Closed'
+  // mpd_status: 1 = enabled, 0 = config gap (isMpdEnabled IS NULL)
+  deadStores: [
+    ['CHAUDHARY KISAN SAMRIDDHI KENDRA',       'uttar pradesh',  'mathura',        34, 'SLA Miss',   313770, 200786, 1],
+    ['SHRIRAM AGRO AGENCY PACHORA',            'maharashtra',    'jalgaon',        32, 'SLA Miss',    31115,   6638, 1],
+    ['GOVIND KRUSHI KENDRA',                   'maharashtra',    'gadchiroli',     21, 'SLA Miss',    43152,  12910, 0],
+    ['JAGDAMBA KRISHI KENDRA',                 'maharashtra',    'chandrapur',     16, 'SLA Miss',        0,      0, 1],
+    ['JAI JAGNNATH KRUSHI SEWA KENDRA WARORA', 'maharashtra',    'chandrapur',     15, 'SLA Miss',    20273,      0, 1],
+    ['M/S RAMI TRADERS',                       'madhya pradesh', 'agarmalwa',      14, 'OCP Block',  313770, 102960, 1],
+    ['PUNDALIK BABA AGRO TECH',                'maharashtra',    'amravati',       14, 'SLA Miss',   186434,      0, 1],
+    ['SHRI RAM KRASHI SEVA KENDRA',            'madhya pradesh', 'bhind',          13, 'SLA Miss',   287681, 287553, 1],
+    ['ADARSH BUSINESS CENTER DEODAR',          'gujarat',        'banaskantha',    13, 'SLA Miss',    70658,  42450, 1],
+    ['Paus Agro Mall',                         'maharashtra',    'nashik',         12, 'SLA Miss',   102762,  24206, 1],
+    ['TULJABHAVANI TRADING COMPANY',           'maharashtra',    'parbhani',       12, 'SLA Miss',        0,      0, 1],
+    ['JINMATA KRUSHI SEVA KENDRA',             'maharashtra',    'nashik',         12, 'SLA Miss',        0,      0, 1],
+    ['SHANTISAGAR KRISHI KENDRA CHINAWAL',     'maharashtra',    'jalgaon',        11, 'SLA Miss',        0,      0, 1],
+    ['Shree Renuka Organics',                  'maharashtra',    'kolhapur',       11, 'SLA Miss',   225308, 181308, 1],
+    ['OM BEEJ BHANDAR',                        'uttar pradesh',  'prayagraj',      11, 'SLA Miss',    93364,  87437, 1],
+    ['UTKARSH KRUSHI SEVA KENDRA',             'maharashtra',    'dhule',          10, 'SLA Miss',    72186,  95664, 1],
+    ['M/S ACHAL FEFTILISER',                   'uttar pradesh',  'deoria',         10, 'SLA Miss',   154759,  51473, 1],
+    ['Sahyadri Krushi Udyog Vambori',          'maharashtra',    'ahilyanagar',    10, 'SLA Miss',    84908,  56654, 1],
+    ['MANENDRA ENTERPRISES',                   'madhya pradesh', 'harda',          10, 'SLA Miss',   190025, 189991, 1],
+    ['GANRAYA AGRO SERVICES',                  'maharashtra',    'ahilyanagar',    10, 'SLA Miss',    48381,  17842, 1],
+    ['CHAUDHARI AGRO',                         'maharashtra',    'jalgaon',        10, 'SLA Miss',   136381,  81400, 1],
+    ['Shri Lakshmi krushi seva kendra pinjar', 'maharashtra',    'akola',           9, 'SLA Miss',   232748, 140374, 1],
+    ['RAVI AGRO AGENCY AND AGRI CLINIC',       'maharashtra',    'yavatmal',        9, 'SLA Miss',    61756,      0, 1],
+    ['KAMAKSHA AGRO MALL KAMARGAON',           'maharashtra',    'ahilyanagar',     8, 'SLA Miss',    26060,   4103, 1],
+    ['Laxmi Agro Mart Hiwarkhed',              'maharashtra',    'akola',           8, 'SLA Miss',   157696,  87299, 0],
+    ['Shri shyam traders Hatwas',              'madhya pradesh', 'hoshangabad',     6, 'SLA Miss',    64829,   9724, 1],
+    ['BABA RAMDEV KRISHI UTPADAN',             'rajasthan',      'barmer',          6, 'SLA Miss',        0,      0, 1],
+    ['MAHESHWARI KRISHI KENDRA',               'madhya pradesh', 'chhindwara',      5, 'SLA Miss',     4624,    694, 1],
+    ['RITURAJ KRISHI SEVA KENDRA',             'rajasthan',      'baran',           5, 'SLA Miss',        0,      0, 1],
+    ['poorva krashi sewa kendra',              'madhya pradesh', 'sehore',          5, 'SLA Miss',    68231,  28301, 1],
+    ['Ajay beej bhandar',                      'madhya pradesh', 'sidhi',           5, 'SLA Miss',    72231,  72097, 1],
+    ['MAHULI KRUSHI KENDRA',                   'maharashtra',    'amravati',        5, 'SLA Miss',   408094, 340713, 1],
+    ['Chodhari Krishi Sewa Kendra',            'madhya pradesh', 'shajapur',        5, 'SLA Miss',        0,      0, 1],
+    ['SHRI BALAJI KRUSHI SEWA KENDRA',         'madhya pradesh', 'dewas',           5, 'SLA Miss',     4604,      0, 1],
+    ['GAJANAND AGRO CENTRE',                   'gujarat',        'panchmahals',     5, 'SLA Miss',        0,      0, 1],
+    ['SHANKAR BEEJ BHANDAR',                   'uttar pradesh',  'maharajganj',     4, 'SLA Miss',        0,      0, 1],
+    ['Mukul pesticides',                       'uttar pradesh',  'rampur',          4, 'SLA Miss',   175062,  65511, 1],
+    ['MAURYA PESTICIDE',                       'uttar pradesh',  'barabanki',       4, 'SLA Miss',     4818,      0, 0],
+    ['GURJAR KRISHI SEWA KENDRA',              'madhya pradesh', 'shajapur',        4, 'SLA Miss',    74448,  14294, 1],
+    ['New maa Narmada sewa Kendra',            'madhya pradesh', 'dewas',           4, 'SLA Miss',        0,      0, 1],
+    ['M/S SIYARAM TRADERS',                    'madhya pradesh', 'dewas',           4, 'OCP Block',   36726,   6602, 1],
+    ['Sarthak krishi seva Kendra',             'madhya pradesh', 'shajapur',        4, 'OCP Block',  128855,  49852, 1],
+    ['VEER TEJA KHAD BEEJ BHANDAR',            'rajasthan',      'jodhpur',         3, 'SLA Miss',        0,      0, 1],
+    ['Mahadev ev krishi sewa kendra',          'uttar pradesh',  'ghazipur',        3, 'SLA Miss',    25914,  12668, 1],
+    ['JAMIDARA PESTICIDE',                     'rajasthan',      'bikaner',         3, 'SLA Miss',     3763,   3763, 0],
+    ['M/S GURU JI KHAD BEEJ BHANDAR',          'uttar pradesh',  'aligarh',         3, 'SLA Miss',   316325, 169836, 1],
+    ['SARVADNYA AGRO CENTER',                  'maharashtra',    'washim',          3, 'SLA Miss',        0,      0, 1],
+    ['SRI VEER TEJA JI PESTICIDES',            'rajasthan',      'sri ganganagar',  3, 'OCP Block',  119309,  18896, 1],
+    ['SHARMA ENTERPRISES',                     'madhya pradesh', 'dewas',           3, 'SLA Miss',    35028,  35028, 1],
+    ['mongali krashi sewa kendra',             'madhya pradesh', 'seoni',           2, 'OCP Block',    4406,      0, 1],
+    ['SHRIRAM AGRITECH',                       'madhya pradesh', 'indore',          2, 'SLA Miss',    35315,  10593, 1],
+    ['BHARAT KRISHI SEWA KENDRA',              'madhya pradesh', 'mandla',          2, 'SLA Miss',     2160,    324, 1],
+    ['SHRI DEV KRISHI SEVA KENDRA',            'madhya pradesh', 'shajapur',        2, 'SLA Miss',   478586, 388868, 1],
+    ['SHRI KRUPA KRUSHI KENDRA',               'maharashtra',    'buldhana',        2, 'SLA Miss',    27362,   4104, 1],
+    ['Patel Traders',                          'madhya pradesh', 'seoni',           2, 'SLA Miss',    30992,   5162, 1],
+    ['RATHI KRUSHI KENDRA',                    'maharashtra',    'buldhana',        2, 'SLA Miss',   204060, 181782, 1],
+    ['SHRI BALAJI BEEJ BHANDAR (Bansur)',       'rajasthan',      'alwar',           2, 'SLA Miss',    18220,      0, 1],
+    ['Shivrana Malharjyoti Krushi Bhandar',    'maharashtra',    'nashik',          2, 'SLA Miss',        0,      0, 0],
+    ['SANJAY KRUSHI SEVA KENDRA',              'maharashtra',    'nashik',          2, 'SLA Miss',   297907, 168291, 1],
+    ['Mahalaxmi krushi seva kandra',           'maharashtra',    'solapur',         2, 'Shop Closed',     0,      0, 0],
+    ['SHRI REWA ANUKAMPA KRISHI SEWA KENDRA',  'madhya pradesh', 'sehore',          2, 'SLA Miss',        0,      0, 1],
+    ['TIWARI BEEJ BHANDAR',                    'madhya pradesh', 'chhatarpur',      2, 'SLA Miss',     3398,    510, 1],
+    ['RAJSHRI KRISHI SEVA KENDRA',             'madhya pradesh', 'indore',          2, 'SLA Miss',        0,      0, 1],
+    ['NEW MAHADEV AGRO SALES',                 'rajasthan',      'jaisalmer',       2, 'SLA Miss',   190982,  39374, 1],
+    ['SHUBHAM KRUSHI SEVA KENDR',              'maharashtra',    'washim',          2, 'SLA Miss',    70981,  47702, 1],
+    ['SAINI BEEJ BHANDAR (Maujamabad)',         'rajasthan',      'jaipur',          1, 'SLA Miss',        0,      0, 1],
+    ['Janta Agro Services',                    'maharashtra',    'akola',           1, 'SLA Miss',   445552, 414722, 1],
+    ['Shree Krishna krishi kendra',            'rajasthan',      'pali',            1, 'SLA Miss',        0,      0, 1],
+    ['SHRI GANESH KRISHI KENDRA',              'maharashtra',    'chandrapur',      1, 'SLA Miss',        0,      0, 1],
+    ['Shaurya enterprises',                    'uttar pradesh',  'sonbhadra',       1, 'SLA Miss',     2327,    349, 1],
+    ['Rishika krishi seva Kendra',             'madhya pradesh', 'bhopal',          1, 'SLA Miss',        0,      0, 0],
+    ['sai krishi kendra',                      'madhya pradesh', 'balaghat',        1, 'SLA Miss',    16490,      0, 0],
+    ['Shiddhi Vinayak Krashi Seva Kendra',     'madhya pradesh', 'narmadapuram',    1, 'SLA Miss',        0,      0, 1],
+    ['Baliraja Krushi Seva Kendra',            'maharashtra',    'ahilyanagar',     1, 'SLA Miss',    46359,   6400, 1],
+    ['CHAMUNDA KHAD BEEJ BHANDAR',             'rajasthan',      'barmer',          1, 'SLA Miss',        0,      0, 1],
+    ['JAGDAMB KRUSHI SEVA KENDRA',             'maharashtra',    'ahilyanagar',     1, 'SLA Miss',     1372,    206, 0],
+    ['SHRINATH KRISHI SEWA KENDRA',            'madhya pradesh', 'vidisha',         1, 'SLA Miss',        0,      0, 1],
+    ['SANSKRITI KRISHI SEWA KENDRA',           'madhya pradesh', 'sehore',          1, 'SLA Miss',     4872,      0, 1],
+    ['SARVADNYA AGRO AGENCIES',                'maharashtra',    'washim',          1, 'SLA Miss',        0,      0, 1],
+    ['MAA KRISHI SEVA KENDRA',                 'madhya pradesh', 'vidisha',         1, 'SLA Miss',        0,      0, 0],
+    ['BAGLI KRISHAK PRODUCER COMPNY',          'madhya pradesh', 'dewas',           1, 'SLA Miss',   357116,  70922, 1],
+    ['YATI TRADERS',                           'madhya pradesh', 'narmadapuram',    1, 'OCP Block',       0,      0, 1],
+    ['SHREE BALAJI AGRO AGENCY',               'maharashtra',    'nagpur',          1, 'SLA Miss',        0,      0, 0],
+    ['DATTATRYA KRUSHI SEVA KENDRA',           'maharashtra',    'nanded',          1, 'Shop Closed', 31273,   6744, 1],
+    ['DIWAKAR TRADING COMPANY',               'madhya pradesh', 'sehore',          1, 'SLA Miss',        0,      0, 0]
   ]
 };
 
@@ -970,6 +1115,7 @@ window.addEventListener('load', () => {
   renderOpsTab();
   renderLmdTab();
   renderSysTab();
+  renderDeeperTab();
   document.getElementById('last-refreshed').innerHTML =
     `Snapshot: ${fmtDate(STATIC_DATA.snapshotFrom)} → ${fmtDate(STATIC_DATA.snapshotTo)}<br>
      <span style="color:#4ade80;font-size:10px">● Static · Connect BQ to refresh live</span>`;
@@ -990,6 +1136,7 @@ function setFilter(key, val, el) {
   renderOpsTab();
   renderLmdTab();
   renderSysTab();
+  renderDeeperTab();
 }
 
 function setDatePreset(preset, el) {
@@ -2313,6 +2460,221 @@ function renderOpsTab() {
   document.getElementById('ops-sla-table').innerHTML = sl;
 }
 
+// ══════════════════════════════════════════════════════════
+//  DEEPER ANALYSIS TAB
+// ══════════════════════════════════════════════════════════
+const deeperFilters = { rootCause: 'ALL', priority: 'ALL' };
+
+function fmtCompact(v) {
+  if (v >= 100000) return '₹' + (v / 100000).toFixed(1) + 'L';
+  if (v >= 1000)   return '₹' + (v / 1000).toFixed(1) + 'K';
+  return '₹' + Math.round(v);
+}
+
+function setDeeperFilter(key, val, el) {
+  deeperFilters[key] = val;
+  el.closest('.deeper-filter-group').querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  renderDeeperTab();
+}
+
+function renderDeeperTab() {
+  const state    = filters.state;
+  const searchVal = (document.getElementById('deeper-search')?.value || '').toLowerCase();
+
+  // Base: apply global state filter
+  let rows = STATIC_DATA.deadStores;
+  if (state !== 'ALL') rows = rows.filter(r => r[1].toLowerCase() === state.toLowerCase());
+
+  // Local root-cause filter
+  if (deeperFilters.rootCause !== 'ALL') rows = rows.filter(r => r[4] === deeperFilters.rootCause);
+
+  // Local priority filter
+  if      (deeperFilters.priority === 'CRITICAL') rows = rows.filter(r => r[3] >= 10);
+  else if (deeperFilters.priority === 'HIGH')     rows = rows.filter(r => r[3] >= 5 && r[3] <= 9);
+  else if (deeperFilters.priority === 'MEDIUM')   rows = rows.filter(r => r[3] >= 1 && r[3] <= 4);
+
+  // Search filter for triage table only
+  const tableRows = searchVal
+    ? rows.filter(r => r[0].toLowerCase().includes(searchVal) || r[2].toLowerCase().includes(searchVal))
+    : rows;
+
+  // KPI stats
+  const totalStores     = rows.length;
+  const totalOrders     = rows.reduce((a, r) => a + r[3], 0);
+  const slaMissStores   = rows.filter(r => r[4] === 'SLA Miss').length;
+  const slaMissOrders   = rows.filter(r => r[4] === 'SLA Miss').reduce((a, r) => a + r[3], 0);
+  const ocpStores       = rows.filter(r => r[4] === 'OCP Block').length;
+  const ocpOrders       = rows.filter(r => r[4] === 'OCP Block').reduce((a, r) => a + r[3], 0);
+  const configGapStores = rows.filter(r => r[7] === 0).length;
+  const configGapOrders = rows.filter(r => r[7] === 0).reduce((a, r) => a + r[3], 0);
+
+  // ── KPI Row ──
+  document.getElementById('deeper-kpis').innerHTML = `
+    <div class="card" style="padding:14px 18px;text-align:center">
+      <div style="font-size:28px;font-weight:800;color:#dc2626">${totalStores}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px;font-weight:600">Dead Stores</div>
+      <div style="font-size:10px;color:#94a3b8">Assigned orders · 0 fulfilled</div>
+    </div>
+    <div class="card" style="padding:14px 18px;text-align:center">
+      <div style="font-size:28px;font-weight:800;color:#7c3aed">${fmt(totalOrders)}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px;font-weight:600">Orders Lost to FC</div>
+      <div style="font-size:10px;color:#94a3b8">Could have been store-fulfilled</div>
+    </div>
+    <div class="card" style="padding:14px 18px;text-align:center">
+      <div style="font-size:28px;font-weight:800;color:#f59e0b">${slaMissStores}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px;font-weight:600">SLA Miss Stores</div>
+      <div style="font-size:10px;color:#94a3b8">${fmt(slaMissOrders)} orders · >24h no action</div>
+    </div>
+    <div class="card" style="padding:14px 18px;text-align:center">
+      <div style="font-size:28px;font-weight:800;color:#ea580c">${ocpStores}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px;font-weight:600">OCP Blocked</div>
+      <div style="font-size:10px;color:#94a3b8">${fmt(ocpOrders)} orders · pay MPD to unlock</div>
+    </div>
+    <div class="card" style="padding:14px 18px;text-align:center">
+      <div style="font-size:28px;font-weight:800;color:#6366f1">${configGapStores}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px;font-weight:600">MPD Config Gap</div>
+      <div style="font-size:10px;color:#94a3b8">${fmt(configGapOrders)} orders · isMpdEnabled null</div>
+    </div>`;
+
+  // ── State Breakdown Chart ──
+  const STATES = [
+    ['maharashtra',    'Maharashtra'],
+    ['madhya pradesh', 'Madhya Pradesh'],
+    ['uttar pradesh',  'Uttar Pradesh'],
+    ['rajasthan',      'Rajasthan'],
+    ['gujarat',        'Gujarat']
+  ];
+  const stateData = STATES.map(([s, label]) => {
+    const sr = rows.filter(r => r[1] === s);
+    return {
+      label,
+      sla:    sr.filter(r => r[4] === 'SLA Miss').reduce((a, r) => a + r[3], 0),
+      ocp:    sr.filter(r => r[4] === 'OCP Block').reduce((a, r) => a + r[3], 0),
+      closed: sr.filter(r => r[4] === 'Shop Closed').reduce((a, r) => a + r[3], 0),
+      total:  sr.reduce((a, r) => a + r[3], 0),
+      stores: sr.length
+    };
+  }).filter(s => s.total > 0);
+
+  const maxOrd = Math.max(...stateData.map(s => s.total), 1);
+  const legend = `<div style="display:flex;gap:16px;padding:0 4px 10px;font-size:10.5px;color:#64748b">
+    <span><span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px;margin-right:4px;vertical-align:middle"></span>SLA Miss</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#ea580c;border-radius:2px;margin-right:4px;vertical-align:middle"></span>OCP Block</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#6366f1;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Shop Closed</span>
+  </div>`;
+  const bars = stateData.map(s => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+      <div style="width:120px;font-size:11.5px;font-weight:600;text-align:right;color:#374151;flex-shrink:0">${s.label}</div>
+      <div style="flex:1;display:flex;height:20px;border-radius:4px;overflow:hidden;background:#f1f5f9;gap:1px">
+        ${s.sla    > 0 ? `<div style="width:${(s.sla/maxOrd*100).toFixed(1)}%;background:#f59e0b" title="SLA Miss: ${s.sla}"></div>` : ''}
+        ${s.ocp    > 0 ? `<div style="width:${(s.ocp/maxOrd*100).toFixed(1)}%;background:#ea580c" title="OCP Block: ${s.ocp}"></div>` : ''}
+        ${s.closed > 0 ? `<div style="width:${(s.closed/maxOrd*100).toFixed(1)}%;background:#6366f1" title="Shop Closed: ${s.closed}"></div>` : ''}
+      </div>
+      <div style="font-size:11.5px;font-weight:700;color:#374151;width:46px">${fmt(s.total)}</div>
+      <div style="font-size:10.5px;color:#94a3b8;width:48px">${s.stores} stores</div>
+    </div>`).join('');
+  document.getElementById('deeper-state-chart').innerHTML = legend + bars;
+
+  // ── OCP Spotlight ──
+  const ocpAll = STATIC_DATA.deadStores.filter(r => r[4] === 'OCP Block');
+  const ocpFiltered = state !== 'ALL' ? ocpAll.filter(r => r[1].toLowerCase() === state.toLowerCase()) : ocpAll;
+  const stAbbr = s => ({maharashtra:'MH','madhya pradesh':'MP','uttar pradesh':'UP',rajasthan:'RJ',gujarat:'GJ'}[s]||s.slice(0,3).toUpperCase());
+
+  let ocpHtml;
+  if (ocpFiltered.length === 0) {
+    ocpHtml = `<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px">No OCP-blocked stores match current state filter.</div>`;
+  } else {
+    const ocpRows = ocpFiltered.map(r => {
+      const mpd = r[6], ocp = r[5], unlock = mpd * 3;
+      const action = mpd > 0
+        ? `<span style="color:#16a34a;font-weight:700">Pay ${fmtCompact(mpd)}</span><span style="color:#64748b;font-size:10px"> → unlocks ${fmtCompact(unlock)}</span>`
+        : ocp > 0
+          ? `<span style="color:#94a3b8;font-size:11px">MPD paid · check credit limit</span>`
+          : `<span style="color:#94a3b8;font-size:11px">OCP cleared · re-verify</span>`;
+      return `<tr style="border-bottom:1px solid #fef3c7">
+        <td style="padding:7px 8px;font-weight:600;font-size:11.5px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r[0]}</td>
+        <td style="padding:7px 8px"><span style="background:#fef9c3;border-radius:4px;padding:2px 6px;font-size:10.5px;font-weight:700;color:#713f12">${stAbbr(r[1])}</span></td>
+        <td style="padding:7px 8px;font-weight:700;color:#ea580c;text-align:center">${r[3]}</td>
+        <td style="padding:7px 8px;font-size:11px;color:#374151">${fmtCompact(ocp)}</td>
+        <td style="padding:7px 8px;font-size:11px;color:#dc2626;font-weight:600">${mpd > 0 ? fmtCompact(mpd) : '—'}</td>
+        <td style="padding:7px 8px;font-size:11px">${action}</td>
+      </tr>`;
+    }).join('');
+    ocpHtml = `<table style="width:100%;border-collapse:collapse;font-size:11.5px">
+      <thead><tr style="background:#fef3c7">
+        <th style="padding:7px 8px;text-align:left;font-size:10.5px;color:#92400e;font-weight:700">Store</th>
+        <th style="padding:7px 8px;text-align:left;font-size:10.5px;color:#92400e;font-weight:700">St</th>
+        <th style="padding:7px 8px;text-align:center;font-size:10.5px;color:#92400e;font-weight:700">Orders</th>
+        <th style="padding:7px 8px;text-align:left;font-size:10.5px;color:#92400e;font-weight:700">OCP Due</th>
+        <th style="padding:7px 8px;text-align:left;font-size:10.5px;color:#92400e;font-weight:700">MPD Remaining</th>
+        <th style="padding:7px 8px;text-align:left;font-size:10.5px;color:#92400e;font-weight:700">Action</th>
+      </tr></thead>
+      <tbody>${ocpRows}</tbody>
+    </table>
+    <div style="padding:8px 8px 4px;font-size:10.5px;color:#6b7280;background:#fffbeb;border-top:1px solid #fde68a;margin-top:2px">
+      💡 <strong>MPD:</strong> Partner pays ₹Y → unlocks 3Y credit (up to total limit) even while in overdue. No finance team needed — self-service.
+    </div>`;
+  }
+  document.getElementById('deeper-ocp-spotlight').innerHTML = ocpHtml;
+
+  // ── Triage Table ──
+  document.getElementById('deeper-table-count').textContent = tableRows.length;
+
+  const priColor  = n => n >= 10 ? '#dc2626' : n >= 5 ? '#ea580c' : '#f59e0b';
+  const priLabel  = n => n >= 10 ? '🔴 URGENT' : n >= 5 ? '🟠 HIGH' : '🟡 MEDIUM';
+  const rcBadge = rc => rc === 'OCP Block'
+    ? `<span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:2px 7px;font-size:10.5px;font-weight:700">OCP</span>`
+    : rc === 'Shop Closed'
+    ? `<span style="background:#ede9fe;color:#5b21b6;border-radius:4px;padding:2px 7px;font-size:10.5px;font-weight:700">Closed</span>`
+    : `<span style="background:#fef9c3;color:#713f12;border-radius:4px;padding:2px 7px;font-size:10.5px;font-weight:700">SLA</span>`;
+  const cfgBadge  = m => m === 0 ? ` <span style="background:#ede9fe;color:#4c1d95;border-radius:4px;padding:2px 5px;font-size:9.5px">⚠️MPD</span>` : '';
+  const actionTag = r => {
+    if (r[4] === 'OCP Block' && r[6] > 0) return `<span style="color:#16a34a;font-weight:600">Pay MPD: ${fmtCompact(r[6])}</span>`;
+    if (r[4] === 'OCP Block')              return `<span style="color:#94a3b8">Credit cleared</span>`;
+    if (r[7] === 0)                        return `<span style="color:#6366f1;font-weight:600">Fix MPD Config</span>`;
+    if (r[3] >= 10)                        return `<span style="color:#dc2626;font-weight:700">Call Today</span>`;
+    if (r[3] >= 5)                         return `<span style="color:#ea580c">Call This Week</span>`;
+    return `<span style="color:#f59e0b">Schedule Call</span>`;
+  };
+
+  const trs = tableRows.map((r, i) => {
+    const barW = Math.round(r[3] / 34 * 100);
+    return `<tr style="border-bottom:1px solid #f1f5f9${r[3] >= 10 ? ';background:#fff8f8' : ''}">
+      <td style="padding:6px 10px;color:#94a3b8;font-size:10.5px">${i + 1}</td>
+      <td style="padding:6px 8px">
+        <div style="font-size:12px;font-weight:600;color:#1a1a2e">${r[0].length > 34 ? r[0].slice(0,34)+'…' : r[0]}</div>
+        <div style="font-size:10.5px;color:#64748b">${r[2].charAt(0).toUpperCase()+r[2].slice(1)}</div>
+      </td>
+      <td style="padding:6px 8px"><span style="background:#f1f5f9;border-radius:4px;padding:2px 7px;font-size:10.5px;font-weight:700">${stAbbr(r[1])}</span></td>
+      <td style="padding:6px 10px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:56px;background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden">
+            <div style="width:${Math.min(barW,100)}%;background:${priColor(r[3])};height:100%"></div>
+          </div>
+          <span style="font-weight:700;font-size:12px;color:${priColor(r[3])}">${r[3]}</span>
+        </div>
+        <div style="font-size:10px;color:#94a3b8">${priLabel(r[3])}</div>
+      </td>
+      <td style="padding:6px 8px">${rcBadge(r[4])}${cfgBadge(r[7])}</td>
+      <td style="padding:6px 10px;font-size:11.5px">${actionTag(r)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('deeper-triage-table').innerHTML = `
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+        <th style="padding:8px 10px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700">#</th>
+        <th style="padding:8px 8px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700">Store · District</th>
+        <th style="padding:8px 8px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700">State</th>
+        <th style="padding:8px 10px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700">Orders Lost</th>
+        <th style="padding:8px 8px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700">Root Cause</th>
+        <th style="padding:8px 10px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700">Action</th>
+      </tr></thead>
+      <tbody>${trs || '<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8">No stores match current filters</td></tr>'}</tbody>
+    </table>`;
+}
+
 function switchTab(name, el) {
   if (el.classList.contains('disabled')) return;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -2326,7 +2688,8 @@ function switchTab(name, el) {
     partner: renderPartnerTab,
     ops:     renderOpsTab,
     lmd:     renderLmdTab,
-    sys:     renderSysTab
+    sys:     renderSysTab,
+    deeper:  renderDeeperTab
   };
   if (renderers[name]) renderers[name]();
 }
