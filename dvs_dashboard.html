@@ -251,7 +251,7 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
   <div class="tab" onclick="switchTab('partner',this)">🏪 Partner Health</div>
   <div class="tab" onclick="switchTab('ops',this)">⚙️ Operations</div>
   <div class="tab" onclick="switchTab('lmd',this)">🚚 Last Mile</div>
-  <div class="tab" onclick="switchTab('sys',this)">🔧 System Health</div>
+  <div class="tab" onclick="switchTab('mpd',this)">💳 MPD Feature</div>
   <div class="tab" onclick="switchTab('deeper',this)">🔍 Deeper Analysis</div>
 </div>
 
@@ -595,28 +595,17 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
 
 </div><!-- /view-lmd -->
 
-<!-- ═══════════ TAB 6: SYSTEM HEALTH ═══════════ -->
-<div id="view-sys" class="view">
-
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:16px 28px 0">
-    <div id="sys-kpi-tat"        class="card" style="padding:14px 18px;text-align:center"></div>
-    <div id="sys-kpi-resolution" class="card" style="padding:14px 18px;text-align:center"></div>
-    <div id="sys-kpi-ocp"        class="card" style="padding:14px 18px;text-align:center"></div>
-    <div id="sys-kpi-gap"        class="card" style="padding:14px 18px;text-align:center"></div>
+<!-- ═══════════ TAB 6: MPD FEATURE ═══════════ -->
+<div id="view-mpd" class="view">
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;padding:16px 28px 0" id="mpd-kpis"></div>
+  <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:14px;padding:14px 28px 0">
+    <div class="card"><div id="mpd-segment-chart"></div></div>
+    <div class="card"><div id="mpd-insights"></div></div>
   </div>
-
-  <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:14px;padding:14px 28px 0">
-    <div class="card">
-      <div class="card-header">Partner Config Health — by State</div>
-      <div id="sys-config-table"></div>
-    </div>
-    <div class="card">
-      <div class="card-header">Actionable Blockers — Ranked by Order Impact</div>
-      <div id="sys-blockers"></div>
-    </div>
+  <div style="padding:14px 28px 20px">
+    <div class="card"><div id="mpd-segment-table"></div></div>
   </div>
-
-</div><!-- /view-sys -->
+</div><!-- /view-mpd -->
 
 <div id="view-deeper" class="view">
 
@@ -1094,6 +1083,16 @@ const STATIC_DATA = {
     ['SHREE BALAJI AGRO AGENCY',               'maharashtra',    'nagpur',          1, 'SLA Miss',        0,      0, 0],
     ['DATTATRYA KRUSHI SEVA KENDRA',           'maharashtra',    'nanded',          1, 'Shop Closed', 31273,   6744, 1],
     ['DIWAKAR TRADING COMPANY',               'madhya pradesh', 'sehore',          1, 'SLA Miss',        0,      0, 0]
+  ],
+
+  // mpdSegments: [label, partners, partners_paid, orders_lost, total_collected, avg_per_partner, avg_txns, resume_rate_pct]
+  // Source: wallet_creditwallettransaction reason_id=4, FY27 Apr 1–May 21
+  // OCP block events from order_management_orderreroutinglogs LIKE '%ocp%'
+  mpdSegments: [
+    ['1-day (one-time)',   150, 101,  206,  9429079,  93357, 4.3,  85.3],
+    ['2–5 days',           229, 178,  999, 18011397, 101188, 5.7,  98.7],
+    ['6–10 days',           75,  63,  873,  5567030,  88366, 3.9, 100.0],
+    ['10+ days (chronic)',  46,  42, 1269,  4520515, 107631, 4.2, 100.0]
   ]
 };
 
@@ -1114,7 +1113,7 @@ window.addEventListener('load', () => {
   renderPartnerTab();
   renderOpsTab();
   renderLmdTab();
-  renderSysTab();
+  renderMpdTab();
   renderDeeperTab();
   document.getElementById('last-refreshed').innerHTML =
     `Snapshot: ${fmtDate(STATIC_DATA.snapshotFrom)} → ${fmtDate(STATIC_DATA.snapshotTo)}<br>
@@ -1140,7 +1139,7 @@ function setFilter(key, val, el) {
   renderPartnerTab();
   renderOpsTab();
   renderLmdTab();
-  renderSysTab();
+  renderMpdTab();
   renderDeeperTab();
 }
 
@@ -1352,7 +1351,7 @@ async function loadDashboard() {
 
   const applyRows = (summaryRows, trendRows) => {
     renderAll(summaryRows, trendRows);
-    ({funnel:renderFunnelTab,partner:renderPartnerTab,ops:renderOpsTab,lmd:renderLmdTab,sys:renderSysTab,deeper:renderDeeperTab})[_activeTab]?.();
+    ({funnel:renderFunnelTab,partner:renderPartnerTab,ops:renderOpsTab,lmd:renderLmdTab,mpd:renderMpdTab,deeper:renderDeeperTab})[_activeTab]?.();
   };
 
   // ── Try local proxy first ──────────────────────────────
@@ -2129,119 +2128,108 @@ function filterPartnerDetail() {
   document.getElementById('ph-detail-count').textContent = `Showing ${filtered.length} of ${all.length} partners`;
 }
 
-function renderSysTab() {
-  const d     = STATIC_DATA;
-  const state = filters.state;
-  const rh    = d.sysRoutingHealth;
-  const pc    = state === 'ALL' ? d.sysPartnerConfig
-    : d.sysPartnerConfig.filter(r => r[0].toLowerCase() === state.toLowerCase());
-  const bl = d.sysBlockers;
+function renderMpdTab() {
+  const segs = STATIC_DATA.mpdSegments;
+  // mpdSegments: [label, partners, paid, orders_lost, collected, avg_per_partner, avg_txns, resume_rate]
+  const totalPartners  = segs.reduce((a,r)=>a+r[1],0);
+  const totalPaid      = segs.reduce((a,r)=>a+r[2],0);
+  const totalOrders    = segs.reduce((a,r)=>a+r[3],0);
+  const totalCollected = segs.reduce((a,r)=>a+r[4],0);
 
-  // Derive per-state KPIs when state filter is active
-  // sysPartnerConfig cols: [state(0), configured(1), missing_taluka(2), ocp_blocked(3), no_tat(4)]
-  // summary cols: [state(0), b2c(1), dvs_fulfilled(2), dvs_rerouted(3), gmv(4), delivered(5), stores(6)]
-  let tatCoverage, resolutionRate, resolutionLabel, ocpBlocked, noTatRec;
-  if (state === 'ALL') {
-    tatCoverage     = `${rh.tatCoverage}%`;
-    resolutionRate  = `${rh.resolutionRate}%`;
-    resolutionLabel = `${fmt(rh.resolved)} orders pushed to a DVS partner`;
-    ocpBlocked      = rh.ocpBlockedOrders;
-    noTatRec        = rh.noTatRecord;
-  } else {
-    const sRow   = d.summary.find(r => r[0].toLowerCase() === state.toLowerCase()) || [state,0,0,0,0,0,0];
-    const pcRow  = pc[0] || [state,0,0,0,0];
-    const b2c      = sRow[1];
-    const attempted = sRow[2] + sRow[3];
-    const resRate   = b2c > 0 ? (attempted / b2c * 100).toFixed(1) : '0.0';
-    tatCoverage     = `${rh.tatCoverage}%`; // no per-state TAT coverage data
-    resolutionRate  = `${resRate}%`;
-    resolutionLabel = `${fmt(attempted)} of ${fmt(b2c)} B2C orders attempted via DVS`;
-    ocpBlocked      = pcRow[3];
-    noTatRec        = pcRow[4];
-  }
-
-  function kpi(id, label, val, sub, color) {
-    document.getElementById(id).innerHTML = `
+  function kpi(label, val, sub, color) {
+    return `<div class="card" style="padding:14px 18px;text-align:center">
       <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${label}</div>
       <div style="font-size:24px;font-weight:800;color:${color};line-height:1.1">${val}</div>
-      <div style="font-size:11px;color:#64748b;margin-top:4px">${sub}</div>`;
+      <div style="font-size:11px;color:#64748b;margin-top:4px">${sub}</div>
+    </div>`;
   }
-  kpi('sys-kpi-tat',        'PromisedTAT Coverage', tatCoverage,     `${state !== 'ALL' ? '⚠️ All-India — no state split available' : fmt(rh.hasTat) + ' of ' + fmt(rh.totalB2c) + ' B2C orders routed'}`, '#16a34a');
-  kpi('sys-kpi-resolution', 'DVS Resolution Rate',  resolutionRate,  resolutionLabel,   '#2563eb');
-  kpi('sys-kpi-ocp',        'OCP Blocked Orders',   fmt(ocpBlocked), 'partner credit hold — re-routed to FC',   '#dc2626');
-  kpi('sys-kpi-gap',        'No Routing Record',    fmt(noTatRec),   'orders with no PromisedTAT entry — pipeline gap', '#d97706');
+  document.getElementById('mpd-kpis').innerHTML =
+    kpi('OCP-Blocked Partners', fmt(totalPartners), 'got ≥1 order blocked in FY27', '#dc2626') +
+    kpi('Orders Lost to OCP',   fmt(totalOrders),   're-routed to FC', '#d97706') +
+    kpi('Partners Who Paid',    fmt(totalPaid),      `${(totalPaid/totalPartners*100).toFixed(0)}% paid after block`, '#2563eb') +
+    kpi('Collections Driven',   '₹' + fmtMoney(totalCollected), 'actual payments (reason_id=4)', '#16a34a') +
+    kpi('Avg Days to Pay',       '4.2', 'after first OCP block event', '#7c3aed');
 
-  // ── Config health table ──
-  const totConf  = pc.reduce((a,r)=>a+r[1],0);
-  const totMiss  = pc.reduce((a,r)=>a+r[2],0);
-  const totOcp   = pc.reduce((a,r)=>a+r[3],0);
-  const totNoTat = pc.reduce((a,r)=>a+r[4],0);
-  let ct = `<table style="width:100%;border-collapse:collapse;font-size:12px">
-    <thead><tr style="background:#f8fafc">
-      <th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b;font-weight:700">State</th>
-      <th style="padding:8px 10px;text-align:right;font-size:11px;color:#64748b;font-weight:700">Configured</th>
-      <th style="padding:8px 10px;text-align:right;font-size:11px;color:#d97706;font-weight:700">Missing Taluka</th>
-      <th style="padding:8px 10px;text-align:right;font-size:11px;color:#dc2626;font-weight:700">OCP Blocked</th>
-      <th style="padding:8px 10px;text-align:right;font-size:11px;color:#64748b;font-weight:700">No TAT Record</th>
-    </tr></thead><tbody>`;
-  pc.forEach(r => {
-    const abbr = {maharashtra:'MH',gujarat:'GJ',rajasthan:'RJ','uttar pradesh':'UP','madhya pradesh':'MP'}[r[0].toLowerCase()]||r[0].substring(0,2).toUpperCase();
-    ct += `<tr style="border-bottom:1px solid #f1f5f9">
-      <td style="padding:7px 10px"><strong>${abbr}</strong> <span style="font-size:10.5px;color:#94a3b8">${r[0]}</span></td>
-      <td style="padding:7px 10px;text-align:right;font-weight:600">${fmt(r[1])}</td>
-      <td style="padding:7px 10px;text-align:right;font-weight:${r[2]>8?700:400};color:${r[2]>8?'#d97706':'#94a3b8'}">${r[2]}</td>
-      <td style="padding:7px 10px;text-align:right;font-weight:700;color:${r[3]>600?'#dc2626':r[3]>400?'#d97706':'#475569'}">${fmt(r[3])}</td>
-      <td style="padding:7px 10px;text-align:right;color:#64748b">${fmt(r[4])}</td>
-    </tr>`;
-  });
-  ct += `<tr style="background:#f8fafc;font-weight:700;border-top:2px solid #e2e8f0">
-    <td style="padding:7px 10px">TOTAL</td>
-    <td style="padding:7px 10px;text-align:right">${fmt(totConf)}</td>
-    <td style="padding:7px 10px;text-align:right;color:#d97706">${totMiss}</td>
-    <td style="padding:7px 10px;text-align:right;color:#dc2626">${fmt(totOcp)}</td>
-    <td style="padding:7px 10px;text-align:right;color:#64748b">${fmt(totNoTat)}</td>
-  </tr></tbody></table>
-  <div style="margin-top:8px;padding:6px 8px;background:#fffbeb;border-left:3px solid #d97706;border-radius:4px;font-size:10.5px;color:#78350f;line-height:1.5">
-    ⚙️ <strong>Missing Taluka config</strong> = partner has DVS enabled but no servingTaluka set — routing engine skips them entirely.
-  </div>`;
-  document.getElementById('sys-config-table').innerHTML = ct;
-
-  // ── Actionable blockers ──
-  const catColor = { 'Operational':'#dc2626', 'Config':'#d97706', 'System Rule':'#94a3b8', 'Data Pipeline':'#64748b' };
-  const totOrders = bl.reduce((a,r)=>a+r[1],0);
-  const maxB = bl[0][1];
-  let bh = (state !== 'ALL'
-    ? `<div style="padding:5px 10px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;font-size:10.5px;color:#1e40af;margin-bottom:10px">
-        📊 <strong>All-India aggregate</strong> — blocker counts are not split by state in this snapshot.
-       </div>`
-    : '') + '<div style="display:flex;flex-direction:column;gap:9px">';
-  bl.forEach(r => {
-    const bw  = (r[1]/maxB*100).toFixed(1);
-    const pct = (r[1]/rh.totalB2c*100).toFixed(1);
-    const cc  = catColor[r[2]]||'#94a3b8';
-    const actionable = r[2] !== 'System Rule';
-    bh += `<div style="opacity:${actionable?1:0.65}">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
-        <span style="font-size:11.5px;font-weight:600;color:#1a1a2e">${r[0]}</span>
-        <span style="font-size:11px;font-weight:700;color:${r[4]}">${fmt(r[1])}
-          <span style="color:#94a3b8;font-weight:400;font-size:10px">&nbsp;(${pct}%)</span>
-        </span>
+  // ── Segment chart (horizontal bars — orders lost vs collected) ──
+  const maxOrders = Math.max(...segs.map(r=>r[3]));
+  const segColors = ['#94a3b8','#f59e0b','#f97316','#dc2626'];
+  let chart = `<div class="card-header">OCP Block Severity — Orders Lost & Collections by Segment</div>`;
+  segs.forEach((r, i) => {
+    const barW       = (r[3] / maxOrders * 100).toFixed(1);
+    const resumeFlag = r[7] === 100 ? `<span style="color:#16a34a;font-weight:700">100% resume</span>` : `<span style="color:#f59e0b;font-weight:700">${r[7]}% resume</span>`;
+    chart += `
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:700;color:#1e293b">${r[0]}</span>
+        <span style="font-size:11px;color:#64748b">${r[1]} partners · ${resumeFlag}</span>
       </div>
-      <div style="background:#f1f5f9;border-radius:3px;height:6px;overflow:hidden;margin-bottom:2px">
-        <div style="height:100%;width:${bw}%;background:${r[4]};border-radius:3px"></div>
+      <div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden;margin-bottom:3px">
+        <div style="height:100%;width:${barW}%;background:${segColors[i]};border-radius:4px"></div>
       </div>
-      <div style="display:flex;justify-content:space-between">
-        <span style="font-size:10px;color:#64748b">${r[3]}</span>
-        <span style="font-size:9.5px;font-weight:700;color:${cc};background:${cc}18;border-radius:3px;padding:1px 5px">${r[2]}</span>
+      <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#64748b">
+        <span>${fmt(r[3])} orders lost</span>
+        <span style="color:#16a34a;font-weight:600">₹${fmtMoney(r[4])} collected · avg ₹${fmtMoney(r[5])}/partner</span>
       </div>
     </div>`;
   });
-  bh += `</div>
-  <div style="margin-top:10px;padding:7px 10px;background:#f0fdf4;border-radius:6px;border-left:3px solid #16a34a;font-size:10.5px;color:#166534;line-height:1.6">
-    🎯 <strong>Config</strong> and <strong>Operational</strong> blockers are fully actionable —
-    fixing OCP blocks + missing partner config alone recovers <strong>${fmt(2629+2211+1450+1082)}</strong> orders (${((2629+2211+1450+1082)/rh.totalB2c*100).toFixed(0)}% of total B2C demand).
-  </div>`;
-  document.getElementById('sys-blockers').innerHTML = bh;
+  document.getElementById('mpd-segment-chart').innerHTML = chart;
+
+  // ── Insights panel ──
+  document.getElementById('mpd-insights').innerHTML = `
+    <div class="card-header">Key Findings</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+      <div style="padding:10px 12px;background:#f0fdf4;border-left:3px solid #16a34a;border-radius:4px;font-size:11.5px;color:#166534;line-height:1.6">
+        <strong>Credit unlock is near-instant</strong><br>
+        DVS resumes within ~1 day of payment. Chronic blockers resume <em>before</em> payment records (~1.5 days prior) — the credit window opens same-day.
+      </div>
+      <div style="padding:10px 12px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:4px;font-size:11.5px;color:#7f1d1d;line-height:1.6">
+        <strong>Chronic blockers (10+ days) — 9% of partners, 38% of OCP losses</strong><br>
+        46 partners · 1,269 orders lost · all paid &amp; resumed. High-value partners in a credit cycle — proactive outreach before next block would recover these orders.
+      </div>
+      <div style="padding:10px 12px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;font-size:11.5px;color:#1e3a8a;line-height:1.6">
+        <strong>DVS drives ₹3.75 Cr in collections (7 weeks)</strong><br>
+        Partners pay to keep DVS running — their lost DVS revenue exceeds the payment cost. Annualised: ~<strong>₹26–28 Cr/year</strong> in collections attributed to DVS program incentive.
+      </div>
+      <div style="padding:10px 12px;background:#fffbeb;border-left:3px solid #d97706;border-radius:4px;font-size:11.5px;color:#78350f;line-height:1.6">
+        <strong>75 partners resumed DVS without a direct payment</strong><br>
+        Credit restored via returns or finance adjustments — not MPD. Separate cohort worth investigating.
+      </div>
+    </div>`;
+
+  // ── Segment table ──
+  let tbl = `
+    <div class="card-header" style="margin-bottom:8px">Segment Breakdown — FY27 Apr 1 – May 21</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8fafc">
+        <th style="padding:8px 12px;text-align:left;font-size:11px;color:#64748b;font-weight:700">Segment</th>
+        <th style="padding:8px 12px;text-align:right;font-size:11px;color:#64748b;font-weight:700">Partners</th>
+        <th style="padding:8px 12px;text-align:right;font-size:11px;color:#d97706;font-weight:700">Orders Lost</th>
+        <th style="padding:8px 12px;text-align:right;font-size:11px;color:#2563eb;font-weight:700">Paid (reason=4)</th>
+        <th style="padding:8px 12px;text-align:right;font-size:11px;color:#16a34a;font-weight:700">Total Collected</th>
+        <th style="padding:8px 12px;text-align:right;font-size:11px;color:#64748b;font-weight:700">Avg / Partner</th>
+        <th style="padding:8px 12px;text-align:right;font-size:11px;color:#7c3aed;font-weight:700">Resume Rate</th>
+      </tr></thead><tbody>`;
+  segs.forEach((r, i) => {
+    tbl += `<tr style="border-bottom:1px solid #f1f5f9">
+      <td style="padding:8px 12px;font-weight:700;color:${segColors[i]}">${r[0]}</td>
+      <td style="padding:8px 12px;text-align:right">${r[1]}</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:600;color:#d97706">${fmt(r[3])}</td>
+      <td style="padding:8px 12px;text-align:right">${r[2]} <span style="color:#94a3b8;font-size:10px">(${(r[2]/r[1]*100).toFixed(0)}%)</span></td>
+      <td style="padding:8px 12px;text-align:right;font-weight:600;color:#16a34a">₹${fmtMoney(r[4])}</td>
+      <td style="padding:8px 12px;text-align:right;color:#64748b">₹${fmtMoney(r[5])}</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:700;color:${r[7]===100?'#16a34a':'#f59e0b'}">${r[7]}%</td>
+    </tr>`;
+  });
+  tbl += `<tr style="background:#f8fafc;font-weight:700;border-top:2px solid #e2e8f0">
+    <td style="padding:8px 12px">TOTAL</td>
+    <td style="padding:8px 12px;text-align:right">${fmt(totalPartners)}</td>
+    <td style="padding:8px 12px;text-align:right;color:#d97706">${fmt(totalOrders)}</td>
+    <td style="padding:8px 12px;text-align:right">${fmt(totalPaid)}</td>
+    <td style="padding:8px 12px;text-align:right;color:#16a34a">₹${fmtMoney(totalCollected)}</td>
+    <td style="padding:8px 12px;text-align:right;color:#64748b">₹${fmtMoney(Math.round(totalCollected/totalPaid))}</td>
+    <td style="padding:8px 12px;text-align:right"></td>
+  </tr></tbody></table>`;
+  document.getElementById('mpd-segment-table').innerHTML = tbl;
 }
 
 function renderLmdTab() {
@@ -2726,7 +2714,7 @@ function switchTab(name, el) {
     partner: renderPartnerTab,
     ops:     renderOpsTab,
     lmd:     renderLmdTab,
-    sys:     renderSysTab,
+    mpd:     renderMpdTab,
     deeper:  renderDeeperTab
   };
   if (renderers[name]) renderers[name]();
