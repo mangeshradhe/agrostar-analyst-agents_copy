@@ -872,6 +872,7 @@ const STATIC_DATA = {
     ['Matin Shaikh',                    2,  37, 100.0, 12.5, 87.5, 56.3],
     ['jogendra bhadu',                  4,  80, 100.0, 14.3, 85.7, 37.8],
     ['Abhay Narayan Verma',             3,  30, 100.0, 16.7, 83.3, 50.0],
+    ['Kantilal Patel',                 11, 165,  88.9, 12.5, 76.4, 39.4],
     ['Balram Singh',                    3,  38,  75.0,  0.0, 75.0, 40.9],
     ['Madhusudan Lodha',                2,  74, 100.0, 27.9, 72.1, 63.9],
     ['Amit Kumar',                      3,  47, 100.0, 29.0, 71.0, 59.7],
@@ -880,7 +881,6 @@ const STATIC_DATA = {
     ['Narsingh Merta',                  6,  86,  68.8,  0.0, 68.8, 39.1],
     ['Vishnu  Chaudhari majalgaon',     2,  73,  85.7, 18.6, 67.1, 52.2],
     ['Hariom Solanki',                  3,  35,  75.0,  9.5, 65.5, 44.8],
-    ['Kantilal Patel',                 11, 165,  77.8, 12.5, 65.3, 39.3],
     ['Mahipatsinh rathod',              6, 389,  75.0,  9.7, 65.3, 26.5],
     ['ujjawal patel',                   2,  44,  71.4,  8.1, 63.3, 39.8],
     ['Udit Bisen',                      3,  22,  80.0, 16.7, 63.3, 38.3],
@@ -901,7 +901,7 @@ const STATIC_DATA = {
     ['Nilam Kahale',                    2,  12, 100.0, 50.0, 50.0, 75.0]
   ],
 
-  // H5 detail — per-store breakdown for top 10 LMDs by variance
+  // H5 detail — per-store breakdown for ALL 30 LMDs in selectivePicking
   // [lmd_name, store_name, district, state, orders, hold_count, hold_pct, delivered, del_pct, variance_pp]
   selectivePickingDetail: [
     ['Matin Shaikh','Nageshwar Fertilizers','Beed','Maharashtra',5,5,100.0,2,40.0,87.5],
@@ -911,36 +911,115 @@ const STATIC_DATA = {
     ['jogendra bhadu','DHARMENDRA AGRO CENTRE','Barmer','Rajasthan',18,3,16.7,10,55.6,85.7],
     ['jogendra bhadu','M/S SAI KRIPA KRISHI SEWA KENDRA','Barmer','Rajasthan',14,2,14.3,6,42.9,85.7],
     ['Abhay Narayan Verma','KISAN KHAD BHANDAR','Ghazipur','Uttar Pradesh',6,6,100.0,4,66.7,83.3],
-    ['Abhay Narayan Verma','M/S HARSH TRADERS','Ballia','Uttar Pradesh',17,6,35.3,12,70.6,83.3],
+    ['Abhay Narayan Verma','M/S HARSH TRADERS','Ballia','Uttar Pradesh',17,6,35.3,14,82.4,83.3],
     ['Abhay Narayan Verma','M/S RENUKA ENTERPRISES','Ballia','Uttar Pradesh',6,1,16.7,5,83.3,83.3],
+    ['Kantilal Patel','KRUSHI MITRA','Navsari','Gujarat',9,8,88.9,3,33.3,76.4],
+    ['Kantilal Patel','ARJUN AGRO AND BEEJ NIGAM','Tapi','Gujarat',19,9,47.4,9,47.4,76.4],
+    ['Kantilal Patel','KHODIYAR KRUPA AGRO','Navsari','Gujarat',16,7,43.8,12,75.0,76.4],
+    ['Kantilal Patel','GYAN AGRO','Navsari','Gujarat',10,4,40.0,7,70.0,76.4],
+    ['Kantilal Patel','N K AGRITECH AND NURSERY','Tapi','Gujarat',38,14,36.8,24,63.2,76.4],
+    ['Kantilal Patel','SADGURUKRUPA AGRO CENTER','Surat','Gujarat',32,11,34.4,22,68.8,76.4],
+    ['Kantilal Patel','RAJ AGRO CENTER','Navsari','Gujarat',9,3,33.3,5,55.6,76.4],
+    ['Kantilal Patel','HARIYALI AGRO SALES','Tapi','Gujarat',6,3,50.0,3,50.0,76.4],
+    ['Kantilal Patel','UNNATI AGRO CENTRE','Tapi','Gujarat',11,3,27.3,4,36.4,76.4],
+    ['Kantilal Patel','KHEDUT AGRO','Navsari','Gujarat',7,2,28.6,6,85.7,76.4],
+    ['Kantilal Patel','SARDAR AGRO AND BEEJ NIGAM','Surat','Gujarat',8,1,12.5,6,75.0,76.4],
     ['Balram Singh','KUMAR BEEJ AND KHAD BHANDAR','Auraiya','Uttar Pradesh',20,15,75.0,5,25.0,75.0],
     ['Balram Singh','Shree Shyam Beej Bhandar','Auraiya','Uttar Pradesh',11,6,54.5,6,54.5,75.0],
     ['Balram Singh','KAMAL TRADERS','Auraiya','Uttar Pradesh',5,0,0.0,1,20.0,75.0],
-    ['Madhusudan Lodha','Mateshwari krishi seva kendra','Bhilwara','Rajasthan',6,6,100.0,2,33.3,72.1],
-    ['Madhusudan Lodha','CHARBHUJA KRISHI SEWA KENDRA','Bhilwara','Rajasthan',68,19,27.9,45,66.2,72.1],
+    ['Madhusudan Lodha','Mateshwari krishi seva kendra','Bhilwara','Rajasthan',6,6,100.0,2,33.3,73.1],
+    ['Madhusudan Lodha','CHARBHUJA KRISHI SEWA KENDRA','Bhilwara','Rajasthan',67,18,26.9,45,67.2,73.1],
+    ['Hakim Shaikh','MANGAL MURTI KRUSHI SEVA KENDRA','Solapur','Maharashtra',7,6,85.7,2,28.6,72.1],
+    ['Hakim Shaikh','Om Krushi Seva Kendra Rashin','Ahilyanagar','Maharashtra',33,10,30.3,14,42.4,72.1],
+    ['Hakim Shaikh','PANDHARPURE AGRO SERVICES','Solapur','Maharashtra',44,6,13.6,27,61.4,72.1],
+    ['Hakim Shaikh','MAULI KRUSHI SEVA KENDRA KANDAR','Solapur','Maharashtra',3,1,33.3,3,100.0,72.1],
     ['Amit Kumar','AMAYARA AGRI JUNCTION','Meerut','Uttar Pradesh',8,8,100.0,1,12.5,71.0],
     ['Amit Kumar','M/S KISAN SAINI BEEJ BHANDAR','Meerut','Uttar Pradesh',8,4,50.0,6,75.0,71.0],
     ['Amit Kumar','AARVI BHADANA AGRI JUNCTION','Meerut','Uttar Pradesh',31,9,29.0,14,45.2,71.0],
-    ['Hakim Shaikh','MANGAL MURTI KRUSHI SEVA KENDRA','Solapur','Maharashtra',7,6,85.7,2,28.6,70.2],
-    ['Hakim Shaikh','Om Krushi Seva Kendra Rashin','Ahilyanagar','Maharashtra',33,10,30.3,12,36.4,70.2],
-    ['Hakim Shaikh','PANDHARPURE AGRO SERVICES','Solapur','Maharashtra',45,7,15.6,27,60.0,70.2],
-    ['Hakim Shaikh','MAULI KRUSHI SEVA KENDRA KANDAR','Solapur','Maharashtra',3,1,33.3,3,100.0,70.2],
     ['ravikumar kumar ','MAHADEV KHAD BEEJ BHANDAR','Jodhpur','Rajasthan',16,14,87.5,8,50.0,68.9],
     ['ravikumar kumar ','SHREE JASNATH AGRO SALES','Jodhpur','Rajasthan',9,8,88.9,2,22.2,68.9],
     ['ravikumar kumar ','KISAN AGRO SOLUTION','Jodhpur','Rajasthan',26,20,76.9,12,46.2,68.9],
+    ['ravikumar kumar ','CHOUDHARY KRISHI YANTRALAYA','Jodhpur','Rajasthan',4,3,75.0,0,0.0,68.9],
     ['ravikumar kumar ','BHOMIYAJI AGRO SALES','Jodhpur','Rajasthan',10,7,70.0,7,70.0,68.9],
+    ['ravikumar kumar ','SHRI GAJNA MAA AGRO SALES','Jodhpur','Rajasthan',3,2,66.7,0,0.0,68.9],
     ['ravikumar kumar ','GANPATI KHAD BEEJ Bhandar','Jodhpur','Rajasthan',23,13,56.5,10,43.5,68.9],
     ['ravikumar kumar ','PARWATI ENTERPRISES','Jodhpur','Rajasthan',35,16,45.7,23,65.7,68.9],
     ['ravikumar kumar ','J P AGRO SALES SAMRAU','Jodhpur','Rajasthan',14,4,28.6,8,57.1,68.9],
     ['ravikumar kumar ','NAGESHWAR AGRO SALES','Jodhpur','Rajasthan',5,1,20.0,4,80.0,68.9],
     ['Narsingh Merta','MAHADEV TRADERS','Nagaur','Rajasthan',16,11,68.8,10,62.5,68.8],
-    ['Narsingh Merta','MAHAVEER KHAD BEEZ BHANDAR','Nagaur','Rajasthan',35,16,45.7,22,62.9,68.8],
+    ['Narsingh Merta','MAHAVEER KHAD BEEZ BHANDAR','Nagaur','Rajasthan',35,17,48.6,22,62.9,68.8],
     ['Narsingh Merta','BABA RAMDEV KHAD BEEJ BHANDAR','Nagaur','Rajasthan',10,5,50.0,4,40.0,68.8],
     ['Narsingh Merta','MERTA AGRO FARMER PRODUCER CO.','Nagaur','Rajasthan',13,4,30.8,12,92.3,68.8],
-    ['Narsingh Merta','SALASAR BALAJI KHAD BEEJ BHANDAR','Nagaur','Rajasthan',12,0,0.0,8,66.7,68.8],
     ['Narsingh Merta','PAREEK AGENCY','Nagaur','Rajasthan',3,1,33.3,2,66.7,68.8],
+    ['Narsingh Merta','SALASAR BALAJI KHAD BEEJ BHANDAR','Nagaur','Rajasthan',12,0,0.0,8,66.7,68.8],
     ['Vishnu  Chaudhari majalgaon','Akshay Krushi Seva kendra Beed','Beed','Maharashtra',14,12,85.7,4,28.6,67.1],
-    ['Vishnu  Chaudhari majalgaon','DEEPAK KRUSHI SEWA KENDRA TAKARWAN','Beed','Maharashtra',59,11,18.6,34,57.6,67.1]
+    ['Vishnu  Chaudhari majalgaon','DEEPAK KRUSHI SEWA KENDRA TAKARWAN','Beed','Maharashtra',59,11,18.6,34,57.6,67.1],
+    ['Dharmraj Pokale','JAI KISAN KRISHI SEVA KENDRA','Ahilyanagar','Maharashtra',5,4,80.0,1,20.0,66.9],
+    ['Dharmraj Pokale','SHRIRAM AGRO SERVICES','Ahilyanagar','Maharashtra',8,4,50.0,0,0.0,66.9],
+    ['Dharmraj Pokale','SHETKARI AGRO AGENCY','Beed','Maharashtra',61,8,13.1,28,45.9,66.9],
+    ['Hariom Solanki','SHREE RAM KHAD BEEJ BHANDAR','Bharatpur','Rajasthan',8,6,75.0,4,50.0,65.5],
+    ['Hariom Solanki','HARIOM KHAD BEEJ BHANDAR','Bharatpur','Rajasthan',6,3,50.0,1,16.7,65.5],
+    ['Hariom Solanki','G B TRADERS','Bharatpur','Rajasthan',21,2,9.5,10,47.6,65.5],
+    ['Hariom Solanki','AGARWAL KRISHI SEWA KENDRA','Bharatpur','Rajasthan',3,1,33.3,1,33.3,65.5],
+    ['Mahipatsinh rathod','NILKANTH AGRO','Surendranagar','Gujarat',8,6,75.0,2,25.0,65.3],
+    ['Mahipatsinh rathod','SHRI RAJ MOMAI AGRO CENTER','Surendranagar','Gujarat',133,26,19.5,88,66.2,65.3],
+    ['Mahipatsinh rathod','SHREE SIDHNATH CHARITABLE TRUST','Surendranagar','Gujarat',31,7,22.6,20,64.5,65.3],
+    ['Mahipatsinh rathod','JAY SHREE BAHUCHAR AGRO AGENCY','Surendranagar','Gujarat',66,10,15.2,37,56.1,65.3],
+    ['Mahipatsinh rathod','SANJAY AGRO','Surendranagar','Gujarat',89,15,16.9,66,74.2,65.3],
+    ['Mahipatsinh rathod','GUJARAT AGRO AND HARDWARE','Surendranagar','Gujarat',62,6,9.7,40,64.5,65.3],
+    ['Sonali  Jain','MANUMATA KRISHI KENDRA','Jalgaon','Maharashtra',23,15,65.2,10,43.5,65.2],
+    ['Sonali  Jain','Ashapuri Krushi Kendra','Jalgaon','Maharashtra',3,2,66.7,0,0.0,65.2],
+    ['Sonali  Jain','NEW PANKAJ KRISHI SEVA KENDRA','Jalgaon','Maharashtra',25,3,12.0,13,52.0,65.2],
+    ['Sonali  Jain','LAXMI AGENCY','Jalgaon','Maharashtra',12,1,8.3,10,83.3,65.2],
+    ['Sonali  Jain','Jijabai Krushi Kendra Sevanagar','Jalgaon','Maharashtra',7,0,0.0,7,100.0,65.2],
+    ['Udit Bisen','NIKKI KRASHI KENDRA & TRADERS','Balaghat','Madhya Pradesh',5,4,80.0,5,100.0,63.3],
+    ['Udit Bisen','SADGURU KRISHI KENDRA BAMHANGAON','Balaghat','Madhya Pradesh',11,2,18.2,10,90.9,63.3],
+    ['Udit Bisen','M/S NISHA KRISHI KENDRA','Balaghat','Madhya Pradesh',6,1,16.7,6,100.0,63.3],
+    ['ujjawal patel','SHRI SAI SAMARTH AGRO AGENCY','Nandurbar','Maharashtra',7,5,71.4,3,42.9,63.3],
+    ['ujjawal patel','Vasave Krishi Seva Kendra','Nandurbar','Maharashtra',37,3,8.1,29,78.4,63.3],
+    ['punamchand more','NARMADE HAR KRUSHI SEVA KENDRA','Dhule','Maharashtra',6,5,83.3,3,50.0,61.1],
+    ['punamchand more','PANDURANG KRUSHI SEVA KENDRA','Dhule','Maharashtra',9,2,22.2,6,66.7,61.1],
+    ['Manoj zore','OM KRISHI MANDIR','Wardha','Maharashtra',5,4,80.0,5,100.0,58.9],
+    ['Manoj zore','PARAMHANS KRUSHI KENDRA','Wardha','Maharashtra',17,11,64.7,8,47.1,58.9],
+    ['Manoj zore','Shri Krushna Agro Agencies','Wardha','Maharashtra',16,9,56.3,4,25.0,58.9],
+    ['Manoj zore','AKSHAY SEEDS Wardha','Wardha','Maharashtra',19,4,21.1,13,68.4,58.9],
+    ['Dinesh mali','RANGREJ Agrotech','Jodhpur','Rajasthan',99,67,67.7,71,71.7,58.6],
+    ['Dinesh mali','SHREE KRISHNA AGRO SALES','Jodhpur','Rajasthan',39,26,66.7,21,53.8,58.6],
+    ['Dinesh mali','MAHALAXMI AGRO AGENCY','Jodhpur','Rajasthan',30,19,63.3,19,63.3,58.6],
+    ['Dinesh mali','SALASAR AGRO TRDERS','Jodhpur','Rajasthan',11,1,9.1,6,54.5,58.6],
+    ['Sant Kumar UP','LAXMI FERTILIZERS AND CEMENT AGENCIES','Bareilly','Uttar Pradesh',9,7,77.8,4,44.4,57.8],
+    ['Sant Kumar UP','GANGWAR BEEJ BHANDAR','Bareilly','Uttar Pradesh',21,14,66.7,12,57.1,57.8],
+    ['Sant Kumar UP','M/S Kanaujia Krishi Raksha Kendra','Bareilly','Uttar Pradesh',4,2,50.0,1,25.0,57.8],
+    ['Sant Kumar UP','SPARSH KRISHI SEWA KENDRA','Bareilly','Uttar Pradesh',50,10,20.0,32,64.0,57.8],
+    ['Hanuman Ram','BILARA AGRO PRODUCER COMPANY','Jodhpur','Rajasthan',11,10,90.9,3,27.3,57.6],
+    ['Hanuman Ram','Shree Marwar Khaad Beej Bhandar','Pali','Rajasthan',41,14,34.1,33,80.5,57.6],
+    ['Hanuman Ram','SANKHALA KRISHI SEVA KENDRA','Pali','Rajasthan',9,3,33.3,4,44.4,57.6],
+    ['SanjayD Dhomase','SAI KRUSHI SEVA KENDRA','Pune','Maharashtra',6,4,66.7,4,66.7,54.2],
+    ['SanjayD Dhomase','VIGHNAHAR KRUSHI SEVA KENDRA','Pune','Maharashtra',41,14,34.1,29,70.7,54.2],
+    ['SanjayD Dhomase','BHAGDESHWAR AGRO PRODUCER COMPANY','Pune','Maharashtra',38,11,28.9,34,89.5,54.2],
+    ['SanjayD Dhomase','KRUSHI SANJIVANI AGRO SERVICES','Pune','Maharashtra',8,1,12.5,6,75.0,54.2],
+    ['Sachin Mothe','SHRI RAJESHWAR KRISHI SEVA KENDRA','Latur','Maharashtra',5,4,80.0,1,20.0,51.6],
+    ['Sachin Mothe','BHARAT KRUSHI SEVA KENDRA','Latur','Maharashtra',40,15,37.5,22,55.0,51.6],
+    ['Sachin Mothe','MAULI KRUSHI VIKAS KENDRA GHARNI','Latur','Maharashtra',26,10,38.5,14,53.8,51.6],
+    ['Sachin Mothe','Aniket krushi seva kendra','Latur','Maharashtra',14,6,42.9,10,71.4,51.6],
+    ['Sachin Mothe','PADILE AGRO AGENCY','Latur','Maharashtra',95,27,28.4,56,58.9,51.6],
+    ['Sachin Mothe','BANDEWAR KRUSHI SEVA KENDRA','Latur','Maharashtra',3,2,66.7,2,66.7,51.6],
+    ['Sachin Mothe','OM KRUSHI SEVA KENDRA','Latur','Maharashtra',3,0,0.0,2,66.7,51.6],
+    ['Sachin Mothe','PARTH KRUSHI SEVA KENDRA','Latur','Maharashtra',3,0,0.0,1,33.3,51.6],
+    ['sanjay  borkar','BANDHAN AGRO WORLD','Wardha','Maharashtra',16,15,93.8,5,31.3,51.2],
+    ['sanjay  borkar','ABHAY SEEDS','Wardha','Maharashtra',13,9,69.2,6,46.2,51.2],
+    ['sanjay  borkar','Shiv Krupa Krushi Sewa Kendra','Wardha','Maharashtra',13,5,38.5,9,69.2,51.2],
+    ['Nilam Kahale','SHETKARI KRUSHI AGRO SINNAR','Nashik','Maharashtra',6,6,100.0,5,83.3,50.0],
+    ['Nilam Kahale','Dattakrupa Agro','Nashik','Maharashtra',6,3,50.0,3,50.0,50.0],
+    ['Rau Ram','CHAMUNDA KHAD BEEZ','Barmer','Rajasthan',18,12,66.7,2,11.1,50.0],
+    ['Rau Ram','Baba Ramdev Khad Beej Bhandar','Barmer','Rajasthan',13,5,38.5,3,23.1,50.0],
+    ['Rau Ram','MAHADEV KHAD BEEJ BHANDAR','Barmer','Rajasthan',6,1,16.7,1,16.7,50.0],
+    ['Ishwar  Gaikwad','BHAVANI KRUSHI SEVA KENDRA','Ahmednagar','Maharashtra',16,11,68.8,5,31.3,50.0],
+    ['Ishwar  Gaikwad','AMBIKA KRUSHI SEVA KENDRA','Ahmednagar','Maharashtra',17,3,17.6,14,82.4,50.0],
+    ['chintan tukdiya','KISAN KRISHI SEWA KENDRA','Ratlam','Madhya Pradesh',6,4,66.7,5,83.3,50.0],
+    ['chintan tukdiya','AMBIKA AGRO AGENCY','Ratlam','Madhya Pradesh',6,1,16.7,6,100.0,50.0],
+    ['chintan tukdiya','Ambika Traders','Ratlam','Madhya Pradesh',9,3,33.3,9,100.0,50.0],
+    ['chintan tukdiya','PATIDAR AGRO AGENCY','Ratlam','Madhya Pradesh',3,2,66.7,3,100.0,50.0]
   ],
 
   // H5 day-of-week pickup distribution per (lmd|store) — [Sun,Mon,Tue,Wed,Thu,Fri,Sat]
@@ -977,7 +1056,18 @@ const STATIC_DATA = {
     'Narsingh Merta|BABA RAMDEV KHAD BEEJ BHANDAR':    [0,0,16.7,0,66.7,0,16.7],
     'Narsingh Merta|MERTA AGRO FARMER PRODUCER CO.':   [58.3,0,8.3,16.7,0,8.3,8.3],
     'Narsingh Merta|SALASAR BALAJI KHAD BEEJ BHANDAR': [0,0,50.0,16.7,25.0,0,8.3],
-    'Narsingh Merta|PAREEK AGENCY':                    [0,0,0,0,0,0,0]
+    'Narsingh Merta|PAREEK AGENCY':                    [0,0,0,0,0,0,0],
+    'Kantilal Patel|KRUSHI MITRA':                     [16.7,0,0,33.3,0,50.0,0],
+    'Kantilal Patel|ARJUN AGRO AND BEEJ NIGAM':        [0,7.1,92.9,0,0,0,0],
+    'Kantilal Patel|KHODIYAR KRUPA AGRO':              [14.3,28.6,21.4,28.6,0,0,7.1],
+    'Kantilal Patel|GYAN AGRO':                        [11.1,22.2,11.1,11.1,0,0,44.4],
+    'Kantilal Patel|N K AGRITECH AND NURSERY':         [0,26.5,73.5,0,0,0,0],
+    'Kantilal Patel|SADGURUKRUPA AGRO CENTER':         [13.3,23.3,0,23.3,16.7,0,23.3],
+    'Kantilal Patel|RAJ AGRO CENTER':                  [14.3,0,14.3,71.4,0,0,0],
+    'Kantilal Patel|HARIYALI AGRO SALES':              [0,0,0,0,0,0,0],
+    'Kantilal Patel|UNNATI AGRO CENTRE':               [22.2,0,0,22.2,22.2,33.3,0],
+    'Kantilal Patel|KHEDUT AGRO':                      [0,0,20.0,20.0,0,0,60.0],
+    'Kantilal Patel|SARDAR AGRO AND BEEJ NIGAM':       [0,0,25.0,12.5,62.5,0,0]
   },
 
   // Tab 6 — System Health
@@ -2665,9 +2755,15 @@ function renderH5SelectivePicking() {
     detailByLmd[r[0]].push(r);
   });
 
+  // Normalize store/LMD names before dowPattern lookup
+  // BQ sometimes returns trailing " . ." "(Mangrop)" etc. — strip trailing punctuation/whitespace
+  function normKey(s) {
+    return (s || '').replace(/[\s.,;()\[\]]+$/, '').replace(/\s+/g, ' ').trim();
+  }
+
   // Mini day-of-week heatmap: [Sun,Mon,Tue,Wed,Thu,Fri,Sat]
   function miniDow(lmd, store) {
-    const key = lmd + '|' + store;
+    const key = normKey(lmd) + '|' + normKey(store);
     const dow = dp[key];
     const labels   = ['S','M','T','W','T','F','S'];
     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -2754,7 +2850,7 @@ function renderH5SelectivePicking() {
         const dMed  = dr[6] >= 30 && dr[6] < 70;
         const dCol  = dHigh ? '#dc2626' : dMed ? '#d97706' : '#16a34a';
         const heatmap = miniDow(dr[0], dr[1]);
-        const domDay  = dominantDay(dp[dr[0]+'|'+dr[1]]);
+        const domDay  = dominantDay(dp[normKey(dr[0])+'|'+normKey(dr[1])]);
         const dayTag  = domDay ? `<span style="font-size:8.5px;color:#2563eb;background:#eff6ff;padding:1px 5px;border-radius:8px;margin-left:5px">${domDay}</span>` : '';
         html += `<tr style="border-top:1px solid #e2e8f0">
           <td style="padding:5px 8px;color:#374151;font-size:10.5px">${dr[1]}${dayTag}</td>
@@ -2774,16 +2870,16 @@ function renderH5SelectivePicking() {
   // ── Kantilal Patel route-schedule spotlight ──
   // Not in top-10 detail, but shows the clearest fixed route schedule
   const kpDow = [
-    { store:'ARJUN AGRO AND BEEJ NIGAM',    dow:[0,7.1,92.9,0,0,0,0],       hold:70.0 },
-    { store:'N K AGRITECH AND NURSERY',      dow:[0,26.5,73.5,0,0,0,0],      hold:2.9  },
-    { store:'RAJ AGRO CENTER',              dow:[14.3,0,14.3,71.4,0,0,0],    hold:57.1 },
-    { store:'SARDAR AGRO AND BEEJ NIGAM',   dow:[0,0,25.0,12.5,62.5,0,0],    hold:12.5 },
-    { store:'KHEDUT AGRO',                  dow:[0,0,20.0,20.0,0,0,60.0],    hold:0    },
-    { store:'GYAN AGRO',                    dow:[11.1,22.2,11.1,11.1,0,0,44.4],hold:55.6},
-    { store:'KHODIYAR KRUPA AGRO',          dow:[14.3,28.6,21.4,28.6,0,0,7.1], hold:21.4},
-    { store:'SADGURUKRUPA AGRO CENTER',     dow:[13.3,23.3,0,23.3,16.7,0,23.3],hold:13.3},
-    { store:'KRUSHI MITRA',                 dow:[16.7,0,0,33.3,0,50.0,0],    hold:77.8 },
-    { store:'UNNATI AGRO CENTRE',           dow:[22.2,0,0,22.2,22.2,33.3,0], hold:33.3 }
+    { store:'KRUSHI MITRA',                 dow:[16.7,0,0,33.3,0,50.0,0],       hold:88.9 },
+    { store:'ARJUN AGRO AND BEEJ NIGAM',    dow:[0,7.1,92.9,0,0,0,0],           hold:47.4 },
+    { store:'KHODIYAR KRUPA AGRO',          dow:[14.3,28.6,21.4,28.6,0,0,7.1],  hold:43.8 },
+    { store:'GYAN AGRO',                    dow:[11.1,22.2,11.1,11.1,0,0,44.4], hold:40.0 },
+    { store:'N K AGRITECH AND NURSERY',     dow:[0,26.5,73.5,0,0,0,0],          hold:36.8 },
+    { store:'SADGURUKRUPA AGRO CENTER',     dow:[13.3,23.3,0,23.3,16.7,0,23.3], hold:34.4 },
+    { store:'RAJ AGRO CENTER',              dow:[14.3,0,14.3,71.4,0,0,0],       hold:33.3 },
+    { store:'KHEDUT AGRO',                  dow:[0,0,20.0,20.0,0,0,60.0],       hold:28.6 },
+    { store:'UNNATI AGRO CENTRE',           dow:[22.2,0,0,22.2,22.2,33.3,0],    hold:27.3 },
+    { store:'SARDAR AGRO AND BEEJ NIGAM',   dow:[0,0,25.0,12.5,62.5,0,0],       hold:12.5 }
   ];
   const dayLabels = ['S','M','T','W','T','F','S'];
   const dayFull   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -2791,7 +2887,7 @@ function renderH5SelectivePicking() {
   let kpHtml = `
   <div style="margin-top:14px;border:1px solid #bae6fd;border-radius:8px;overflow:hidden">
     <div style="background:#0369a1;color:#fff;padding:8px 12px;font-size:11px;font-weight:700">
-      📅 Route Schedule Spotlight — Kantilal Patel (Gujarat · 11 stores · 65.3pp variance)
+      📅 Route Schedule Spotlight — Kantilal Patel (Gujarat · 11 stores · 76.4pp variance)
       <span style="font-weight:400;opacity:0.85;margin-left:8px">Each store is assigned a specific pickup day — orders not on that day wait up to 6 days</span>
     </div>
     <div style="overflow-x:auto;background:#f8fbff">
@@ -2829,8 +2925,8 @@ function renderH5SelectivePicking() {
   });
   kpHtml += `</table></div>
   <div style="padding:6px 12px;background:#f0f9ff;font-size:10px;color:#0c4a6e;line-height:1.6">
-    ARJUN AGRO gets 93% of pickups on <strong>Tuesday</strong>. SARDAR AGRO gets 63% on <strong>Thursday</strong>. KHEDUT AGRO gets 60% on <strong>Saturday</strong>.
-    An order packed Monday at SARDAR AGRO waits until Thursday — <strong>3 wasted days</strong> before the LMD even shows up.
+    KRUSHI MITRA (88.9% HOLD) gets 50% of pickups on <strong>Friday</strong>. ARJUN AGRO gets 93% on <strong>Tuesday</strong>. SARDAR AGRO gets 63% on <strong>Thursday</strong>. KHEDUT AGRO gets 60% on <strong>Saturday</strong>.
+    An order packed Monday at KRUSHI MITRA waits until Friday — <strong>4 wasted days</strong> before the LMD even shows up.
   </div>
   </div>`;
 

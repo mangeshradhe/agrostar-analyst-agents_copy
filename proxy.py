@@ -6,15 +6,25 @@ Auth:    gcloud auth application-default login
 """
 
 import datetime
-from flask import Flask, jsonify, request
+import os
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
-from google.cloud import bigquery
 
 app = Flask(__name__)
 CORS(app)
 
 PROJECT = 'agrostar-data'
-client = bigquery.Client(project=PROJECT)
+DASHBOARD_PATH = os.path.join(os.path.dirname(__file__), 'dvs_dashboard.html')
+
+# Lazy BigQuery client — initialised on first query so server starts even without ADC
+_bq_client = None
+
+def get_client():
+    global _bq_client
+    if _bq_client is None:
+        from google.cloud import bigquery
+        _bq_client = bigquery.Client(project=PROJECT)
+    return _bq_client
 
 # ── Queries (mirrors buildSummaryQuery / buildTrendQuery in the dashboard) ──
 
@@ -106,8 +116,14 @@ ORDER BY 1
 
 
 def run_query(sql):
-    rows = client.query(sql).result()
+    rows = get_client().query(sql).result()
     return [[str(v) if v is not None else None for v in row] for row in rows]
+
+
+@app.route('/')
+@app.route('/dvs_dashboard')
+def dashboard():
+    return send_file(DASHBOARD_PATH)
 
 
 @app.route('/health')
@@ -128,5 +144,5 @@ def refresh():
 
 
 if __name__ == '__main__':
-    print('DVS proxy → http://localhost:8080  (Ctrl-C to stop)')
-    app.run(host='127.0.0.1', port=8080)
+    print('DVS proxy → http://localhost:7891/dvs_dashboard  (Ctrl-C to stop)')
+    app.run(host='127.0.0.1', port=7891)
