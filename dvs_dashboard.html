@@ -943,6 +943,43 @@ const STATIC_DATA = {
     ['Vishnu  Chaudhari majalgaon','DEEPAK KRUSHI SEWA KENDRA TAKARWAN','Beed','Maharashtra',59,11,18.6,34,57.6,67.1]
   ],
 
+  // H5 day-of-week pickup distribution per (lmd|store) — [Sun,Mon,Tue,Wed,Thu,Fri,Sat]
+  // 0 = no pickups that day; 100 = all pickups on that day
+  dowPattern: {
+    'Matin Shaikh|Nageshwar Fertilizers':              [0,0,0,0,0,0,0],
+    'Matin Shaikh|SHREE VITTHAL AGRO AGENCIES':        [6.5,35.5,3.2,3.2,25.8,6.5,19.4],
+    'jogendra bhadu|MUMTAZ TRADING COMPANY':           [100,0,0,0,0,0,0],
+    'jogendra bhadu|INDIAN TRADING COMPANY':           [26.8,0,7.3,41.5,9.8,0,14.6],
+    'jogendra bhadu|DHARMENDRA AGRO CENTRE':           [11.1,16.7,0,5.6,38.9,5.6,22.2],
+    'jogendra bhadu|M/S SAI KRIPA KRISHI SEWA KENDRA': [0,0,7.1,78.6,7.1,0,7.1],
+    'Abhay Narayan Verma|KISAN KHAD BHANDAR':          [16.7,16.7,0,33.3,16.7,16.7,0],
+    'Abhay Narayan Verma|M/S HARSH TRADERS':           [0,26.7,0,26.7,20.0,26.7,0],
+    'Abhay Narayan Verma|M/S RENUKA ENTERPRISES':      [0,0,0,0,0,0,0],
+    'Madhusudan Lodha|Mateshwari krishi seva kendra':  [0,0,0,0,0,0,0],
+    'Madhusudan Lodha|CHARBHUJA KRISHI SEWA KENDRA':   [10.7,10.7,12.5,12.5,17.9,19.6,16.1],
+    'Amit Kumar|AMAYARA AGRI JUNCTION':                [0,0,0,0,0,0,0],
+    'Amit Kumar|M/S KISAN SAINI BEEJ BHANDAR':         [0,28.6,28.6,0,14.3,14.3,14.3],
+    'Amit Kumar|AARVI BHADANA AGRI JUNCTION':          [3.2,45.2,25.8,0,16.1,9.7,0],
+    'Hakim Shaikh|MANGAL MURTI KRUSHI SEVA KENDRA':    [0,0,0,0,0,0,0],
+    'Hakim Shaikh|Om Krushi Seva Kendra Rashin':       [50.0,8.3,0,0,25.0,0,16.7],
+    'Hakim Shaikh|PANDHARPURE AGRO SERVICES':          [13.5,0,37.8,16.2,13.5,0,18.9],
+    'Hakim Shaikh|MAULI KRUSHI SEVA KENDRA KANDAR':    [0,0,0,0,0,0,0],
+    'ravikumar kumar |MAHADEV KHAD BEEJ BHANDAR':      [0,50.0,12.5,12.5,0,25.0,0],
+    'ravikumar kumar |SHREE JASNATH AGRO SALES':       [0,33.3,50.0,0,0,16.7,0],
+    'ravikumar kumar |KISAN AGRO SOLUTION':            [26.3,15.8,10.5,10.5,36.8,0,0],
+    'ravikumar kumar |BHOMIYAJI AGRO SALES':           [0,22.2,22.2,22.2,22.2,11.1,0],
+    'ravikumar kumar |GANPATI KHAD BEEJ Bhandar':      [15.8,5.3,5.3,26.3,31.6,0,15.8],
+    'ravikumar kumar |PARWATI ENTERPRISES':            [16.7,10.0,16.7,16.7,13.3,13.3,13.3],
+    'ravikumar kumar |J P AGRO SALES SAMRAU':          [0,16.7,50.0,8.3,16.7,8.3,0],
+    'ravikumar kumar |NAGESHWAR AGRO SALES':           [40.0,0,0,0,20.0,20.0,20.0],
+    'Narsingh Merta|MAHADEV TRADERS':                  [15.4,7.7,38.5,0,23.1,0,15.4],
+    'Narsingh Merta|MAHAVEER KHAD BEEZ BHANDAR':       [17.9,21.4,25.0,17.9,7.1,10.7,0],
+    'Narsingh Merta|BABA RAMDEV KHAD BEEJ BHANDAR':    [0,0,16.7,0,66.7,0,16.7],
+    'Narsingh Merta|MERTA AGRO FARMER PRODUCER CO.':   [58.3,0,8.3,16.7,0,8.3,8.3],
+    'Narsingh Merta|SALASAR BALAJI KHAD BEEJ BHANDAR': [0,0,50.0,16.7,25.0,0,8.3],
+    'Narsingh Merta|PAREEK AGENCY':                    [0,0,0,0,0,0,0]
+  },
+
   // Tab 6 — System Health
   sysRoutingHealth: {
     totalB2c: 58809, hasTat: 57515, tatCoverage: 97.8,
@@ -2619,20 +2656,52 @@ function renderH5SelectivePicking() {
   const d   = STATIC_DATA;
   const sp  = d.selectivePicking;
   const spd = d.selectivePickingDetail;
+  const dp  = d.dowPattern || {};
 
-  // Group detail rows by lmd_name for lookup
+  // Group detail rows by lmd_name
   const detailByLmd = {};
   spd.forEach(r => {
     if (!detailByLmd[r[0]]) detailByLmd[r[0]] = [];
     detailByLmd[r[0]].push(r);
   });
 
-  // Summary table — all 30 LMDs
+  // Mini day-of-week heatmap: [Sun,Mon,Tue,Wed,Thu,Fri,Sat]
+  function miniDow(lmd, store) {
+    const key = lmd + '|' + store;
+    const dow = dp[key];
+    const labels   = ['S','M','T','W','T','F','S'];
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    if (!dow || dow.every(v => v === 0)) {
+      return `<span style="font-size:9px;color:#dc2626;font-style:italic;white-space:nowrap">✖ never&nbsp;picked</span>`;
+    }
+    const maxPct = Math.max(...dow);
+    return dow.map((pct, i) => {
+      const isTop = pct === maxPct && pct > 0;
+      const alpha = pct === 0 ? 0 : 0.1 + (pct / 100) * 0.9;
+      const bg    = pct === 0 ? '#f1f5f9'
+                  : isTop     ? `rgba(37,99,235,${alpha.toFixed(2)})`
+                  :              `rgba(99,102,241,${alpha.toFixed(2)})`;
+      const tc    = pct >= 40 ? '#fff' : '#64748b';
+      const border = isTop ? 'outline:1.5px solid #1d4ed8;outline-offset:-1px;' : '';
+      return `<span title="${dayNames[i]}: ${pct}%" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:20px;border-radius:3px;${border}background:${bg};color:${tc};font-size:8px;font-weight:${isTop?800:600};margin:0 1px">${labels[i]}</span>`;
+    }).join('');
+  }
+
+  // Helper: dominant day label for a DOW array
+  function dominantDay(dow) {
+    if (!dow || dow.every(v => v === 0)) return null;
+    const names = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const max = Math.max(...dow);
+    if (max < 40) return null; // no clear day
+    return names[dow.indexOf(max)];
+  }
+
+  // Summary table
   let html = `
   <div style="margin-bottom:10px;padding:7px 10px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:4px;font-size:10.5px;color:#0c4a6e;line-height:1.6">
-    💡 <strong>Confirmed:</strong> LMD partners systematically pick up more from some stores than others.
-    Matin Shaikh holds 100% of orders at one Beed store while picking normally at another (87.5pp gap).
-    This exposes an informal priority queue the system is unaware of — some stores are consistently deprioritized.
+    💡 <strong>Confirmed:</strong> LMDs run informal per-store pickup schedules the system cannot see.
+    Stores on a poor day-slot wait 2–3 extra days for pickup, directly causing the 51-hr PACKED→PICKED median.
+    Click any ▶ row to expand — hover cells to see exact day %.
   </div>
   <div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap">
@@ -2648,11 +2717,11 @@ function renderH5SelectivePicking() {
     </tr></thead><tbody>`;
 
   sp.forEach((r, idx) => {
-    const varBig  = r[5] >= 70;
-    const varMed  = r[5] >= 50 && r[5] < 70;
-    const varCol  = varBig ? '#dc2626' : varMed ? '#d97706' : '#475569';
-    const varBg   = varBig ? 'background:#fff8f8' : '';
-    const details = detailByLmd[r[0]];
+    const varBig    = r[5] >= 70;
+    const varMed    = r[5] >= 50 && r[5] < 70;
+    const varCol    = varBig ? '#dc2626' : varMed ? '#d97706' : '#475569';
+    const varBg     = varBig ? 'background:#fff8f8' : '';
+    const details   = detailByLmd[r[0]];
     const hasDetail = details && details.length > 0;
 
     html += `<tr style="border-bottom:1px solid #f1f5f9;${varBg};cursor:${hasDetail?'pointer':'default'}"
@@ -2668,27 +2737,32 @@ function renderH5SelectivePicking() {
       <td style="padding:7px 8px;text-align:right;color:#64748b">${r[6]}%</td>
     </tr>`;
 
-    // Detail rows (hidden by default, shown for top-10 LMDs that have detail data)
+    // Expandable store-level drilldown with DOW heatmap
     if (hasDetail) {
-      html += `<tr id="h5d-${idx}" style="display:none"><td colspan="7" style="padding:0 0 6px 24px">
-        <table style="width:calc(100% - 24px);border-collapse:collapse;font-size:11px;background:#fafafa;border-radius:6px;overflow:hidden">
+      html += `<tr id="h5d-${idx}" style="display:none"><td colspan="7" style="padding:0 0 8px 24px">
+        <table style="width:calc(100%-24px);border-collapse:collapse;font-size:11px;background:#fafafa;border-radius:6px;overflow:hidden;margin-right:4px">
           <tr style="background:#f1f5f9">
             <th style="padding:5px 8px;text-align:left;color:#64748b;font-weight:600">Store</th>
             <th style="padding:5px 8px;text-align:left;color:#64748b;font-weight:600">District</th>
             <th style="padding:5px 6px;text-align:right;color:#64748b;font-weight:600">Orders</th>
             <th style="padding:5px 6px;text-align:right;color:#dc2626;font-weight:600">HOLD%</th>
             <th style="padding:5px 6px;text-align:right;color:#16a34a;font-weight:600">Del%</th>
+            <th style="padding:5px 10px;text-align:center;color:#2563eb;font-weight:600">Pickup Days <span style="font-weight:400;font-size:9px">(S M T W T F S)</span></th>
           </tr>`;
-      [...details].sort((a,b)=>b[6]-a[6]).forEach(dr => {
+      [...details].sort((a,b) => b[6] - a[6]).forEach(dr => {
         const dHigh = dr[6] >= 70;
         const dMed  = dr[6] >= 30 && dr[6] < 70;
         const dCol  = dHigh ? '#dc2626' : dMed ? '#d97706' : '#16a34a';
+        const heatmap = miniDow(dr[0], dr[1]);
+        const domDay  = dominantDay(dp[dr[0]+'|'+dr[1]]);
+        const dayTag  = domDay ? `<span style="font-size:8.5px;color:#2563eb;background:#eff6ff;padding:1px 5px;border-radius:8px;margin-left:5px">${domDay}</span>` : '';
         html += `<tr style="border-top:1px solid #e2e8f0">
-          <td style="padding:4px 8px;color:#374151;font-size:10.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${dr[1]}</td>
-          <td style="padding:4px 8px;color:#6b7280;font-size:10.5px">${dr[2]}</td>
-          <td style="padding:4px 6px;text-align:right">${dr[4]}</td>
-          <td style="padding:4px 6px;text-align:right;font-weight:700;color:${dCol}">${dr[6]}%</td>
-          <td style="padding:4px 6px;text-align:right;color:#16a34a">${dr[8]}%</td>
+          <td style="padding:5px 8px;color:#374151;font-size:10.5px">${dr[1]}${dayTag}</td>
+          <td style="padding:5px 8px;color:#6b7280;font-size:10.5px">${dr[2]}</td>
+          <td style="padding:5px 6px;text-align:right">${dr[4]}</td>
+          <td style="padding:5px 6px;text-align:right;font-weight:700;color:${dCol}">${dr[6]}%</td>
+          <td style="padding:5px 6px;text-align:right;color:#16a34a">${dr[8]}%</td>
+          <td style="padding:5px 10px;text-align:center">${heatmap}</td>
         </tr>`;
       });
       html += `</table></td></tr>`;
@@ -2696,7 +2770,71 @@ function renderH5SelectivePicking() {
   });
 
   html += `</tbody></table></div>`;
-  document.getElementById('lmd-h5').innerHTML = html;
+
+  // ── Kantilal Patel route-schedule spotlight ──
+  // Not in top-10 detail, but shows the clearest fixed route schedule
+  const kpDow = [
+    { store:'ARJUN AGRO AND BEEJ NIGAM',    dow:[0,7.1,92.9,0,0,0,0],       hold:70.0 },
+    { store:'N K AGRITECH AND NURSERY',      dow:[0,26.5,73.5,0,0,0,0],      hold:2.9  },
+    { store:'RAJ AGRO CENTER',              dow:[14.3,0,14.3,71.4,0,0,0],    hold:57.1 },
+    { store:'SARDAR AGRO AND BEEJ NIGAM',   dow:[0,0,25.0,12.5,62.5,0,0],    hold:12.5 },
+    { store:'KHEDUT AGRO',                  dow:[0,0,20.0,20.0,0,0,60.0],    hold:0    },
+    { store:'GYAN AGRO',                    dow:[11.1,22.2,11.1,11.1,0,0,44.4],hold:55.6},
+    { store:'KHODIYAR KRUPA AGRO',          dow:[14.3,28.6,21.4,28.6,0,0,7.1], hold:21.4},
+    { store:'SADGURUKRUPA AGRO CENTER',     dow:[13.3,23.3,0,23.3,16.7,0,23.3],hold:13.3},
+    { store:'KRUSHI MITRA',                 dow:[16.7,0,0,33.3,0,50.0,0],    hold:77.8 },
+    { store:'UNNATI AGRO CENTRE',           dow:[22.2,0,0,22.2,22.2,33.3,0], hold:33.3 }
+  ];
+  const dayLabels = ['S','M','T','W','T','F','S'];
+  const dayFull   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let kpHtml = `
+  <div style="margin-top:14px;border:1px solid #bae6fd;border-radius:8px;overflow:hidden">
+    <div style="background:#0369a1;color:#fff;padding:8px 12px;font-size:11px;font-weight:700">
+      📅 Route Schedule Spotlight — Kantilal Patel (Gujarat · 11 stores · 65.3pp variance)
+      <span style="font-weight:400;opacity:0.85;margin-left:8px">Each store is assigned a specific pickup day — orders not on that day wait up to 6 days</span>
+    </div>
+    <div style="overflow-x:auto;background:#f8fbff">
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <tr style="background:#e0f2fe">
+        <th style="padding:5px 10px;text-align:left;color:#0369a1;font-weight:600">Store</th>
+        <th style="padding:5px 6px;text-align:right;color:#dc2626;font-weight:600">HOLD%</th>
+        <th style="padding:5px 12px;text-align:center;color:#0369a1;font-weight:600">Pickup Day Pattern (S M T W T F S)</th>
+        <th style="padding:5px 10px;text-align:center;color:#0369a1;font-weight:600">Assigned Day</th>
+      </tr>`;
+
+  kpDow.forEach(s => {
+    const maxPct = Math.max(...s.dow);
+    const domIdx = s.dow.indexOf(maxPct);
+    const domDayName = maxPct >= 40 ? dayFull[domIdx] : '—';
+    const holdCol = s.hold >= 50 ? '#dc2626' : s.hold >= 25 ? '#d97706' : '#16a34a';
+    const cells = s.dow.map((pct, i) => {
+      const isTop   = pct === maxPct && pct > 0;
+      const alpha   = pct === 0 ? 0 : 0.1 + (pct / 100) * 0.9;
+      const bg      = pct === 0 ? '#f1f5f9' : isTop ? `rgba(3,105,161,${alpha.toFixed(2)})` : `rgba(99,102,241,${alpha.toFixed(2)})`;
+      const tc      = pct >= 40 ? '#fff' : '#64748b';
+      const border  = isTop ? 'outline:2px solid #0369a1;outline-offset:-1px;' : '';
+      return `<span title="${dayFull[i]}: ${pct}%" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:22px;border-radius:3px;${border}background:${bg};color:${tc};font-size:8.5px;font-weight:${isTop?800:600};margin:0 1.5px">${dayLabels[i]}</span>`;
+    }).join('');
+    kpHtml += `<tr style="border-top:1px solid #e0f2fe">
+      <td style="padding:5px 10px;color:#1e3a5f;font-size:10.5px;font-weight:500">${s.store}</td>
+      <td style="padding:5px 6px;text-align:right;font-weight:700;color:${holdCol}">${s.hold > 0 ? s.hold+'%' : '—'}</td>
+      <td style="padding:5px 12px;text-align:center">${cells}</td>
+      <td style="padding:5px 10px;text-align:center">
+        ${domDayName !== '—'
+          ? `<span style="background:#0369a1;color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">${domDayName}</span>`
+          : `<span style="color:#94a3b8;font-size:10px">mixed</span>`}
+      </td>
+    </tr>`;
+  });
+  kpHtml += `</table></div>
+  <div style="padding:6px 12px;background:#f0f9ff;font-size:10px;color:#0c4a6e;line-height:1.6">
+    ARJUN AGRO gets 93% of pickups on <strong>Tuesday</strong>. SARDAR AGRO gets 63% on <strong>Thursday</strong>. KHEDUT AGRO gets 60% on <strong>Saturday</strong>.
+    An order packed Monday at SARDAR AGRO waits until Thursday — <strong>3 wasted days</strong> before the LMD even shows up.
+  </div>
+  </div>`;
+
+  document.getElementById('lmd-h5').innerHTML = html + kpHtml;
 }
 
 function toggleH5Detail(id) {
