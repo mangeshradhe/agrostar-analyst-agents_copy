@@ -228,6 +228,27 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
 
 /* ── Footer ── */
 .footer { text-align: center; padding: 16px; font-size: 10.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; margin-top: 4px; }
+
+/* ── Pipeline Tab ── */
+.pipeline-strip { background:#1e293b;color:#fff;padding:10px 28px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;font-size:12px; }
+.pipeline-strip strong { font-weight:800; }
+.ps-flow { display:flex;align-items:stretch;gap:0;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:16px; }
+.ps-stage { flex:1;min-width:0;padding:16px 10px;text-align:center;border-right:1px solid #f1f5f9;position:relative; }
+.ps-stage:last-child { border-right:none; }
+.ps-stage.red   { background:#fef2f2; }
+.ps-stage.amber { background:#fffbeb; }
+.ps-stage.blue  { background:#eff6ff; }
+.ps-stage.green { background:#f0fdf4; }
+.ps-stage.gray  { background:#f9fafb; }
+.ps-count { font-size:22px;font-weight:800;line-height:1;color:#0f172a; }
+.ps-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-top:5px;color:#64748b; }
+.ps-pct   { font-size:11px;font-weight:700;margin-top:3px; }
+.ps-note  { font-size:10px;color:#94a3b8;margin-top:2px; }
+.ps-arrow { display:flex;align-items:center;padding:0 2px;color:#cbd5e1;font-size:16px;align-self:center;flex-shrink:0; }
+.pl-view-bar { background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 28px;display:flex;align-items:center;gap:12px; }
+.pipeline-panel { padding:16px 28px 20px; }
+.wow-mini { display:flex;align-items:flex-end;gap:2px;height:36px;margin-top:6px; }
+.wow-bar { width:12px;border-radius:2px 2px 0 0;min-height:2px; }
 </style>
 </head>
 <body>
@@ -253,6 +274,7 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
   <div class="tab" onclick="switchTab('lmd',this)">🚚 Last Mile</div>
   <div class="tab" onclick="switchTab('mpd',this)">💳 MPD Feature</div>
   <div class="tab" onclick="switchTab('deeper',this)">🔍 Deeper Analysis</div>
+  <div class="tab" onclick="switchTab('pipeline',this)">🚛 Pipeline</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════ FILTER BAR -->
@@ -660,6 +682,33 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
 
 </div><!-- /view-deeper -->
 
+<!-- ═══════════ TAB 8: LOGISTICS PIPELINE ═══════════ -->
+<div id="view-pipeline" class="view">
+  <div class="pipeline-strip" id="pipeline-strip">Loading…</div>
+  <div style="padding:16px 28px 0">
+    <div class="card">
+      <div class="card-title">Order Assembly Line
+        <span>Where is each DVS order right now? · Apr 1–May 22 2026</span>
+      </div>
+      <div id="pipeline-assembly"></div>
+    </div>
+  </div>
+  <div class="pl-view-bar">
+    <span class="filter-label">View As</span>
+    <span class="pill active" onclick="setPipelineView('overview',this)">📊 State Leader</span>
+    <span class="pill" onclick="setPipelineView('diagnose',this)">🔬 Diagnose</span>
+    <span class="pill" onclick="setPipelineView('act',this)">⚡ Act Now</span>
+    <span class="pill" onclick="setPipelineView('plan',this)">📋 WoW Trend</span>
+    <span style="margin-left:auto;font-size:11px;color:#94a3b8">
+      State filter above applies · Last week (May 18) is partial
+    </span>
+  </div>
+  <div id="pipeline-overview" class="pipeline-panel"></div>
+  <div id="pipeline-diagnose" class="pipeline-panel" style="display:none"></div>
+  <div id="pipeline-act" class="pipeline-panel" style="display:none"></div>
+  <div id="pipeline-plan" class="pipeline-panel" style="display:none"></div>
+</div><!-- /view-pipeline -->
+
 <div class="footer">
   DVS Program Dashboard · Agrostar · Live BigQuery Connection · GMV in actual ₹ (Indian comma format)
 </div>
@@ -686,18 +735,18 @@ const STATIC_DATA = {
   snapshotFrom: '2026-04-01',
   snapshotTo:   '2026-05-21',
   summary: [
-    ['Maharashtra',    17531, 6652, 6158, 24257292, 2695, 322],
-    ['Uttar Pradesh',  12759, 3913, 1656, 11506289, 2022, 207],
-    ['Rajasthan',      10326, 4231, 1287, 17460219, 2227, 182],
-    ['Gujarat',         9858, 6331, 1087, 24218398, 3779, 194],
-    ['Madhya Pradesh',  7878, 2066, 1014,  8043145, 1332, 172]
+    ['Maharashtra',    17654, 6551, 6247, 23756453, 2757, 320],
+    ['Uttar Pradesh',  12868, 3930, 1681, 11598037, 2097, 206],
+    ['Rajasthan',      10365, 4224, 1305, 17859459, 2271, 181],
+    ['Gujarat',         9956, 6377, 1101, 24428080, 3877, 195],
+    ['Madhya Pradesh',  7940, 2061, 1028,  8110428, 1346, 171]
   ],
   // Funnel: 4 stages — source: PromisedTAT (routing decisions) + taluka-level DVS config validation
   funnelStages: [
-    { label: 'Total B2C Demand',       val: 58320, color: '#2563eb', leak: 15009, leakLabel: 'Leak 1 — No DVS coverage (no partner or no franchise LMD in non-DVS taluka)', leakColor: '#dc2626' },
-    { label: 'In DVS-Covered Talukas', val: 43311, color: '#16a34a', leak:  9866, leakLabel: 'Leak 2 — Routing engine could not assign to a store',                          leakColor: '#d97706' },
-    { label: 'DVS Attempted',          val: 33445, color: '#15803d', leak: 10475, leakLabel: 'Leak 3 — Partner assigned but re-routed to FC',                                leakColor: '#ea580c' },
-    { label: 'DVS Fulfilled ✅',        val: 22970, color: '#166534', leak: null,  leakLabel: null,                                                                            leakColor: null }
+    { label: 'Total B2C Demand',       val: 58809, color: '#2563eb', leak: 12339, leakLabel: 'Leak 1 — No DVS coverage (no partner or no franchise LMD in non-DVS taluka)', leakColor: '#dc2626' },
+    { label: 'In DVS-Covered Talukas', val: 46470, color: '#16a34a', leak: 12047, leakLabel: 'Leak 2 — Routing engine could not assign to a store',                          leakColor: '#d97706' },
+    { label: 'DVS Attempted',          val: 34423, color: '#15803d', leak: 11275, leakLabel: 'Leak 3 — Partner assigned but re-routed to FC',                                leakColor: '#ea580c' },
+    { label: 'DVS Fulfilled ✅',        val: 23148, color: '#166534', leak: null,  leakLabel: null,                                                                            leakColor: null }
   ],
   // Leak 1 by state — source: PromisedTAT no_taluka + reclassified no_dehlivery (non-DVS talukas)
   leak1ByState: [
@@ -710,54 +759,56 @@ const STATIC_DATA = {
   // Leak 2 — Root causes (total: 9,866) from PromisedTAT + validated against DVS-configured talukas
   // Note: resolved_no_dehlivery orders NOT in DVS-configured talukas (3,195) moved to Leak 1
   leak2RootCauses: [
-    { label: 'Partner Not Configured at Order Time', count: 2211, pct: 22.4, color: '#64748b',
+    { label: 'Partner Not Configured at Order Time', count: 2700, pct: 22.4, color: '#64748b',
       note: 'Taluka now has a DVS partner but had none when order was placed. Fix: faster onboarding + real-time config sync.' },
-    { label: 'Clearance Sale Items',                 count: 1588, pct: 16.1, color: '#f59e0b',
+    { label: 'Clearance Sale Items',                 count: 1939, pct: 16.1, color: '#f59e0b',
       note: 'Clearance / promotional SKUs excluded from DVS routing by system rule.' },
-    { label: 'License Gap',                          count: 1450, pct: 14.7, color: '#dc2626',
+    { label: 'License Gap',                          count: 1771, pct: 14.7, color: '#dc2626',
       note: 'Store not licensed for the ordered product category (Seeds, Fertilizer, etc.). Fix: license onboarding for high-volume stores.' },
-    { label: 'Distance Too Far',                     count: 1303, pct: 13.2, color: '#7c3aed',
+    { label: 'Distance Too Far',                     count: 1591, pct: 13.2, color: '#7c3aed',
       note: 'Farmer location exceeds the store\'s configured routing distance threshold. Fix: review distance config per taluka.' },
-    { label: 'No Routing Record',                    count: 1285, pct: 13.0, color: '#94a3b8',
+    { label: 'No Routing Record',                    count: 1569, pct: 13.0, color: '#94a3b8',
       note: 'No PromisedTAT entry or unrecorded reason — possible CSR/system orders that bypassed the routing engine.' },
-    { label: 'No Franchise LMD (DVS taluka, 3PL delivery)', count: 1082, pct: 11.0, color: '#2563eb',
+    { label: 'No Franchise LMD (DVS taluka, 3PL delivery)', count: 1321, pct: 11.0, color: '#2563eb',
       note: 'DVS partner IS configured for the taluka but franchise LMD is missing — 3PL (Delhivery) is the only shipper. Fix: deploy franchise LMD in these specific talukas.' },
-    { label: 'Restricted SKUs',                      count:  947, pct:  9.6, color: '#ea580c',
+    { label: 'Restricted SKUs',                      count: 1156, pct:  9.6, color: '#ea580c',
       note: 'SKU restricted from DVS routing by system policy. May need category-level review.' }
   ],
   // Leak 3 re-route reasons (from order_management_orderreroutinglogs)
   leak3Reasons: [
-    { label: 'SLA Miss (>24hr no action)', count: 7738, color: '#dc2626' },
-    { label: 'OCP Block (credit hold)',    count: 2629, color: '#d97706' },
-    { label: 'Shop Closed / Strike',       count:  719, color: '#f59e0b' },
+    { label: 'SLA Miss (>24hr no action)', count: 7869, color: '#dc2626' },
+    { label: 'OCP Block (credit hold)',    count: 2673, color: '#d97706' },
+    { label: 'Shop Closed / Strike',       count:  716, color: '#f59e0b' },
     { label: 'Backfill Failure',           count:   73, color: '#94a3b8' },
     { label: 'Mapping Issue',              count:   31, color: '#cbd5e1' },
-    { label: 'Other',                      count:   21, color: '#e2e8f0' }
+    { label: 'Other',                      count:    0, color: '#e2e8f0' }
   ],
   // Leak 3 per-state re-route reason breakdown (BQ: order_management_orderreroutinglogs, Apr1–May21)
   // Keys are lowercase state names; counts are from exclusive CASE-WHEN categorisation (sums = total ✓)
   leak3ByState: {
-    'maharashtra':    { total:6264, sla:4572, ocp:959,  shopClosed:719, backfill:13, mapping:1,  other:0  },
-    'gujarat':        { total:1101, sla: 665, ocp:413,  shopClosed:  0, backfill: 2, mapping:0,  other:21 },
-    'rajasthan':      { total:1308, sla: 783, ocp:442,  shopClosed:  0, backfill:53, mapping:30, other:0  },
-    'uttar pradesh':  { total:1683, sla:1174, ocp:506,  shopClosed:  0, backfill: 3, mapping:0,  other:0  },
-    'madhya pradesh': { total:1032, sla: 674, ocp:356,  shopClosed:  0, backfill: 2, mapping:0,  other:0  }
+    'maharashtra':    { total:6247, sla:4559, ocp:958,  shopClosed:716, backfill:13, mapping:1,  other:0 },
+    'uttar pradesh':  { total:1681, sla:1173, ocp:505,  shopClosed:  0, backfill: 3, mapping:0,  other:0 },
+    'rajasthan':      { total:1305, sla: 780, ocp:442,  shopClosed:  0, backfill:53, mapping:30, other:0 },
+    'gujarat':        { total:1101, sla: 686, ocp:413,  shopClosed:  0, backfill: 2, mapping:0,  other:0 },
+    'madhya pradesh': { total:1028, sla: 671, ocp:355,  shopClosed:  0, backfill: 2, mapping:0,  other:0 }
   },
 
   // Tab 4 — Operations & SLA
   opsOrderStatus: [
-    { label: 'Delivered',           count: 18376, color: '#16a34a' },
-    { label: 'RTO / Returned',      count:  2067, color: '#dc2626' },
-    { label: 'Picked (In Transit)', count:   919, color: '#2563eb' },
-    { label: 'Packed at Store',     count:  1148, color: '#f59e0b' },
-    { label: 'On Hold (Restock)',   count:   460, color: '#7c3aed' }
+    { label: 'Delivered',           count: 12351, color: '#16a34a' },
+    { label: 'RTO / Returned',      count:  3677, color: '#dc2626' },
+    { label: 'Picked (In Transit)', count:  1865, color: '#2563eb' },
+    { label: 'Packed at Store',     count:  3190, color: '#f59e0b' },
+    { label: 'On Hold (Restock)',   count:  1677, color: '#7c3aed' },
+    { label: 'Hold by LMD',         count:  2269, color: '#f97316' },
+    { label: 'No Action Yet',       count:   467, color: '#94a3b8' }
   ],
   // [stage, medianMins, slaMin, breachPct, breachCount]
   opsSlaStages: [
-    ['Created → First Action (Pack/Hold)', 42,   60,  30.0,  6890],
-    ['Packed → Picked by LMD',            852,  1440, 18.5,  4252],
-    ['Picked → Delivered to Farmer',      1308, 1440, 24.1,  5536],
-    ['End-to-End (Created → Delivered)',  3300, 4320, 22.3,  4098]
+    ['Created → First Action (Pack/Hold)',  88,   60,  58.5, 13260],
+    ['Packed → Picked by LMD',           3061, 1440,  72.1, 12897],
+    ['Picked → Delivered to Farmer',     1017, 1440,  41.1,  5077],
+    ['End-to-End (Created → Delivered)', 6991, 4320,  70.4,  8699]
   ],
 
   // Tab 5 — Last Mile  (sourced from BQ: Apr 1 – May 21 2026)
@@ -766,48 +817,48 @@ const STATIC_DATA = {
   // del_pct = delivered / (delivered + rto)
   // [state, dvs_franchise, dvs_del_pct, dvs_rto_pct, fc_franchise, fc_del_pct, fc_rto_pct, hold_by_lmd]
   lmdStateComparison: [
-    ['Maharashtra',    6681, 67.2, 32.8, 10068, 66.3, 33.7, 414],
-    ['Gujarat',        6342, 77.1, 22.9,  3235, 77.7, 22.3, 296],
-    ['Rajasthan',      4234, 75.8, 24.2,  5829, 68.6, 31.4, 418],
-    ['Uttar Pradesh',  3927, 77.0, 23.0,  8327, 70.2, 29.8, 389],
-    ['Madhya Pradesh', 2067, 87.9, 12.1,  5211, 66.6, 33.4,  82]
+    ['Maharashtra',    6551, 67.1, 32.9, 11105, 66.9, 33.1, 2274],
+    ['Gujarat',        6378, 77.0, 23.0,  3579, 78.7, 21.3, 1340],
+    ['Rajasthan',      4224, 75.5, 24.5,  6146, 69.0, 31.0, 1811],
+    ['Uttar Pradesh',  3932, 77.5, 22.5,  8941, 72.4, 27.6, 1990],
+    ['Madhya Pradesh', 2061, 87.9, 12.1,  5882, 67.7, 32.3,  546]
   ],
   // Real LMD names from BQ — ranked by DVS orders DESC
   // [lmd_name, dvs_orders, fc_orders, dvs_delivered, dvs_rto, dvs_rto_pct, fc_delivered, fc_rto, fc_rto_pct, dvs_hold]
   lmdLeaderboard: [
-    ['Mahipatsinh Rathod',    390,  24, 235,  68, 22.4,  16,   4, 20.0, 36],
-    ['Tushar Bhesaniya',      295,  66, 196,  54, 21.6,  41,   9, 18.0, 19],
-    ['Tejabhai Paraliya',     287,   3, 169,  70, 29.3,   2,   0,  0.0,  9],
-    ['Raza Enterprice',       259, 104, 173,  39, 18.4,  69,  17, 19.8,  5],
-    ['Kuldip Algotar',        242, 240, 166,  46, 21.7, 138,  58, 29.6, 11],
-    ['Vishal Solanki',        225,  53, 139,  24, 14.7,  32,   7, 17.9,  6],
-    ['Dharmendrasinh Tank',   213,  93, 180,  21, 10.4,  77,   5,  6.1,  4],
-    ['Ravikaran Singh',       212, 125,  63,  21, 25.0,  61,  29, 32.2, 40],
-    ['Chavda Laljibhai',      207,  42, 137,  34, 19.9,  30,  12, 28.6,  4],
-    ['Jignesh Jani',          206, 226, 149,  24, 13.9, 201,   9,  4.3,  5],
-    ['Mukesh Alwar',          199, 262, 108,  44, 28.9,  94, 113, 54.6, 17],
-    ['Sachin Mothe',          193, 286, 103,  47, 31.3, 182,  60, 24.8, 14],
-    ['Vikash Kumar Singh',    193, 128, 111,  37, 25.0,  89,  18, 16.8, 30],
-    ['Sumer Singh',           189, 166, 113,   5,  4.2, 114,  39, 25.5, 19],
-    ['Dinesh Mali',           183, 113, 117,   9,  7.1,  60,  46, 43.4, 17],
-    ['Himanshu Chauhan',      181,  62,  85,  32, 27.4,  38,  11, 22.4, 11],
-    ['Hargovanji Thakor',     179,  22, 131,  19, 12.7,  17,   2, 10.5, 10],
-    ['Pravinbhai Parmar',     179,   9, 110,  27, 19.7,   4,   0,  0.0, 27],
-    ['Manish Kumar',          178, 122, 129,  33, 20.4,  98,  23, 19.0, 10],
-    ['Laxman Ram',            171,  85, 104,  26, 20.0,  62,  20, 24.4, 25]
+    ['Mahipatsinh Rathod',    391,  24, 254,  73, 22.3,  16,   4, 20.0,  0],
+    ['Tushar Bhesaniya',      298,  66, 199,  55, 21.7,  43,   9, 17.3,  0],
+    ['Tejabhai Paraliya',     288,   3, 180,  74, 29.1,   2,   0,  0.0,  0],
+    ['Raza Enterprice',       260, 104, 176,  41, 18.9,  72,  17, 19.1,  0],
+    ['Kuldip Algotar',        246, 247, 167,  46, 21.6, 142,  58, 29.0,  0],
+    ['Vishal Solanki',        230,  54, 141,  24, 14.5,  32,   7, 17.9,  0],
+    ['Dharmendrasinh Tank',   218,  93, 182,  22, 10.8,  79,   5,  6.0,  0],
+    ['Ravikaran Singh',       214, 125,  76,  21, 21.6,  62,  29, 31.9,  0],
+    ['Chavda Laljibhai',      208,  42, 139,  34, 19.7,  30,  12, 28.6,  0],
+    ['Jignesh Jani',          206, 229, 149,  24, 13.9, 201,   9,  4.3,  0],
+    ['Mukesh Alwar',          202, 264, 112,  46, 29.1,  95, 118, 55.4,  0],
+    ['Vikash Kumar Singh',    196, 128, 114,  37, 24.5,  92,  18, 16.4,  0],
+    ['Sachin Mothe',          195, 291, 106,  48, 31.2, 183,  60, 24.7,  0],
+    ['Sumer Singh',           191, 166, 114,   5,  4.2, 117,  39, 25.0,  0],
+    ['Dinesh Mali',           184, 113, 117,  11,  8.6,  60,  46, 43.4,  0],
+    ['Himanshu Chauhan',      183,  67,  91,  32, 26.0,  39,  11, 22.0,  0],
+    ['Pravinbhai Parmar',     181,   9, 115,  27, 19.0,   4,   0,  0.0,  0],
+    ['Hargovanji Thakor',     179,  23, 138,  20, 12.7,  17,   3, 15.0,  0],
+    ['Manish Kumar',          178, 122, 131,  35, 21.1,  98,  23, 19.0,  0],
+    ['Kantilal Patel',        171, 110, 102,  37, 26.6,  63,  17, 21.3,  0]
   ],
 
   // Tab 6 — System Health
   sysRoutingHealth: {
-    totalB2c: 58320, hasTat: 57035, tatCoverage: 97.8,
-    resolved: 33445, resolutionRate: 57.4,
-    ocpBlockedOrders: 2629, noTatRecord: 1285
+    totalB2c: 58809, hasTat: 57515, tatCoverage: 97.8,
+    resolved: 34423, resolutionRate: 58.5,
+    ocpBlockedOrders: 2673, noTatRecord: 1296
   },
   // Actionable blockers — combines Leak 2 root causes + Leak 3 config/system issues
   // [label, count, category, fix, color]
   sysBlockers: [
-    ['SLA Miss — Partner >24hr no action',       7738, 'Operational',   'Partner activation, WhatsApp nudges',                '#dc2626'],
-    ['OCP Credit Block',                          2629, 'Config',        'Credit limit review for DVS-active partners',        '#d97706'],
+    ['SLA Miss — Partner >24hr no action',       7869, 'Operational',   'Partner activation, WhatsApp nudges',                '#dc2626'],
+    ['OCP Credit Block',                          2673, 'Config',        'Credit limit review for DVS-active partners',        '#d97706'],
     ['Partner Not Configured at Order Time',      2211, 'Config',        'Proactive taluka onboarding before demand peaks',    '#f59e0b'],
     ['Clearance Sale Exclusion',                  1588, 'System Rule',   'Policy decision — review DVS eligibility for clearance', '#94a3b8'],
     ['License Gap (Seeds / Fertilizer)',          1450, 'Config',        'Identify unlicensed partners, trigger license drive','#7c3aed'],
@@ -840,11 +891,11 @@ const STATIC_DATA = {
   // Tab 3 — Partner Health
   // [state, configured, got_demand, fulfilled, never_got_demand, demand_zero_fulfilled, orders, gmv, avg_orders, champions, stars, active_cat, occasional]
   partnerStateHealth: [
-    ['Maharashtra',    372, 356, 313, 16, 43, 6652, 24257292, 21.2, 127, 59, 86, 49],
-    ['Madhya Pradesh', 228, 212, 171, 16, 41, 2066,  8043145, 12.1,  30, 31, 72, 38],
-    ['Uttar Pradesh',  226, 222, 203,  4, 19, 3913, 11506289, 19.3,  60, 39, 78, 29],
-    ['Rajasthan',      212, 200, 178, 12, 22, 4231, 17460219, 23.8,  58, 44, 60, 18],
-    ['Gujarat',        195, 189, 184,  6,  5, 6331, 24218398, 34.4, 104, 45, 32, 13]
+    ['Maharashtra',    372, 347, 311, 25, 36, 6520, 23282108, 21.0,  34, 93, 105, 79],
+    ['Gujarat',        195, 187, 185,  8,  2, 6054, 23120791, 32.7,  41, 60,  61, 23],
+    ['Rajasthan',      211, 190, 177, 21, 13, 4201, 17277959, 23.7,  26, 31,  73, 47],
+    ['Uttar Pradesh',  226, 213, 202, 13, 11, 3890, 11466963, 19.3,  24, 36,  78, 64],
+    ['Madhya Pradesh', 228, 204, 170, 24, 34, 2030,  7836262, 11.9,   5, 24,  70, 71]
   ],
   // [store_code, store_name, state, district, orders, gmv]
   partnerLeaderboard: [
@@ -872,217 +923,145 @@ const STATIC_DATA = {
   // cols: [store_name(0), state(1), district(2), taluka_count(3), b2c_demand(4), fulfilled(5),
   //        l2_license(6), l2_distance(7), l2_no_lmd(8), l2_clearance(9), l2_restricted(10), l3_sla(11)]
   partnerDetailTable: [
-    ['KISHAN SEWA KENDAR Gurusar Modia',              'rajasthan',      'sri ganganagar',       2, 396, 52,  0,  0, 0,  3, 65, 13],
-    ['SHIV SHAKTI PESTICIDES',                         'rajasthan',      'sri ganganagar',       1, 311,161,  0,  0, 0,  3, 61, 11],
-    ['SAMBHAJI KRUSHI SEVA KENDRA RAMEGAON',           'maharashtra',    'latur',                2, 302, 18,  0,  0, 0, 14,  0, 18],
-    ['MAHALAXMI AGRO AGENCY',                          'rajasthan',      'jodhpur',              4, 290, 30,  0,  0, 0,  2, 46,  2],
-    ['Viraj Agrotech Budh',                            'maharashtra',    'satara',               2, 286, 18,  0,  1, 0, 16,  0, 17],
-    ['HINGLAJ KRISHI SEVA KENDRA Sekhala',             'rajasthan',      'jodhpur',              6, 279,124,  1,  7, 0,  3, 27,  4],
-    ['SHRI KARNI AGRO SALES',                          'rajasthan',      'jodhpur',              3, 263,  0,  0,  0, 0,  2, 46,  4],
-    ['APNA KISAN BAZAR BAP',                           'rajasthan',      'phalodi',              2, 263,  0,  0,  0, 0,  2, 46,  0],
-    ['RANGREJ Agrotech',                               'rajasthan',      'jodhpur',              1, 262,105,  0,  0, 0,  2, 46,  1],
-    ['SHREE KRISHNA AGRO SALES',                       'rajasthan',      'jodhpur',              1, 262, 39,  0,  0, 0,  2, 46,  4],
-    ['Shri. Pandurang Krushi Seva Kendra',             'maharashtra',    'satara',               2, 256,  8,  0,  0, 0,  3,  0, 45],
-    ['SADGURUKRUPA AGRO CENTER',                       'gujarat',        'surat',                2, 256, 32,  0,  0, 0,  5,  0,  0],
-    ['SARVADNY KRUSHI VIKAS & FARMER PRODUCER CO',     'maharashtra',    'beed',                 1, 254, 74,  0,  1, 0,  2,  0, 78],
-    ['KHANDESHWAR KRUSHI SEVA KENDRA',                 'maharashtra',    'beed',                 1, 254, 24,  0,  1, 0,  2,  0, 64],
-    ['Chhaya traders',                                 'uttar pradesh',  'aligarh',              1, 250, 41, 52, 31, 0,  9,  0,  1],
-    ['KRUSHNAKUNJ AGRO CENTER',                        'gujarat',        'bhavnagar',            1, 244, 50,  0,  0, 0,  3,  0,  2],
-    ['KRUSHI DHARATAL FARMER PRODUCER CO',             'gujarat',        'botad',                2, 244,186,  9,  0, 0,  5,  0,  1],
-    ['NEW PANKAJ KRISHI SEVA KENDRA',                  'maharashtra',    'jalgaon',              1, 239, 31,  0,  0, 0, 20,  0, 82],
-    ['LAXMI AGENCY',                                   'maharashtra',    'jalgaon',              1, 239, 14,  0,  0, 0, 20,  0, 10],
-    ['MANUMATA KRISHI KENDRA',                         'maharashtra',    'jalgaon',              1, 239, 21,  0,  0, 0, 20,  0, 12],
-    ['Jijabai Krushi Kendra Sevanagar',                'maharashtra',    'jalgaon',              1, 239, 11,  0,  0, 0, 20,  0, 34],
-    ['Bajrang krishi seva kendar',                     'rajasthan',      'jodhpur',              1, 233,171,  0,  7, 0,  8, 35,  1],
-    ['SHRI HARI KHAD BHANDAR',                         'uttar pradesh',  'bulandshahr',          4, 228,  4, 16,  7, 0,  9,  0, 10],
-    ['CHOUDHARY KHAD DAWA BEEJ BHANDAR',               'uttar pradesh',  'bulandshahr',          4, 228,  7, 16,  7, 0,  9,  0, 23],
-    ['VIJAY AGRO CENTER',                              'gujarat',        'rajkot',               2, 224, 50,  0,  1, 0,  0,  0,  0],
-    ['KALE KRUSHI UDYOG',                              'maharashtra',    'satara',               2, 224, 13,  0,  0, 0, 11,  0,  3],
-    ['GAJANAN KRISHI SEVA KENDRA',                     'maharashtra',    'satara',               1, 223, 61,  0,  0, 0, 11,  0, 41],
-    ['SHRI SWAMISAMARTH KRUSHI SEVA KENDRA',           'maharashtra',    'satara',               1, 223,  6,  0,  0, 0, 11,  0, 62],
-    ['HARIOM KRUSHI SEVA KENDRA Adgaon fata',          'maharashtra',    'parbhani',             1, 211,  0,  0,  4, 0,  8,  0,  0],
-    ['KISAN TRADERS BORI',                             'maharashtra',    'parbhani',             1, 211, 62,  0,  4, 0,  8,  0, 12],
-    ['ADISHREE KRUSHI UDYOG SAMUH',                    'maharashtra',    'parbhani',             1, 211, 19,  0,  4, 0,  8,  0,105],
-    ['GUJARAT AGRO AND HARDWARE (Sayla)',               'gujarat',        'surendranagar',        1, 207, 61,  0,  0, 0,  1,  0,  7],
-    ['SHRI RAJ MOMAI AGRO CENTER',                     'gujarat',        'surendranagar',        1, 207,134,  0,  0, 0,  1,  0,  3],
-    ['NATH KRUSHI SEVA KENDRA',                        'maharashtra',    'ahilyanagar',          2, 207, 47,  5,  0, 0,  7,  0, 52],
-    ['Swami agro servises',                            'maharashtra',    'ahilyanagar',          2, 203, 25, 14,  0, 0, 23,  0, 11],
-    ['M/s GODARA BEEJ BHANDAR',                        'rajasthan',      'ganganagar',           6, 201, 63,  0,  0, 0,  2, 37,  4],
-    ['SHREE KRISHNA AGRO SALES Asarlaai',              'rajasthan',      'jodhpur',              2, 200, 82,  0,  5, 0,  4, 26,  2],
-    ['KHILJI KHAD BEEJ BHANDAR',                       'rajasthan',      'jodhpur',              3, 200, 35,  0,  5, 0,  4, 26,  8],
-    ['SHREE SANWARIYA AGRO SOLUTION',                  'rajasthan',      'bhilwara',             3, 197, 40,  1,  0, 0,  5, 17,  4],
-    ['Yogesh krishi kendra',                           'madhya pradesh', 'balaghat',             2, 189, 32, 20, 16, 0,  5,  0,  3],
-    ['KAMDHENOO KISAN MART',                           'maharashtra',    'ahilyanagar',          2, 188,  7,  7,  0, 0,  4,  0, 45],
-    ['RAJASTHAN KRISHI SEVA KENDRA',                   'rajasthan',      'alwar',                2, 188,122,  0,  0, 0,  2, 30,  1],
-    ['CHOUDHARY ENTERPRISES',                          'rajasthan',      'alwar',                2, 187, 33,  0,  1, 0,  2, 31, 12],
-    ['AADVIK TRADERS',                                 'uttar pradesh',  'amroha',               1, 186, 34,  0, 10, 0,  7,  0,  6],
-    ['M/S KUMAR AGRICULTURE STORE',                    'uttar pradesh',  'jyotiba phule nagar',  1, 186,126,  0, 10, 0,  7,  0,  1],
-    ['NARAYAN BEEJ BHANDAR',                           'uttar pradesh',  'aligarh',              1, 185,  1,  6,  0, 0,  3,  0,  3],
-    ['TUSHAR KRUSHI KENDRA',                           'maharashtra',    'chandrapur',           1, 185, 74,  0,  2, 0,  4,  0, 64],
-    ['JAI JAGNNATH KRUSHI SEWA KENDRA WARORA',         'maharashtra',    'chandrapur',           1, 185,  0,  0,  2, 0,  4,  0, 10],
-    ['AGREE JUNCTION KRISHI KENDRA',                   'uttar pradesh',  'aligarh',              1, 185,150,  6,  0, 0,  3,  0, 13],
-    ['JAGDAMBA KRISHI KENDRA',                         'maharashtra',    'chandrapur',           1, 185,  0,  0,  2, 0,  4,  0, 16],
-    ['New kisan sewa kendra',                          'rajasthan',      'hanumangarh',          1, 184, 35,  0,  0, 0,  2, 56,  1],
-    ['M/S SHREE NAMDEV BEEJ BHANDAR',                  'rajasthan',      'hanumangarh',          2, 184, 52,  0,  0, 0,  2, 56,  0],
-    ['JHAJHRIYA KHAD BEEJ BHANDAR (RAMBAS)',           'rajasthan',      'hanumangarh',          1, 184, 31,  0,  0, 0,  2, 56,  1],
-    ['SHRI MANGALMURTI KRUSHI SEVA KENDRA',            'maharashtra',    'satara',               1, 181, 33,  0,  1, 0,  9,  0, 34],
-    ['GANESH FERTILIZERS',                             'maharashtra',    'satara',               1, 181, 54,  0,  1, 0,  9,  0, 13],
-    ['PRABHUDEV KRUSHI SEVA KENDRA',                   'maharashtra',    'nanded',               1, 181,116,  0,  0, 0,  0,  0, 51],
-    ['HINDUSTAN AGRO SERVICES',                        'maharashtra',    'solapur',              1, 181, 38,  0,  0, 0,  6,  0, 45],
-    ['VITTHAL AGRO CENTER TEMBHURNI',                  'maharashtra',    'solapur',              1, 181, 45,  0,  0, 0,  6,  0,  8],
-    ['Deshmukh krushi kendra khairao',                 'maharashtra',    'solapur',              1, 181, 26,  0,  0, 0,  6,  0,  5],
-    ['GOVIND TRADING CO.',                             'maharashtra',    'latur',                1, 178, 67,  0,  0, 0, 10,  0,  5],
-    ['M/S ISHWARI KRISHI SEVA KENDRA',                 'maharashtra',    'latur',                1, 178, 23,  0,  0, 0, 10,  0, 10],
-    ['VYANKATESH KRISHI SEVA KENDRA KASAR SHIRSHI',    'maharashtra',    'latur',                1, 178,  4,  0,  0, 0, 10,  0, 19],
-    ['RASAL KRUSHI SEVA KENDRA',                       'maharashtra',    'jalna',                1, 177, 20,  0,  0, 0,  1,  0, 23],
-    ['ANNADATA BEEJ BHANDAR',                          'maharashtra',    'jalna',                1, 177, 30,  0,  0, 0,  1,  0,  3],
-    ['Mahalaxmi Krushi Seva Kendra',                   'maharashtra',    'jalna',                1, 177, 46,  0,  0, 0,  1,  0, 46],
-    ['BHOMIYAJI AGRO SALES',                           'rajasthan',      'jodhpur',              1, 176, 16,  0,  3, 0,  9, 39,  3],
-    ['SHREE JASNATH AGRO SALES',                       'rajasthan',      'jodhpur',              1, 176, 10,  0,  3, 0,  9, 39,  0],
-    ['MAHADEV KHAD BEEJ BHANDAR',                      'rajasthan',      'jodhpur',              1, 176, 16,  0,  3, 0,  9, 39,  2],
-    ['NAGNATH KRUSHI SEVA KENDRA TELKUDGAON',          'maharashtra',    'ahilyanagar',          1, 176, 70,  2,  0, 0,  7,  0, 17],
-    ['PARWATI ENTERPRISES',                            'rajasthan',      'jodhpur',              1, 176, 35,  0,  3, 0,  9, 39,  1],
-    ['J P AGRO SALES SAMRAU',                          'rajasthan',      'jodhpur',              1, 176, 14,  0,  3, 0,  9, 39,  7],
-    ['SHRI GAJNA MAA AGRO SALES',                      'rajasthan',      'jodhpur',              1, 176,  3,  0,  3, 0,  9, 39, 11],
-    ['CHOUDHARY KRISHI YANTRALAYA Cherai',             'rajasthan',      'jodhpur',              1, 176,  4,  0,  3, 0,  9, 39,  0],
-    ['SHRI RAM PESTISIDES',                            'rajasthan',      'hanumangarh',          1, 175,  0,  0,  0, 0,  5, 36,  0],
-    ['SHREE BAL RAM BEEJ BHANDAR',                     'rajasthan',      'hanumangarh',          1, 175, 19,  0,  0, 0,  5, 36, 25],
-    ['SUBHE SINGH AND SONS',                           'rajasthan',      'hanumangarh',          1, 175, 84,  0,  0, 0,  5, 36,  1],
-    ['BALAJI KISAN SEVA KENDRA',                       'rajasthan',      'bikaner',              1, 174,  0,  0, 27, 0,  8, 35,  0],
-    ['PUNJAB AGRO SALES',                              'rajasthan',      'bikaner',              1, 174,  3,  0, 27, 0,  8, 35,  4],
-    ['KISAN KHAD BEEJ BHANDAR',                        'rajasthan',      'bikaner',              1, 174, 73,  0, 27, 0,  8, 35,  0],
-    ['SHREE BRAHMANI AGRO AGENCY',                     'rajasthan',      'bikaner',              1, 174, 49,  0,  0, 0, 43, 16,  7],
-    ['RAJASTHAN AGRO AGENCY',                          'rajasthan',      'bikaner',              1, 174,  4,  0,  0, 0, 43, 16, 22],
-    ['BHARAT SEEDS',                                   'rajasthan',      'bikaner',              1, 174,  3,  0,  0, 0, 43, 16,  3],
-    ['VEER BIGGAJI KHAD BEEJ BHANDAR',                 'rajasthan',      'bikaner',              1, 174, 12,  0, 27, 0,  8, 35,  6],
-    ['MAA SIDDHI VINAYAK AGRO TRADERS',                'madhya pradesh', 'jabalpur',             3, 171,  2, 56,  0, 0, 24,  0,  0],
-    ['MERTA AGRO FARMER PRODUCER CO',                  'rajasthan',      'nagaur',               1, 171, 13, 66,  0, 0,  1, 20,  0],
-    ['PAREEK AGENCY (Merta Road)',                     'rajasthan',      'nagaur',               1, 171, 11, 66,  0, 0,  1, 20,  2],
-    ['BABA RAMDEV KHAD BEEJ BHANDAR (GOTAN)',          'rajasthan',      'nagaur',               1, 171, 18, 66,  0, 0,  1, 20,  1],
-    ['MAHADEV TRADERS',                                'rajasthan',      'nagaur',               1, 171, 16, 66,  0, 0,  1, 20,  0],
-    ['SALASAR BALAJI KHAD BEEJ BHANDAR MERTA CITY',   'rajasthan',      'nagaur',               1, 171, 12, 66,  0, 0,  1, 20,  5],
-    ['N S KHAD & BEEJ BHANDAR',                        'uttar pradesh',  'etah',                 1, 169, 50,  0, 47, 0,  6,  0, 13],
-    ['SHRI VEER TEJAJI KHAD BEEJ BHANDAR',             'rajasthan',      'jodhpur',              2, 169, 16,  0,  5, 0,  3, 25, 15],
-    ['SRUSHTI AGRITECH',                               'gujarat',        'surendranagar',        1, 169, 37,  0,  0, 0,  0,  0,  0],
-    ['SHRI YOGESHVAR FERTILIZER',                      'gujarat',        'surendranagar',        1, 169,128,  0,  0, 0,  0,  0,  0],
-    ['M/S RAJPUT KRISHI SEVA KENDRA',                  'uttar pradesh',  'etah',                 1, 169, 43,  0, 47, 0,  6,  0,  1],
-    ['KRISHNA KHAD BHEJ BHANDAR',                      'rajasthan',      'jodhpur',              2, 169, 65,  0,  5, 0,  3, 25,  1],
-    ['KISAN KRISHI SEVA KENDRA',                       'maharashtra',    'osmanabad',            2, 168, 36,  0,  0, 0,  5,  0, 80],
-    ['M P SINGH ENTERPRISES',                          'uttar pradesh',  'etah',                 1, 167, 65,  2, 11, 0,  9,  0,  2],
-    ['Anuj Yadav',                                     'uttar pradesh',  'etah',                 1, 167, 30,  2, 11, 0,  9,  0, 46],
-    ['VISHNU AGRO AGENCIES',                           'rajasthan',      'jalore',               2, 166,  8,  8,  0, 0,  3, 16,  3],
-    ['LAKSHMI KISAN SEVA KENDRA',                      'uttar pradesh',  'gonda',                2, 166,110,  0,  0, 0,  6,  0,  0],
-    ['DHARMA AGRO',                                    'gujarat',        'bharuch',              2, 163, 71,  0,  2, 0,  1,  0,  6],
-    ['CHAUHAN KHAD BEEJ BHANDAR',                      'uttar pradesh',  'kasganj',              1, 163, 70,  0, 63, 0, 19,  0,  3],
-    ['PARMATMA EK KRUSHI SEVA KENDRA PAUNI',           'maharashtra',    'bhandara',             1, 162, 87,  0,  8, 0, 20,  0, 44],
-    ['CHARBHUJA KRISHI SEWA KENDRA (Mangrop)',         'rajasthan',      'bhilwara',             1, 162, 95,  1,  0, 0,  5, 17, 13],
-    ['SHIV AGRO CENTER',                               'gujarat',        'rajkot',               1, 162, 72,  0,  4, 0,  5,  0, 18],
-    ['SHIVSHAKTI KRISHI SEVA KENDRA',                  'rajasthan',      'bhilwara',             2, 162,  3,  1,  0, 0,  5, 17,  8],
-    ['TIRUPATI AGRO CENTER',                           'gujarat',        'rajkot',               1, 162, 54,  0,  4, 0,  5,  0,  1],
-    ['BAPU AGRO AGENCY KOLSA',                         'maharashtra',    'hingoli',              1, 158, 69,  0,  0, 0,  1,  0, 52],
-    ['JAGDAMBA AGRO AGENCY (Tankla)',                  'rajasthan',      'nagaur',               2, 158, 14,  0,  0, 0,  3, 22,  0],
-    ['Shree kotkar traders krushi seva kendra',        'maharashtra',    'hingoli',              1, 158, 28,  0,  0, 0,  1,  0,  7],
-    ['SAHU KRISHI KENDRA',                             'madhya pradesh', 'jabalpur',             1, 156,  8, 56,  0, 0, 24,  0,  4],
-    ['DEEPAK TRADERS',                                 'madhya pradesh', 'jabalpur',             1, 156, 38, 56,  0, 0, 24,  0, 16],
-    ['SHRI PANDURANG AGRO AGENCIES SHEWDI',            'maharashtra',    'nanded',               1, 155,102,  0,  0, 0,  4,  0, 42],
-    ['PARTH KRUSHI SEVA KENDRA',                       'maharashtra',    'latur',                1, 154,  3,  0,  0, 0,  3,  0,  1],
-    ['PADILE AGRO AGENCY',                             'maharashtra',    'latur',                1, 154, 97,  0,  0, 0,  3,  0, 40],
-    ['PATEL KRISHI SEWA KENDRA',                       'uttar pradesh',  'barabanki',            1, 153, 33,  0,106, 0,  1,  0,  0],
-    ['DWARKADHISH AGRO CENTER',                        'gujarat',        'rajkot',               1, 153, 16,  0,  1, 0,  0,  0,  0],
-    ['JAY MATAJI AGRITECH',                            'gujarat',        'rajkot',               1, 153, 55,  0,  1, 0,  0,  0,  0],
-    ['MARUTI AGRO AGENCY',                             'rajasthan',      'jaisalmer',            2, 152, 92,  0,  4, 0,  2, 15,  0],
-    ['BALAJI AGRO SALES Khara',                        'rajasthan',      'jodhpur',              2, 152,  9,  0,  4, 0,  2, 15, 13]
+    ['SOMNATH SALES',                                             'gujarat',        'junagadh',                  1, 336, 336, 0, 0, 0, 0, 0,   0],
+    ['PRAMUKH AGRO CENTRE ( Sihor )',                             'gujarat',        'bhavnagar',                 1, 290, 287, 0, 0, 0, 0, 0,   3],
+    ['KRUSHI DHARATAL FARMER PRODUCER COMPANY LIMITED',           'gujarat',        'botad',                     2, 266, 265, 0, 0, 0, 0, 0,   1],
+    ['Bajrang krishi seva kendar .',                              'rajasthan',      'jodhpur',                   1, 217, 201, 0, 0, 0, 0, 0,   1],
+    ['SHIV SHAKTI PESTICIDES',                                    'rajasthan',      'sri ganganagar',            1, 213, 202, 0, 0, 0, 0, 0,   5],
+    ['AJAY BENIWAL PESTICIDES & FERTILIZER',                      'rajasthan',      'hanumangarh',               1, 208, 208, 0, 0, 0, 0, 0,   0],
+    ['PRABHUDEV KRUSHI SEVA KENDRA',                              'maharashtra',    'nanded',                    1, 195, 123, 0, 0, 0, 0, 0,  39],
+    ['SARVADNY KRUSHI VIKAS & FARMER PRODUCER COMPANY LIMITED',   'maharashtra',    'beed',                      1, 182,  77, 0, 0, 0, 0, 0,  91],
+    ['MAA SATI KRISHI SEVA KENDRA',                               'rajasthan',      'barmer',                    1, 169, 159, 0, 0, 0, 0, 0,  10],
+    ['AGREE JUNCTION KRISHI KENDRA',                              'uttar pradesh',  'aligarh',                   1, 167, 153, 0, 0, 0, 0, 0,   6],
+    ['SHRI PANDURANG AGRO AGENCIES SHEWDI',                       'maharashtra',    'nanded',                    1, 162, 106, 0, 0, 0, 0, 0,  37],
+    ['ADISHREE KRUSHI UDYOG SAMUH',                               'maharashtra',    'parbhani',                  1, 158,  14, 0, 0, 0, 0, 0, 142],
+    ['PADILE AGRO AGENCY .',                                      'maharashtra',    'latur',                     1, 158, 107, 0, 0, 0, 0, 0,  31],
+    ['OM AGRITECH',                                               'gujarat',        'surendranagar',             1, 155, 153, 0, 0, 0, 0, 0,   2],
+    ['MRV AGRITECH',                                              'rajasthan',      'hanumangarh',               1, 155, 152, 0, 0, 0, 0, 0,   0],
+    ['Kisan krishi seva kendra',                                  'madhya pradesh', 'guna',                      1, 150, 147, 0, 0, 0, 0, 0,   1],
+    ['JAY AGRO CENTER',                                           'gujarat',        'amreli',                    1, 147, 145, 0, 0, 0, 0, 0,   2],
+    ['VIJAY AGRO CENTER',                                         'gujarat',        'bhavnagar',                 1, 147, 145, 0, 0, 0, 0, 0,   0],
+    ['M/s SWARA AGRO HITECH',                                     'maharashtra',    'satara',                    1, 142,  28, 0, 0, 0, 0, 0,  92],
+    ['OM AGRITECH',                                               'gujarat',        'rajkot',                    1, 142, 142, 0, 0, 0, 0, 0,   0],
+    ['Shivshankar krushi Kendra dharasur',                        'maharashtra',    'parbhani',                  1, 141, 128, 0, 0, 0, 0, 0,   3],
+    ['TUSHAR KRUSHI KENDRA .',                                    'maharashtra',    'chandrapur',                1, 140,  70, 0, 0, 0, 0, 0,  60],
+    ['PARMATMA EK KRUSHI SEVA KENDRA PAUNI',                      'maharashtra',    'bhandara',                  1, 138,  86, 0, 0, 0, 0, 0,  33],
+    ['SHRI RAJ MOMAI AGRO CENTER',                                'gujarat',        'surendranagar',             1, 138, 135, 0, 0, 0, 0, 0,   2],
+    ['Jagoliya krishi sewa kendra .',                             'madhya pradesh', 'neemuch',                   1, 136, 130, 0, 0, 0, 0, 0,   2],
+    ['PRAMUKH AGRO CENTER (TANA)',                                 'gujarat',        'bhavnagar',                 1, 134, 131, 0, 0, 0, 0, 0,   3],
+    ['BAPU AGRO AGENCY KOLSA',                                    'maharashtra',    'hingoli',                   1, 134,  68, 0, 0, 0, 0, 0,  60],
+    ['KISAN KRISHI SEVA KENDRA',                                  'maharashtra',    'osmanabad',                 2, 133,  37, 0, 0, 0, 0, 0,  75],
+    ['NEW PANKAJ KRISHI SEVA KENDRA',                             'maharashtra',    'jalgaon',                   1, 131,  33, 0, 0, 0, 0, 0,  59],
+    ['Warpe Krushi Seva Kendra',                                  'maharashtra',    'osmanabad',                 1, 131, 121, 0, 0, 0, 0, 0,   1],
+    ['HINGLAJ KRISHI SEVA KENDRA Sekhala',                        'rajasthan',      'jodhpur',                   6, 130, 125, 0, 0, 0, 0, 0,   2],
+    ['SHRI YOGESHVAR FERTILIZER',                                 'gujarat',        'surendranagar',             1, 128, 128, 0, 0, 0, 0, 0,   0],
+    ['M/S KUMAR AGRICULTURE STORE . . .',                         'uttar pradesh',  'jyotiba phule nagar',       1, 128, 127, 0, 0, 0, 0, 0,   1],
+    ['PANGARKAR AGRO AGENCY',                                     'maharashtra',    'hingoli',                   1, 127,  33, 0, 0, 0, 0, 0,  82],
+    ['NEELKANTH AGRO .',                                          'gujarat',        'amreli',                    1, 127, 125, 0, 0, 0, 0, 0,   2],
+    ['G R AGRO',                                                  'maharashtra',    'jalgaon',                   1, 127, 121, 0, 0, 0, 0, 0,   0],
+    ['M/s ADISHAKTI KRUSHI KENDRA .',                             'maharashtra',    'chandrapur',                1, 126,  51, 0, 0, 0, 0, 0,  56],
+    ['CHOUHAN TRADING COMPANY .',                                 'madhya pradesh', 'katni',                     1, 125, 125, 0, 0, 0, 0, 0,   0],
+    ['Vijay krishi seva kendra ',                                 'madhya pradesh', 'ratlam',                    2, 125, 125, 0, 0, 0, 0, 0,   0],
+    ['RAJASTHAN KRISHI SEVA KENDRA  .',                           'rajasthan',      'alwar',                     2, 124, 123, 0, 0, 0, 0, 0,   1],
+    ['SHIVMUDRA KRUSHI UDYOG',                                    'maharashtra',    'chhatrapati sambhajinagar', 1, 121,   3, 0, 0, 0, 0, 0,  29],
+    ['NATH KRUSHI SEVA KENDRA',                                   'maharashtra',    'ahilyanagar',               2, 120,  47, 0, 0, 0, 0, 0,  30],
+    ['GAJANAN KRISHI SEVA KENDRA',                                'maharashtra',    'satara',                    1, 119,  61, 0, 0, 0, 0, 0,  32],
+    ['SAINATH KRUSHI SEWA KENDRA .',                              'maharashtra',    'solapur',                   1, 119,  71, 0, 0, 0, 0, 0,  26],
+    ['KHODAL KRUPA AGRO',                                         'gujarat',        'botad',                     1, 118, 106, 0, 0, 0, 0, 0,   3],
+    ['SHREE RAM KHAD BEEJ BHANDAR(sanchore)  . .',                'rajasthan',      'jalore',                    1, 117, 113, 0, 0, 0, 0, 0,   2],
+    ['PATIL AGRO CENTER SHAHAPUR .',                              'maharashtra',    'buldhana',                  1, 117,  74, 0, 0, 0, 0, 0,  14],
+    ['RANGREJ Agrotech',                                          'rajasthan',      'jodhpur',                   1, 116, 114, 0, 0, 0, 0, 0,   2],
+    ['GAJANAN AGRO AGENCIES AND MASHINERY ',                      'maharashtra',    'beed',                      1, 115,  64, 0, 0, 0, 0, 0,  11],
+    ['Shree Basweshwar Krushi Seva Kendra',                       'maharashtra',    'solapur',                   1, 115, 108, 0, 0, 0, 0, 0,   0],
+    ['Mahalaxmi Krushi Seva Kendra',                              'maharashtra',    'jalna',                     1, 113,  46, 0, 0, 0, 0, 0,  56],
+    ['CHARBHUJA KRISHI SEWA KENDRA (Mangrop) .',                  'rajasthan',      'bhilwara',                  1, 112,  98, 0, 0, 0, 0, 0,  11],
+    ['VINAYAK ENTERPRISE',                                        'gujarat',        'gandhinagar',               1, 111, 107, 0, 0, 0, 0, 0,   4],
+    ['KHANDESHWAR KRUSHI SEVA KENDRA .',                          'maharashtra',    'beed',                      1, 110,  26, 0, 0, 0, 0, 0,  39],
+    ['LAKSHMI KISAN SEVA KENDRA',                                 'uttar pradesh',  'gonda',                     2, 110, 110, 0, 0, 0, 0, 0,   0],
+    ['NAGNATH KRUSHI SEVA KENDRA TELKUDGAON .',                   'maharashtra',    'ahilyanagar',               1, 109,  88, 0, 0, 0, 0, 0,   5],
+    ['SAGAR KRISHI KENDRA',                                       'maharashtra',    'yavatmal',                  1, 108,   5, 0, 0, 0, 0, 0,  88],
+    ['SHREE KRISHNA AGRO SALES Asarlaai',                         'rajasthan',      'jodhpur',                   2, 106,  95, 0, 0, 0, 0, 0,  10],
+    ['Shree Ram Agro Sales .',                                    'rajasthan',      'jodhpur',                   1, 106, 104, 0, 0, 0, 0, 0,   1],
+    ['KIRAN AGRO SALES CORPORATION   wani',                       'maharashtra',    'yavatmal',                  1, 106,  51, 0, 0, 0, 0, 0,  48],
+    ['VIKAS KRASHI SEVA KENDRA',                                  'madhya pradesh', 'mandsaur',                  1, 106,  98, 0, 0, 0, 0, 0,   4],
+    ['SHYAM KHAD BEEJ BHANDAR .',                                 'rajasthan',      'churu',                     2, 105, 105, 0, 0, 0, 0, 0,   0],
+    ['JANARDHAN KHAD BEEJ BHANDAR PANCHLA SIDDHA .',              'rajasthan',      'nagaur',                    1, 103,  77, 0, 0, 0, 0, 0,   3],
+    ['M/S PRATIGYA KRISHI SEWA KENDRA',                           'uttar pradesh',  'farrukhabad',               1, 103,  90, 0, 0, 0, 0, 0,   8],
+    ['Mangrudkar Krishi Sewa Kendra Sirsi .',                     'maharashtra',    'nagpur',                    1, 102,  95, 0, 0, 0, 0, 0,   2],
+    ['DD Enterprises',                                            'uttar pradesh',  'bulandshahr',               1, 102,  92, 0, 0, 0, 0, 0,   3],
+    ['M/S SHREE NAMDEV BEEJ BHANDAR',                             'rajasthan',      'hanumangarh',               2, 102, 102, 0, 0, 0, 0, 0,   0],
+    ['Yogeshwar Krushi Seva Kendra Jamadi',                       'maharashtra',    'chhatrapati sambhajinagar', 1,  99,  54, 0, 0, 0, 0, 0,  33],
+    ['Tukai agro agency ',                                        'maharashtra',    'nashik',                    1,  98,  81, 0, 0, 0, 0, 0,  13],
+    ['SWARAJ AGRO AGENCY',                                        'maharashtra',    'satara',                    1,  98,  92, 0, 0, 0, 0, 0,   0],
+    ['KUSHWAHA BEEJ BHANDAR .',                                   'madhya pradesh', 'rewa',                      1,  98,  97, 0, 0, 0, 0, 0,   1],
+    ['SANJAY AGRO',                                               'gujarat',        'surendranagar',             1,  98,  91, 0, 0, 0, 0, 0,   7],
+    ['GOURAV AGRO SERVICE CENTER',                                'maharashtra',    'beed',                      1,  97,  36, 0, 0, 0, 0, 0,  55],
+    ['SHIV AGRO CENTER',                                          'gujarat',        'rajkot',                    1,  95,  73, 0, 0, 0, 0, 0,   7],
+    ['M/S. R.K. TRADERS AND SEEDS SUPPLIER',                      'madhya pradesh', 'satna',                     1,  95,  87, 0, 0, 0, 0, 0,   0],
+    ['Anuj Yadav',                                                'uttar pradesh',  'etah',                      1,  95,  32, 0, 0, 0, 0, 0,  58],
+    ['Tirupati agro agency ',                                     'maharashtra',    'jalgaon',                   1,  95,  61, 0, 0, 0, 0, 0,  31],
+    ['HINDUSTAN AGRO SERVICES',                                   'maharashtra',    'solapur',                   1,  95,  41, 0, 0, 0, 0, 0,  48],
+    ['SAMRAT SEEDS AND FERTILIZER',                               'uttar pradesh',  'auraiya',                   1,  95,   2, 0, 0, 0, 0, 0,  93],
+    ['Kissan Agrijunction One Stop shop .',                       'uttar pradesh',  'saharanpur',                3,  94,  88, 0, 0, 0, 0, 0,   6],
+    ['MAURYA FERTILIZERS .',                                      'uttar pradesh',  'lakhimpur kheri',           1,  94,  93, 0, 0, 0, 0, 0,   0],
+    ['MARUTI AGRO AGENCY',                                        'rajasthan',      'jaisalmer',                 2,  94,  93, 0, 0, 0, 0, 0,   0],
+    ['Om Krushi Seva Kendra Rashin',                              'maharashtra',    'ahilyanagar',               1,  94,  36, 0, 0, 0, 0, 0,  24],
+    ['SUBHE SINGH AND SONS',                                      'rajasthan',      'hanumangarh',               1,  94,  93, 0, 0, 0, 0, 0,   1],
+    ['VITTHAL BEEJ BHANDAR',                                      'maharashtra',    'nanded',                    1,  93,  80, 0, 0, 0, 0, 0,   6],
+    ['NANDAN AGRO MART MITIYAJ',                                  'gujarat',        'junagadh',                  2,  93,  88, 0, 0, 0, 0, 0,   5],
+    ['M/S DEV KISAN SEVA KENDRA',                                 'uttar pradesh',  'hathras',                   1,  92,  91, 0, 0, 0, 0, 0,   1],
+    ['MADHAV AGRO CENTER',                                        'gujarat',        'kutch',                     1,  91,  84, 0, 0, 0, 0, 0,   7],
+    ['PIYUSH TRADERS',                                            'rajasthan',      'jhalawar',                  1,  90,  74, 0, 0, 0, 0, 0,  14],
+    ['SHREE KRISHNA AGRO SALES',                                  'rajasthan',      'jodhpur',                   1,  90,  82, 0, 0, 0, 0, 0,   0],
+    ['KISAN TRADERS BORI',                                        'maharashtra',    'parbhani',                  1,  89,  71, 0, 0, 0, 0, 0,  11],
+    ['HARYANA AGRO BEEJ KHAD BHANDAR',                            'rajasthan',      'bikaner',                   1,  89,  25, 0, 0, 0, 0, 0,  46],
+    ['VERAI AGRO CENTRE',                                         'gujarat',        'banaskantha',               2,  88,  84, 0, 0, 0, 0, 0,   1],
+    ['CHAUHAN KHAD BEEJ BHANDAR . .',                             'uttar pradesh',  'kasganj',                   1,  88,  81, 0, 0, 0, 0, 0,   4],
+    ['D S AGRO TRADERS .',                                        'uttar pradesh',  'bulandshahr',               1,  88,  54, 0, 0, 0, 0, 0,   7],
+    [' JAY BAJRANG BALI KHAD BEEJ BHANDAR',                       'uttar pradesh',  'mainpuri',                  3,  87,  83, 0, 0, 0, 0, 0,   3],
+    ['KARMVIR BHAURAO PATIL KRUSHI SEVA KENDRA Pethwadaj',        'maharashtra',    'nanded',                    1,  87,  76, 0, 0, 0, 0, 0,   3],
+    ['MANGLI KISAN PRODUCER COMPANY LIMITED',                     'rajasthan',      'bundi',                     1,  87,  56, 0, 0, 0, 0, 0,  17],
+    ['DEVGAONKAR AGRO SERVICES',                                  'maharashtra',    'solapur',                   1,  86,   7, 0, 0, 0, 0, 0,  36],
+    ['SHRI SWAMISAMARTH KRUSHI SEVA KENDRA',                      'maharashtra',    'satara',                    1,  85,   5, 0, 0, 0, 0, 0,  70],
+    ['JAY AGRO',                                                  'gujarat',        'amreli',                    2,  84,  61, 0, 0, 0, 0, 0,   2],
+    ['KUNJADIYA BROTHERS ( Clinic )',                              'gujarat',        'amreli',                    1,  83,  65, 0, 0, 0, 0, 0,   0],
+    ['N P ENTERPRISE',                                            'gujarat',        'morbi',                     1,  83,  83, 0, 0, 0, 0, 0,   0],
+    ['UNIQUE FERTILIZERS .',                                      'gujarat',        'bharuch',                   1,  83,  83, 0, 0, 0, 0, 0,   0],
+    ['VITTHAL AGRO CENTER TEMBHURNI .',                           'maharashtra',    'solapur',                   1,  83,  70, 0, 0, 0, 0, 0,  10],
+    ['M/s Gupta Khad Beej Kitnashak Bhandar',                     'uttar pradesh',  'budaun',                    1,  83,  78, 0, 0, 0, 0, 0,   0],
+    ['New shivshakti krushi seva Kendra Bhadne',                  'maharashtra',    'dhule',                     2,  83,  39, 0, 0, 0, 0, 0,   3],
+    ['SAURABH AGRO AGENCY',                                       'maharashtra',    'solapur',                   1,  83,  82, 0, 0, 0, 0, 0,   0],
+    ['MORDEN AGRO AND SEEDS',                                     'gujarat',        'jamnagar',                  1,  83,  83, 0, 0, 0, 0, 0,   0],
+    ['KRUSHI AGRO CENTRE',                                        'gujarat',        'kachchh',                   1,  82,  77, 0, 0, 0, 0, 0,   5],
+    ['GUJARAT AGRO  AND HARDWARE  (Sayla)',                        'gujarat',        'surendranagar',             1,  82,  74, 0, 0, 0, 0, 0,   2],
+    ['M/S GUPTA KHAAD BHANDAR',                                   'uttar pradesh',  'hardoi',                    1,  82,  78, 0, 0, 0, 0, 0,   3],
+    ['SHREE SAWARIYA SETH KRISHI SEVA KENDRA',                    'madhya pradesh', 'guna',                      1,  81,  38, 0, 0, 0, 0, 0,  11],
+    ['GOVIND TRADING CO. .',                                      'maharashtra',    'latur',                     1,  81,  72, 0, 0, 0, 0, 0,   5],
+    ['SAWATA KRUSHI SEVA KENDRA',                                 'maharashtra',    'chhatrapati sambhajinagar', 2,  81,  37, 0, 0, 0, 0, 0,  34],
+    ['SHREE MAHAKALI AGRO CENTER MAYAPUR',                        'gujarat',        'morbi',                     1,  81,  79, 0, 0, 0, 0, 0,   2],
+    ['Uttam kisan bazar',                                         'madhya pradesh', 'ratlam',                    1,  81,  44, 0, 0, 0, 0, 0,  15],
+    ['NEW PANDURANG AGRO AGENCIES Nathapur',                      'maharashtra',    'beed',                      1,  81,  19, 0, 0, 0, 0, 0,  45],
+    ['GROW AGRI BUSINESS',                                        'gujarat',        'sabar kantha',              1,  81,  80, 0, 0, 0, 0, 0,   1],
+    ['S. K. KISAN SEWA KENDRA .',                                 'uttar pradesh',  'aligarh',                   1,  81,  48, 0, 0, 0, 0, 0,   7]
   ],
 
   // deadStores: [store_name, state, district, orders_lost, root_cause, ocp_outstanding, mpd_remaining, mpd_status]
   // root_cause: 'SLA Miss' | 'OCP Block' | 'Shop Closed'
   // mpd_status: 1 = enabled, 0 = config gap (isMpdEnabled IS NULL)
   deadStores: [
-    ['CHAUDHARY KISAN SAMRIDDHI KENDRA',       'uttar pradesh',  'mathura',        34, 'SLA Miss',   313770, 200786, 1],
-    ['SHRIRAM AGRO AGENCY PACHORA',            'maharashtra',    'jalgaon',        32, 'SLA Miss',    31115,   6638, 1],
-    ['GOVIND KRUSHI KENDRA',                   'maharashtra',    'gadchiroli',     21, 'SLA Miss',    43152,  12910, 0],
-    ['JAGDAMBA KRISHI KENDRA',                 'maharashtra',    'chandrapur',     16, 'SLA Miss',        0,      0, 1],
-    ['JAI JAGNNATH KRUSHI SEWA KENDRA WARORA', 'maharashtra',    'chandrapur',     15, 'SLA Miss',    20273,      0, 1],
-    ['M/S RAMI TRADERS',                       'madhya pradesh', 'agarmalwa',      14, 'OCP Block',   52825, 102960, 1],
-    ['PUNDALIK BABA AGRO TECH',                'maharashtra',    'amravati',       14, 'SLA Miss',   186434,      0, 1],
-    ['SHRI RAM KRASHI SEVA KENDRA',            'madhya pradesh', 'bhind',          13, 'SLA Miss',   287681, 287553, 1],
-    ['ADARSH BUSINESS CENTER DEODAR',          'gujarat',        'banaskantha',    13, 'SLA Miss',    70658,  42450, 1],
-    ['Paus Agro Mall',                         'maharashtra',    'nashik',         12, 'SLA Miss',   102762,  24206, 1],
-    ['TULJABHAVANI TRADING COMPANY',           'maharashtra',    'parbhani',       12, 'SLA Miss',        0,      0, 1],
-    ['JINMATA KRUSHI SEVA KENDRA',             'maharashtra',    'nashik',         12, 'SLA Miss',        0,      0, 1],
-    ['SHANTISAGAR KRISHI KENDRA CHINAWAL',     'maharashtra',    'jalgaon',        11, 'SLA Miss',        0,      0, 1],
-    ['Shree Renuka Organics',                  'maharashtra',    'kolhapur',       11, 'SLA Miss',   225308, 181308, 1],
-    ['OM BEEJ BHANDAR',                        'uttar pradesh',  'prayagraj',      11, 'SLA Miss',    93364,  87437, 1],
-    ['UTKARSH KRUSHI SEVA KENDRA',             'maharashtra',    'dhule',          10, 'SLA Miss',    72186,  95664, 1],
-    ['M/S ACHAL FEFTILISER',                   'uttar pradesh',  'deoria',         10, 'SLA Miss',   154759,  51473, 1],
-    ['Sahyadri Krushi Udyog Vambori',          'maharashtra',    'ahilyanagar',    10, 'SLA Miss',    84908,  56654, 1],
-    ['MANENDRA ENTERPRISES',                   'madhya pradesh', 'harda',          10, 'SLA Miss',   190025, 189991, 1],
-    ['GANRAYA AGRO SERVICES',                  'maharashtra',    'ahilyanagar',    10, 'SLA Miss',    48381,  17842, 1],
-    ['CHAUDHARI AGRO',                         'maharashtra',    'jalgaon',        10, 'SLA Miss',   136381,  81400, 1],
-    ['Shri Lakshmi krushi seva kendra pinjar', 'maharashtra',    'akola',           9, 'SLA Miss',   232748, 140374, 1],
-    ['RAVI AGRO AGENCY AND AGRI CLINIC',       'maharashtra',    'yavatmal',        9, 'SLA Miss',    61756,      0, 1],
-    ['KAMAKSHA AGRO MALL KAMARGAON',           'maharashtra',    'ahilyanagar',     8, 'SLA Miss',    26060,   4103, 1],
-    ['Laxmi Agro Mart Hiwarkhed',              'maharashtra',    'akola',           8, 'SLA Miss',   157696,  87299, 0],
-    ['Shri shyam traders Hatwas',              'madhya pradesh', 'hoshangabad',     6, 'SLA Miss',    64829,   9724, 1],
-    ['BABA RAMDEV KRISHI UTPADAN',             'rajasthan',      'barmer',          6, 'SLA Miss',        0,      0, 1],
-    ['MAHESHWARI KRISHI KENDRA',               'madhya pradesh', 'chhindwara',      5, 'SLA Miss',     4624,    694, 1],
-    ['RITURAJ KRISHI SEVA KENDRA',             'rajasthan',      'baran',           5, 'SLA Miss',        0,      0, 1],
-    ['poorva krashi sewa kendra',              'madhya pradesh', 'sehore',          5, 'SLA Miss',    68231,  28301, 1],
-    ['Ajay beej bhandar',                      'madhya pradesh', 'sidhi',           5, 'SLA Miss',    72231,  72097, 1],
-    ['MAHULI KRUSHI KENDRA',                   'maharashtra',    'amravati',        5, 'SLA Miss',   408094, 340713, 1],
-    ['Chodhari Krishi Sewa Kendra',            'madhya pradesh', 'shajapur',        5, 'SLA Miss',        0,      0, 1],
-    ['SHRI BALAJI KRUSHI SEWA KENDRA',         'madhya pradesh', 'dewas',           5, 'SLA Miss',     4604,      0, 1],
-    ['GAJANAND AGRO CENTRE',                   'gujarat',        'panchmahals',     5, 'SLA Miss',        0,      0, 1],
-    ['SHANKAR BEEJ BHANDAR',                   'uttar pradesh',  'maharajganj',     4, 'SLA Miss',        0,      0, 1],
-    ['Mukul pesticides',                       'uttar pradesh',  'rampur',          4, 'SLA Miss',   175062,  65511, 1],
-    ['MAURYA PESTICIDE',                       'uttar pradesh',  'barabanki',       4, 'SLA Miss',     4818,      0, 0],
-    ['GURJAR KRISHI SEWA KENDRA',              'madhya pradesh', 'shajapur',        4, 'SLA Miss',    74448,  14294, 1],
-    ['New maa Narmada sewa Kendra',            'madhya pradesh', 'dewas',           4, 'SLA Miss',        0,      0, 1],
-    ['M/S SIYARAM TRADERS',                    'madhya pradesh', 'dewas',           4, 'OCP Block',   29246,   6602, 1],
-    ['Sarthak krishi seva Kendra',             'madhya pradesh', 'shajapur',        4, 'OCP Block',  126299,  49852, 1],
-    ['VEER TEJA KHAD BEEJ BHANDAR',            'rajasthan',      'jodhpur',         3, 'SLA Miss',        0,      0, 1],
-    ['Mahadev ev krishi sewa kendra',          'uttar pradesh',  'ghazipur',        3, 'SLA Miss',    25914,  12668, 1],
-    ['JAMIDARA PESTICIDE',                     'rajasthan',      'bikaner',         3, 'SLA Miss',     3763,   3763, 0],
-    ['M/S GURU JI KHAD BEEJ BHANDAR',          'uttar pradesh',  'aligarh',         3, 'SLA Miss',   316325, 169836, 1],
-    ['SARVADNYA AGRO CENTER',                  'maharashtra',    'washim',          3, 'SLA Miss',        0,      0, 1],
-    ['SRI VEER TEJA JI PESTICIDES',            'rajasthan',      'sri ganganagar',  3, 'OCP Block',  118141,  18896, 1],
-    ['SHARMA ENTERPRISES',                     'madhya pradesh', 'dewas',           3, 'SLA Miss',    35028,  35028, 1],
-    ['mongali krashi sewa kendra',             'madhya pradesh', 'seoni',           2, 'OCP Block',       0,      0, 1],
-    ['SHRIRAM AGRITECH',                       'madhya pradesh', 'indore',          2, 'SLA Miss',    35315,  10593, 1],
-    ['BHARAT KRISHI SEWA KENDRA',              'madhya pradesh', 'mandla',          2, 'SLA Miss',     2160,    324, 1],
-    ['SHRI DEV KRISHI SEVA KENDRA',            'madhya pradesh', 'shajapur',        2, 'SLA Miss',   478586, 388868, 1],
-    ['SHRI KRUPA KRUSHI KENDRA',               'maharashtra',    'buldhana',        2, 'SLA Miss',    27362,   4104, 1],
-    ['Patel Traders',                          'madhya pradesh', 'seoni',           2, 'SLA Miss',    30992,   5162, 1],
-    ['RATHI KRUSHI KENDRA',                    'maharashtra',    'buldhana',        2, 'SLA Miss',   204060, 181782, 1],
-    ['SHRI BALAJI BEEJ BHANDAR (Bansur)',       'rajasthan',      'alwar',           2, 'SLA Miss',    18220,      0, 1],
-    ['Shivrana Malharjyoti Krushi Bhandar',    'maharashtra',    'nashik',          2, 'SLA Miss',        0,      0, 0],
-    ['SANJAY KRUSHI SEVA KENDRA',              'maharashtra',    'nashik',          2, 'SLA Miss',   297907, 168291, 1],
-    ['Mahalaxmi krushi seva kandra',           'maharashtra',    'solapur',         2, 'Shop Closed',     0,      0, 0],
-    ['SHRI REWA ANUKAMPA KRISHI SEWA KENDRA',  'madhya pradesh', 'sehore',          2, 'SLA Miss',        0,      0, 1],
-    ['TIWARI BEEJ BHANDAR',                    'madhya pradesh', 'chhatarpur',      2, 'SLA Miss',     3398,    510, 1],
-    ['RAJSHRI KRISHI SEVA KENDRA',             'madhya pradesh', 'indore',          2, 'SLA Miss',        0,      0, 1],
-    ['NEW MAHADEV AGRO SALES',                 'rajasthan',      'jaisalmer',       2, 'SLA Miss',   190982,  39374, 1],
-    ['SHUBHAM KRUSHI SEVA KENDR',              'maharashtra',    'washim',          2, 'SLA Miss',    70981,  47702, 1],
-    ['SAINI BEEJ BHANDAR (Maujamabad)',         'rajasthan',      'jaipur',          1, 'SLA Miss',        0,      0, 1],
-    ['Janta Agro Services',                    'maharashtra',    'akola',           1, 'SLA Miss',   445552, 414722, 1],
-    ['Shree Krishna krishi kendra',            'rajasthan',      'pali',            1, 'SLA Miss',        0,      0, 1],
-    ['SHRI GANESH KRISHI KENDRA',              'maharashtra',    'chandrapur',      1, 'SLA Miss',        0,      0, 1],
-    ['Shaurya enterprises',                    'uttar pradesh',  'sonbhadra',       1, 'SLA Miss',     2327,    349, 1],
-    ['Rishika krishi seva Kendra',             'madhya pradesh', 'bhopal',          1, 'SLA Miss',        0,      0, 0],
-    ['sai krishi kendra',                      'madhya pradesh', 'balaghat',        1, 'SLA Miss',    16490,      0, 0],
-    ['Shiddhi Vinayak Krashi Seva Kendra',     'madhya pradesh', 'narmadapuram',    1, 'SLA Miss',        0,      0, 1],
-    ['Baliraja Krushi Seva Kendra',            'maharashtra',    'ahilyanagar',     1, 'SLA Miss',    46359,   6400, 1],
-    ['CHAMUNDA KHAD BEEJ BHANDAR',             'rajasthan',      'barmer',          1, 'SLA Miss',        0,      0, 1],
-    ['JAGDAMB KRUSHI SEVA KENDRA',             'maharashtra',    'ahilyanagar',     1, 'SLA Miss',     1372,    206, 0],
-    ['SHRINATH KRISHI SEWA KENDRA',            'madhya pradesh', 'vidisha',         1, 'SLA Miss',        0,      0, 1],
-    ['SANSKRITI KRISHI SEWA KENDRA',           'madhya pradesh', 'sehore',          1, 'SLA Miss',     4872,      0, 1],
-    ['SARVADNYA AGRO AGENCIES',                'maharashtra',    'washim',          1, 'SLA Miss',        0,      0, 1],
-    ['MAA KRISHI SEVA KENDRA',                 'madhya pradesh', 'vidisha',         1, 'SLA Miss',        0,      0, 0],
-    ['BAGLI KRISHAK PRODUCER COMPNY',          'madhya pradesh', 'dewas',           1, 'SLA Miss',   357116,  70922, 1],
-    ['YATI TRADERS',                           'madhya pradesh', 'narmadapuram',    1, 'OCP Block',       0,      0, 1],
-    ['SHREE BALAJI AGRO AGENCY',               'maharashtra',    'nagpur',          1, 'SLA Miss',        0,      0, 0],
-    ['DATTATRYA KRUSHI SEVA KENDRA',           'maharashtra',    'nanded',          1, 'Shop Closed', 31273,   6744, 1],
-    ['DIWAKAR TRADING COMPANY',               'madhya pradesh', 'sehore',          1, 'SLA Miss',        0,      0, 0]
+    ['ADARSH BUSINESS CENTER DEODAR',           'gujarat',        'banaskantha', 13, 'SLA Miss',  0, 0, 1],
+    ['mongali krashi sewa kendra',              'madhya pradesh', 'seoni',        5, 'OCP Block', 0, 0, 1],
+    ['SANJAY KRUSHI SEVA KENDRA',               'maharashtra',    'nashik',       5, 'SLA Miss',  0, 0, 1],
+    ['Baliraja Krushi Seva Kendra Pisorekhand', 'maharashtra',    'ahilyanagar',  4, 'SLA Miss',  0, 0, 1],
+    ['JAMIDARA PESTICIDE',                      'rajasthan',      'bikaner',      3, 'SLA Miss',  0, 0, 0],
+    ['BHARAT KRISHI SEWA KENDRA SEWA KENDRA',   'madhya pradesh', 'mandla',       2, 'SLA Miss',  0, 0, 1],
+    ['SHRI REWA ANUKAMPA KRISHI SEWA KENDRA',   'madhya pradesh', 'sehore',       2, 'SLA Miss',  0, 0, 1],
+    ['Janta Agro Services',                     'maharashtra',    'akola',        1, 'SLA Miss',  0, 0, 1],
+    ['SHRINATH KRISHI SEWA KENDRA',             'madhya pradesh', 'vidisha',      1, 'SLA Miss',  0, 0, 1],
+    ['SHREE BALAJI AGRO AGENCY',                'maharashtra',    'nagpur',       1, 'SLA Miss',  0, 0, 0],
+    ['SAINI BEEJ BHANDAR (Maujamabad)',          'rajasthan',      'jaipur',       1, 'SLA Miss',  0, 0, 1],
+    ['BAGLI KRISHAK PRODUCER COMPNY',           'madhya pradesh', 'dewas',        1, 'SLA Miss',  0, 0, 1],
+    ['SHRI GANESH KRISHI KENDRA',               'maharashtra',    'chandrapur',   1, 'SLA Miss',  0, 0, 1]
   ],
 
   // mpdSegments: [label, partners, partners_paid, orders_lost, total_collected, avg_per_partner, avg_txns, resume_rate_pct]
@@ -1093,6 +1072,170 @@ const STATIC_DATA = {
     ['2–5 days',           229, 178,  999, 18011397, 101188, 5.7,  98.7],
     ['6–10 days',           75,  63,  873,  5567030,  88366, 3.9, 100.0],
     ['10+ days (chronic)',  46,  42, 1269,  4520515, 107631, 4.2, 100.0]
+  ],
+
+  // ── PIPELINE TAB DATA (Apr 1–May 22 2026) ──
+  // [state, total, packed_waiting, hold_by_lmd, on_hold, in_transit, delivered, rto, no_action]
+  pipelineStatus: [
+    ['Maharashtra',    6724, 636, 340, 895, 395, 2737, 1216, 373],
+    ['Gujarat',        6449, 370, 120, 212, 626, 3869, 1028,  97],
+    ['Rajasthan',      4277, 452, 289, 169, 264, 2263,  663, 104],
+    ['Uttar Pradesh',  4014, 391, 300, 268, 222, 2103,  600, 119],
+    ['Madhya Pradesh', 2102,  85,  67, 302,  46, 1345,  177,  72]
+  ],
+
+  // [state, district, total, on_hold_n, on_hold_pct, hold_lmd_n, hold_lmd_pct, delivered_n, delivery_rate]
+  districtDrilldown: [
+    ['Gujarat','Surendranagar',874,302,34.6,109,12.5,563,64.4],
+    ['Gujarat','Bhavnagar',873,382,43.8,162,18.6,592,67.8],
+    ['Gujarat','Amreli',647,328,50.7,192,29.7,412,63.7],
+    ['Gujarat','Rajkot',574,165,28.7,170,29.6,348,60.6],
+    ['Gujarat','Jamnagar',382,162,42.4,63,16.5,237,62.0],
+    ['Gujarat','Junagadh',346,148,42.8,92,26.6,200,57.8],
+    ['Gujarat','Mahesana',273,108,39.6,102,37.4,193,70.7],
+    ['Gujarat','Botad',268,96,35.8,13,4.9,152,56.7],
+    ['Gujarat','Bharuch',249,90,36.1,56,22.5,172,69.1],
+    ['Gujarat','Kachchh',188,98,52.1,53,28.2,108,57.4],
+    ['Gujarat','Vadodara',178,79,44.4,32,18.0,121,68.0],
+    ['Gujarat','Banaskantha',174,49,28.2,31,17.8,78,44.8],
+    ['Gujarat','Morbi',157,67,42.7,34,21.7,75,47.8],
+    ['Gujarat','Anand',127,32,25.2,27,21.3,79,62.2],
+    ['Gujarat','Gandhinagar',124,38,30.6,8,6.5,67,54.0],
+    ['Gujarat','Gir Somnath',111,37,33.3,16,14.4,51,45.9],
+    ['Gujarat','Ahmedabad',104,41,39.4,9,8.7,68,65.4],
+    ['Gujarat','Surat',80,28,35.0,22,27.5,52,65.0],
+    ['Gujarat','Navsari',59,20,33.9,24,40.7,36,61.0],
+    ['Gujarat','Tapi',46,12,26.1,20,43.5,17,37.0],
+    ['Gujarat','Vav-Tharad',23,10,43.5,8,34.8,5,21.7],
+    ['Madhya Pradesh','Katni',257,89,34.6,78,30.4,190,73.9],
+    ['Madhya Pradesh','Betul',171,72,42.1,41,24.0,95,55.6],
+    ['Madhya Pradesh','Rewa',149,80,53.7,37,24.8,92,61.7],
+    ['Madhya Pradesh','Ujjain',119,73,61.3,45,37.8,73,61.3],
+    ['Madhya Pradesh','Balaghat',115,61,53.0,14,12.2,58,50.4],
+    ['Madhya Pradesh','Rajgarh',93,36,38.7,34,36.6,52,55.9],
+    ['Madhya Pradesh','Jabalpur',90,47,52.2,26,28.9,58,64.4],
+    ['Madhya Pradesh','Guna',89,32,36.0,31,34.8,74,83.1],
+    ['Madhya Pradesh','Ratlam',87,60,69.0,18,20.7,51,58.6],
+    ['Madhya Pradesh','Seoni',76,29,38.2,9,11.8,56,73.7],
+    ['Madhya Pradesh','Chhindwara',63,23,36.5,23,36.5,52,82.5],
+    ['Madhya Pradesh','Dhar',58,38,65.5,18,31.0,40,69.0],
+    ['Madhya Pradesh','Mandsaur',57,35,61.4,22,38.6,28,49.1],
+    ['Madhya Pradesh','Shivpuri',49,28,57.1,15,30.6,33,67.3],
+    ['Madhya Pradesh','Sehore',49,33,67.3,14,28.6,23,46.9],
+    ['Madhya Pradesh','Dewas',35,22,62.9,15,42.9,20,57.1],
+    ['Madhya Pradesh','Shajapur',28,14,50.0,11,39.3,20,71.4],
+    ['Madhya Pradesh','Bhopal',37,31,83.8,4,10.8,27,73.0],
+    ['Madhya Pradesh','Damoh',16,4,25.0,3,18.8,14,87.5],
+    ['Maharashtra','Solapur',521,155,29.8,233,44.7,250,48.0],
+    ['Maharashtra','Nanded',468,223,47.6,118,25.2,140,29.9],
+    ['Maharashtra','Beed',452,110,24.3,131,29.0,129,28.5],
+    ['Maharashtra','Ahilyanagar',439,142,32.3,99,22.6,194,44.2],
+    ['Maharashtra','Nagpur',427,199,46.6,170,39.8,149,34.9],
+    ['Maharashtra','Latur',408,130,31.9,171,41.9,202,49.5],
+    ['Maharashtra','Jalgaon',371,162,43.7,130,35.0,170,45.8],
+    ['Maharashtra','Jalna',355,121,34.1,127,35.8,132,37.2],
+    ['Maharashtra','Satara',323,87,26.9,55,17.0,188,58.2],
+    ['Maharashtra','Buldhana',314,120,38.2,107,34.1,129,41.1],
+    ['Maharashtra','Chandrapur',286,117,40.9,93,32.5,109,38.1],
+    ['Maharashtra','Parbhani',236,67,28.4,54,22.9,106,44.9],
+    ['Maharashtra','Bhandara',225,97,43.1,67,29.8,128,56.9],
+    ['Maharashtra','Wardha',201,103,51.2,89,44.3,65,32.3],
+    ['Maharashtra','Chhatrapati Sambhajinagar',201,51,25.4,83,41.3,80,39.8],
+    ['Maharashtra','Yavatmal',194,62,32.0,89,45.9,56,28.9],
+    ['Maharashtra','Dharashiv',179,57,31.8,67,37.4,61,34.1],
+    ['Maharashtra','Amravati',163,69,42.3,60,36.8,51,31.3],
+    ['Maharashtra','Pune',162,37,22.8,47,29.0,111,68.5],
+    ['Maharashtra','Hingoli',161,76,47.2,61,37.9,36,22.4],
+    ['Maharashtra','Nashik',151,52,34.4,55,36.4,72,47.7],
+    ['Maharashtra','Dhule',109,45,41.3,32,29.4,37,33.9],
+    ['Maharashtra','Akola',81,19,23.5,32,39.5,33,40.7],
+    ['Maharashtra','Washim',51,12,23.5,31,60.8,12,23.5],
+    ['Maharashtra','Gondia',19,4,21.1,13,68.4,12,63.2],
+    ['Rajasthan','Phalodi',613,136,22.2,308,50.2,348,56.8],
+    ['Rajasthan','Jodhpur',428,109,25.5,237,55.4,202,47.2],
+    ['Rajasthan','Barmer',374,69,18.4,68,18.2,158,42.2],
+    ['Rajasthan','Ganganagar',361,82,22.7,191,52.9,262,72.6],
+    ['Rajasthan','Nagaur',325,66,20.3,194,59.7,175,53.8],
+    ['Rajasthan','Bikaner',276,77,27.9,168,60.9,150,54.3],
+    ['Rajasthan','Hanumangarh',276,77,27.9,119,43.1,207,75.0],
+    ['Rajasthan','Alwar',253,54,21.3,94,37.2,141,55.7],
+    ['Rajasthan','Bhilwara',175,63,36.0,72,41.1,93,53.1],
+    ['Rajasthan','Churu',153,37,24.2,26,17.0,78,51.0],
+    ['Rajasthan','Jalore',153,58,37.9,19,12.4,66,43.1],
+    ['Rajasthan','Chittorgarh',147,50,34.0,73,49.7,52,35.4],
+    ['Rajasthan','Jhalawar',122,59,48.4,47,38.5,19,15.6],
+    ['Rajasthan','Bharatpur',115,33,28.7,51,44.3,41,35.7],
+    ['Rajasthan','Jaisalmer',111,17,15.3,48,43.2,40,36.0],
+    ['Rajasthan','Baran',74,31,41.9,7,9.5,46,62.2],
+    ['Rajasthan','Bundi',55,23,41.8,23,41.8,33,60.0],
+    ['Uttar Pradesh','Aligarh',367,186,50.7,218,59.4,108,29.4],
+    ['Uttar Pradesh','Budaun',280,110,39.3,160,57.1,168,60.0],
+    ['Uttar Pradesh','Bulandshahr',255,30,11.8,90,35.3,153,60.0],
+    ['Uttar Pradesh','Etah',236,78,33.1,58,24.6,139,58.9],
+    ['Uttar Pradesh','Kheri',224,46,20.5,142,63.4,142,63.4],
+    ['Uttar Pradesh','Mainpuri',195,40,20.5,102,52.3,91,46.7],
+    ['Uttar Pradesh','Hardoi',148,28,18.9,94,63.5,90,60.8],
+    ['Uttar Pradesh','Gonda',144,66,45.8,68,47.2,91,63.2],
+    ['Uttar Pradesh','Farrukhabad',120,31,25.8,57,47.5,56,46.7],
+    ['Uttar Pradesh','Bareilly',119,35,29.4,50,42.0,63,52.9],
+    ['Uttar Pradesh','Bahraich',111,40,36.0,81,73.0,51,45.9],
+    ['Uttar Pradesh','Agra',104,21,20.2,66,63.5,51,49.0],
+    ['Uttar Pradesh','Sitapur',100,30,30.0,62,62.0,53,53.0],
+    ['Uttar Pradesh','Muzaffarnagar',89,23,25.8,44,49.4,48,53.9],
+    ['Uttar Pradesh','Amroha',88,30,34.1,13,14.8,63,71.6],
+    ['Uttar Pradesh','Hathras',81,21,25.9,29,35.8,30,37.0],
+    ['Uttar Pradesh','Fatehpur',70,8,11.4,57,81.4,27,38.6],
+    ['Uttar Pradesh','Pilibhit',68,27,39.7,47,69.1,33,48.5],
+    ['Uttar Pradesh','Bijnor',41,21,51.2,34,82.9,23,56.1],
+    ['Uttar Pradesh','Azamgarh',33,20,60.6,23,69.7,20,60.6],
+    ['Uttar Pradesh','Sambhal',39,16,41.0,25,64.1,14,35.9],
+    ['Uttar Pradesh','Kannauj',39,6,15.4,24,61.5,17,43.6],
+    ['Uttar Pradesh','Sultanpur',16,7,43.8,15,93.8,9,56.3],
+    ['Uttar Pradesh','Deoria',18,10,55.6,16,88.9,10,55.6]
+  ],
+
+  // [wk, state, total, store_action_rate, on_hold_pct, hold_lmd_pct, pickup_24h_rate, delivery_rate]
+  wowStages: [
+    ['2026-03-30','Gujarat',749,99.9,37.2,13.2,36.4,74.5],
+    ['2026-03-30','Madhya Pradesh',336,99.4,39.6,20.2,28.7,84.2],
+    ['2026-03-30','Maharashtra',1030,99.4,24.5,20.2,26.7,67.4],
+    ['2026-03-30','Rajasthan',612,100.0,22.7,20.6,24.0,65.5],
+    ['2026-03-30','Uttar Pradesh',388,99.7,21.4,39.7,20.2,77.8],
+    ['2026-04-06','Gujarat',693,100.0,38.1,12.3,35.1,71.9],
+    ['2026-04-06','Madhya Pradesh',351,100.0,39.0,17.9,37.9,87.5],
+    ['2026-04-06','Maharashtra',906,99.9,23.8,28.9,23.3,67.7],
+    ['2026-04-06','Rajasthan',469,100.0,26.0,21.5,21.1,67.4],
+    ['2026-04-06','Uttar Pradesh',400,99.3,25.8,47.3,16.9,68.5],
+    ['2026-04-13','Gujarat',843,100.0,48.0,25.1,34.5,70.1],
+    ['2026-04-13','Madhya Pradesh',277,99.6,42.2,32.1,31.9,84.1],
+    ['2026-04-13','Maharashtra',848,99.4,29.4,26.4,24.6,60.6],
+    ['2026-04-13','Rajasthan',237,100.0,33.8,33.3,24.5,68.8],
+    ['2026-04-13','Uttar Pradesh',451,99.3,32.6,47.7,18.3,65.2],
+    ['2026-04-20','Gujarat',990,100.1,43.4,27.4,32.4,71.0],
+    ['2026-04-20','Madhya Pradesh',221,100.0,43.4,29.0,37.1,87.8],
+    ['2026-04-20','Maharashtra',556,99.6,21.6,34.0,29.8,60.3],
+    ['2026-04-20','Rajasthan',438,100.0,30.8,40.0,17.1,70.8],
+    ['2026-04-20','Uttar Pradesh',440,99.8,38.0,54.1,15.3,64.8],
+    ['2026-04-27','Gujarat',654,100.0,42.2,14.8,29.1,72.8],
+    ['2026-04-27','Madhya Pradesh',155,99.4,54.2,30.3,25.3,80.6],
+    ['2026-04-27','Maharashtra',209,99.0,23.4,45.5,22.7,56.9],
+    ['2026-04-27','Rajasthan',639,100.0,28.8,49.1,18.2,73.4],
+    ['2026-04-27','Uttar Pradesh',353,100.0,34.0,50.1,16.1,67.4],
+    ['2026-05-04','Gujarat',1041,100.1,36.0,18.3,36.6,67.8],
+    ['2026-05-04','Madhya Pradesh',234,100.0,57.7,45.3,23.9,70.1],
+    ['2026-05-04','Maharashtra',923,100.0,36.7,58.5,20.5,42.7],
+    ['2026-05-04','Rajasthan',757,100.0,23.5,60.2,14.8,61.4],
+    ['2026-05-04','Uttar Pradesh',533,100.0,33.2,58.5,15.9,67.2],
+    ['2026-05-11','Gujarat',1006,100.0,34.3,30.1,27.7,46.5],
+    ['2026-05-11','Madhya Pradesh',253,100.0,67.6,36.0,17.8,39.5],
+    ['2026-05-11','Maharashtra',1158,99.3,60.0,44.3,16.5,23.7],
+    ['2026-05-11','Rajasthan',708,100.0,26.0,62.0,14.7,37.4],
+    ['2026-05-11','Uttar Pradesh',793,99.7,34.6,56.6,14.9,48.2],
+    ['2026-05-18','Gujarat',760,86.8,29.9,16.4,22.3,14.2],
+    ['2026-05-18','Madhya Pradesh',411,82.0,52.1,10.7,11.6,12.7],
+    ['2026-05-18','Maharashtra',1492,73.4,39.0,22.0,11.1,5.2],
+    ['2026-05-18','Rajasthan',663,83.9,23.7,25.8,10.8,8.3],
+    ['2026-05-18','Uttar Pradesh',816,85.0,28.7,39.3,10.2,11.4]
   ]
 };
 
@@ -1115,6 +1258,7 @@ window.addEventListener('load', () => {
   renderLmdTab();
   renderMpdTab();
   renderDeeperTab();
+  renderPipelineTab();
   document.getElementById('last-refreshed').innerHTML =
     `Snapshot: ${fmtDate(STATIC_DATA.snapshotFrom)} → ${fmtDate(STATIC_DATA.snapshotTo)}<br>
      <span style="color:#f59e0b;font-size:10px">● Static · connecting to proxy…</span>`;
@@ -1141,6 +1285,7 @@ function setFilter(key, val, el) {
   renderLmdTab();
   renderMpdTab();
   renderDeeperTab();
+  renderPipelineTab();
 }
 
 function setDatePreset(preset, el) {
@@ -1357,7 +1502,7 @@ async function loadDashboard() {
   // ── Try local proxy first ──────────────────────────────
   showOverlay(true, 'Fetching live data…', 'Connecting to local proxy');
   try {
-    const res = await fetch(`http://localhost:8080/api/refresh?from=${from}&to=${to}`,
+    const res = await fetch(`http://localhost:7891/api/refresh?from=${from}&to=${to}`,
       { signal: AbortSignal.timeout(90000) });
     if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
     const data = await res.json();
@@ -2700,6 +2845,313 @@ function renderDeeperTab() {
 
 let _activeTab = 'exec';
 
+// ══════════════════════════════════════════════════════════
+//  PIPELINE TAB
+// ══════════════════════════════════════════════════════════
+let _pipelineView = 'overview';
+
+function setPipelineView(view, el) {
+  _pipelineView = view;
+  document.querySelectorAll('#view-pipeline .pl-view-bar .pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.pipeline-panel').forEach(p => p.style.display = 'none');
+  document.getElementById('pipeline-' + view).style.display = 'block';
+  renderPipelineSubPanel();
+}
+
+function renderPipelineTab() {
+  const sf = filters.state;
+  const rows = sf === 'ALL' ? STATIC_DATA.pipelineStatus : STATIC_DATA.pipelineStatus.filter(r => r[0] === sf);
+  if (!rows.length) return;
+
+  // Aggregate
+  let total=0, packed=0, holdLmd=0, onHold=0, inTrans=0, deliv=0, rto=0, noAct=0;
+  rows.forEach(r => { total+=r[1]; packed+=r[2]; holdLmd+=r[3]; onHold+=r[4]; inTrans+=r[5]; deliv+=r[6]; rto+=r[7]; noAct+=r[8]; });
+  const stuck = packed + holdLmd + onHold + noAct;
+
+  // Status strip
+  const criticals = [];
+  STATIC_DATA.pipelineStatus.forEach(r => {
+    const holdPct = ((r[3]/r[1])*100);
+    const onhPct  = ((r[4]/r[1])*100);
+    if (holdPct > 20) criticals.push(r[0].split(' ')[0] + ' HOLD_LMD ' + holdPct.toFixed(0) + '%');
+    if (onhPct  > 20) criticals.push(r[0].split(' ')[0] + ' ON_HOLD '  + onhPct.toFixed(0)  + '%');
+  });
+  document.getElementById('pipeline-strip').innerHTML =
+    `<span>⚠️ <strong>${stuck.toLocaleString('en-IN')}</strong> orders stuck</span>` +
+    `<span style="color:#fbbf24">📦 <strong>${packed.toLocaleString('en-IN')}</strong> packed — LMD not picking up</span>` +
+    `<span style="color:#f87171">⏸ <strong>${holdLmd.toLocaleString('en-IN')}</strong> held by LMD</span>` +
+    `<span style="color:#fb923c">🔒 <strong>${onHold.toLocaleString('en-IN')}</strong> on hold (inventory)</span>` +
+    `<span style="margin-left:auto;color:#86efac">✅ <strong>${deliv.toLocaleString('en-IN')}</strong> delivered · ${(100*deliv/total).toFixed(1)}%</span>`;
+
+  // Assembly line
+  const pct = n => (100*n/total).toFixed(1) + '%';
+  document.getElementById('pipeline-assembly').innerHTML = `
+    <div style="display:flex;align-items:stretch;gap:0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:8px">
+      <div class="ps-stage blue" style="flex:1.6">
+        <div class="ps-count">${total.toLocaleString('en-IN')}</div>
+        <div class="ps-label">Total DVS Orders</div>
+        <div class="ps-pct" style="color:#2563eb">Apr 1 – May 22</div>
+      </div>
+      <div class="ps-arrow">▶</div>
+      <div class="ps-stage amber" style="flex:1">
+        <div class="ps-count" style="color:#d97706">${noAct.toLocaleString('en-IN')}</div>
+        <div class="ps-label">No Action Yet</div>
+        <div class="ps-pct" style="color:#d97706">${pct(noAct)}</div>
+        <div class="ps-note">Store not responded</div>
+      </div>
+      <div class="ps-arrow">▶</div>
+      <div class="ps-stage amber" style="flex:1">
+        <div class="ps-count" style="color:#d97706">${onHold.toLocaleString('en-IN')}</div>
+        <div class="ps-label">On Hold / Restock</div>
+        <div class="ps-pct" style="color:#d97706">${pct(onHold)}</div>
+        <div class="ps-note">No inventory</div>
+      </div>
+      <div class="ps-arrow">▶</div>
+      <div class="ps-stage ${packed>500?'red':'amber'}" style="flex:1">
+        <div class="ps-count" style="color:${packed>500?'#dc2626':'#d97706'}">${packed.toLocaleString('en-IN')}</div>
+        <div class="ps-label">Packed at Store</div>
+        <div class="ps-pct" style="color:${packed>500?'#dc2626':'#d97706'}">${pct(packed)}</div>
+        <div class="ps-note">LMD not showing up</div>
+      </div>
+      <div class="ps-arrow">▶</div>
+      <div class="ps-stage red" style="flex:1">
+        <div class="ps-count" style="color:#dc2626">${holdLmd.toLocaleString('en-IN')}</div>
+        <div class="ps-label">Held by LMD</div>
+        <div class="ps-pct" style="color:#dc2626">${pct(holdLmd)}</div>
+        <div class="ps-note">LMD deliberately holding</div>
+      </div>
+      <div class="ps-arrow">▶</div>
+      <div class="ps-stage blue" style="flex:1">
+        <div class="ps-count" style="color:#2563eb">${inTrans.toLocaleString('en-IN')}</div>
+        <div class="ps-label">In Transit</div>
+        <div class="ps-pct" style="color:#2563eb">${pct(inTrans)}</div>
+        <div class="ps-note">LMD picked up</div>
+      </div>
+      <div class="ps-arrow">▶</div>
+      <div class="ps-stage green" style="flex:1.4">
+        <div class="ps-count" style="color:#16a34a">${deliv.toLocaleString('en-IN')}</div>
+        <div class="ps-label">Delivered ✅</div>
+        <div class="ps-pct" style="color:#16a34a">${pct(deliv)}</div>
+        <div class="ps-note">${rto.toLocaleString('en-IN')} RTO (${pct(rto)})</div>
+      </div>
+    </div>
+    <div style="font-size:10.5px;color:#94a3b8;text-align:right">
+      Bottleneck: <strong style="color:#dc2626">PACKED→PICKED</strong> median wait = 51 hrs (SLA: 24 hrs) ·
+      ${((packed+holdLmd)*100/total).toFixed(1)}% of orders are waiting for LMD right now
+    </div>`;
+
+  // Sub-panels
+  renderPipelineSubPanel();
+}
+
+function renderPipelineSubPanel() {
+  const sf = filters.state;
+  if (_pipelineView === 'overview')  renderPipelineOverview(sf);
+  if (_pipelineView === 'diagnose')  renderPipelineDiagnose(sf);
+  if (_pipelineView === 'act')       renderPipelineAct(sf);
+  if (_pipelineView === 'plan')      renderPipelinePlan(sf);
+}
+
+function renderPipelineOverview(sf) {
+  const el = document.getElementById('pipeline-overview');
+  const rows = sf === 'ALL' ? STATIC_DATA.pipelineStatus : STATIC_DATA.pipelineStatus.filter(r => r[0] === sf);
+  const wowRows = STATIC_DATA.wowStages;
+
+  let html = `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px">`;
+  STATIC_DATA.pipelineStatus.forEach(r => {
+    const [state, total, packed, holdLmd, onHold, inTrans, deliv, rto, noAct] = r;
+    const holdPct = (holdLmd*100/total).toFixed(1);
+    const onhPct  = (onHold*100/total).toFixed(1);
+    const delPct  = (deliv*100/total).toFixed(1);
+    const crisis  = parseFloat(holdPct) > 20 ? `🔴 LMD: ${holdPct}%` : (parseFloat(onhPct) > 30 ? `🟡 Inv: ${onhPct}%` : `🟢 OK`);
+    const crCol   = parseFloat(holdPct) > 20 ? '#dc2626' : (parseFloat(onhPct) > 30 ? '#d97706' : '#16a34a');
+
+    // WoW sparkline for HOLD_BY_LMD% — last 6 weeks excl last partial
+    const stateWow = wowRows.filter(w => w[1] === state).slice(0,7);
+    const maxHold  = Math.max(...stateWow.map(w => w[5]), 1);
+    const sparkHtml = stateWow.map(w => {
+      const h = Math.round((w[5] / maxHold) * 34);
+      const col = w[5] > 40 ? '#ef4444' : w[5] > 25 ? '#f59e0b' : '#22c55e';
+      return `<div class="wow-bar" style="height:${h}px;background:${col};flex:1"></div>`;
+    }).join('');
+
+    const dimmed = (sf !== 'ALL' && state !== sf) ? 'opacity:.35' : '';
+    html += `
+      <div class="card" style="${dimmed}">
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px">${state.replace('Uttar Pradesh','Uttar Pradesh').replace('Madhya Pradesh','Madhya Pradesh')}</div>
+        <div style="font-size:20px;font-weight:800;color:#0f172a">${total.toLocaleString('en-IN')}<span style="font-size:12px;font-weight:400;color:#64748b;margin-left:4px">orders</span></div>
+        <div style="font-size:11px;color:#16a34a;font-weight:700;margin-top:3px">✅ ${delPct}% delivered</div>
+        <div style="font-size:11px;font-weight:700;color:${crCol};margin-top:3px">${crisis}</div>
+        <div class="wow-mini">${sparkHtml}</div>
+        <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">Hold_LMD% trend (W1→W7)</div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  // Insight box
+  const worst = STATIC_DATA.pipelineStatus.reduce((a,b) => (b[3]/b[1]) > (a[3]/a[1]) ? b : a);
+  const worstPct = (worst[3]*100/worst[1]).toFixed(1);
+  html += `<div class="info-box red">
+    🔑 <strong>Key takeaway:</strong>
+    ${worst[0]} has the highest HOLD_BY_LMD rate at <strong>${worstPct}%</strong> (${worst[3].toLocaleString('en-IN')} orders).
+    Rajasthan HOLD_BY_LMD has been climbing every week — from 20.6% in W1 to 62.0% in W7.
+    Gujarat is the only state where LMD behaviour is relatively stable (&lt;30% hold rate most weeks).
+    Madhya Pradesh has a different problem — inventory: ${(STATIC_DATA.pipelineStatus.find(r=>r[0]==='Madhya Pradesh')[4]*100/STATIC_DATA.pipelineStatus.find(r=>r[0]==='Madhya Pradesh')[1]).toFixed(1)}% of orders are ON_HOLD.
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+function renderPipelineDiagnose(sf) {
+  const el = document.getElementById('pipeline-diagnose');
+  let rows = STATIC_DATA.districtDrilldown;
+  if (sf !== 'ALL') rows = rows.filter(r => r[0] === sf);
+  // Sort by combined blocker score (hold_lmd + on_hold pcts)
+  rows = [...rows].sort((a,b) => (b[6]+b[4]) - (a[6]+a[4])).slice(0, 50);
+
+  let html = `<div class="card">
+    <div class="card-title">District Diagnosis — Worst Blocked Districts <span>by (ON_HOLD% + HOLD_LMD%) — top 50</span></div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th style="text-align:left">District</th>
+        <th style="text-align:left">State</th>
+        <th>Orders</th>
+        <th>On Hold %</th>
+        <th>Hold LMD %</th>
+        <th>Blocker Score</th>
+        <th>Del Rate</th>
+        <th>Diagnosis</th>
+      </tr></thead><tbody>`;
+
+  rows.forEach(r => {
+    const [state, dist, total, ohN, ohP, hlN, hlP, delN, delR] = r;
+    const score = ohP + hlP;
+    const scoreColor = score > 80 ? '#dc2626' : score > 60 ? '#d97706' : '#64748b';
+    const diag = hlP > ohP ? `🔴 LMD Crisis` : ohP > 40 ? `🟡 Inventory` : `⚪ Mixed`;
+    const delColor = delR < 40 ? '#dc2626' : delR < 55 ? '#d97706' : '#16a34a';
+    html += `<tr>
+      <td>${dist}</td>
+      <td style="color:#64748b;font-weight:400">${state}</td>
+      <td>${total.toLocaleString('en-IN')}</td>
+      <td><span class="rate-pill ${ohP>50?'rate-red':ohP>35?'rate-amber':'rate-green'}">${ohP}%</span></td>
+      <td><span class="rate-pill ${hlP>40?'rate-red':hlP>25?'rate-amber':'rate-green'}">${hlP}%</span></td>
+      <td style="font-weight:800;color:${scoreColor}">${score.toFixed(1)}</td>
+      <td style="color:${delColor};font-weight:700">${delR}%</td>
+      <td style="font-size:11px">${diag}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div></div>`;
+  el.innerHTML = html;
+}
+
+function renderPipelineAct(sf) {
+  const el = document.getElementById('pipeline-act');
+  let rows = STATIC_DATA.districtDrilldown;
+  if (sf !== 'ALL') rows = rows.filter(r => r[0] === sf);
+
+  // Split into LMD crisis vs Inventory crisis
+  const lmdCrisis = [...rows].filter(r=>r[6]>40).sort((a,b)=>b[6]-a[6]).slice(0,15);
+  const invCrisis = [...rows].filter(r=>r[4]>50).sort((a,b)=>b[4]-a[4]).slice(0,15);
+
+  const makeList = (arr, metric, metricIdx, label, color) => {
+    if (!arr.length) return `<div class="no-data">No districts above threshold</div>`;
+    return arr.map(r => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r[1]}</div>
+          <div style="font-size:10.5px;color:#64748b">${r[0]} · ${r[2].toLocaleString('en-IN')} orders</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:16px;font-weight:800;color:${color}">${r[metricIdx]}%</div>
+          <div style="font-size:10px;color:#94a3b8">${label}</div>
+        </div>
+      </div>`).join('');
+  };
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card">
+        <div class="card-title" style="color:#dc2626">🔴 LMD Pickup Crisis <span>HOLD_BY_LMD &gt; 40% — call LMD supervisors now</span></div>
+        ${makeList(lmdCrisis, 'hold_lmd_pct', 6, 'Hold LMD%', '#dc2626')}
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:#d97706">🟡 Inventory Crisis <span>ON_HOLD &gt; 50% — escalate replenishment</span></div>
+        ${makeList(invCrisis, 'on_hold_pct', 4, 'On Hold%', '#d97706')}
+      </div>
+    </div>`;
+}
+
+function renderPipelinePlan(sf) {
+  const el = document.getElementById('pipeline-plan');
+  const states = ['Maharashtra','Gujarat','Rajasthan','Uttar Pradesh','Madhya Pradesh'];
+  const weeks  = [...new Set(STATIC_DATA.wowStages.map(r=>r[0]))];
+  const wkLabels = ['W1\nMar30','W2\nApr6','W3\nApr13','W4\nApr20','W5\nApr27','W6\nMay4','W7\nMay11','W8*\nMay18'];
+
+  // Table: states as rows, weeks as cols, showing hold_lmd_pct (col 5)
+  let html = `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Week-on-Week HOLD_BY_LMD% by State <span>% of DVS orders held by LMD that week · * W8 partial week</span></div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th style="text-align:left">State</th>
+          ${wkLabels.map((w,i) => `<th>${w.split('\n')[0]}<br><span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8">${w.split('\n')[1]}</span></th>`).join('')}
+          <th>Trend</th>
+        </tr></thead><tbody>`;
+
+  const filtStates = sf !== 'ALL' ? states.filter(s=>s===sf) : states;
+  filtStates.forEach(state => {
+    const stRows = STATIC_DATA.wowStages.filter(r=>r[1]===state);
+    html += `<tr><td>${state}</td>`;
+    weeks.forEach(wk => {
+      const row = stRows.find(r=>r[0]===wk);
+      if (!row) { html += `<td>—</td>`; return; }
+      const v = row[5]; // hold_lmd_pct
+      const cls = v > 50 ? 'rate-red' : v > 30 ? 'rate-amber' : 'rate-green';
+      html += `<td><span class="rate-pill ${cls}">${v}%</span></td>`;
+    });
+    // Arrow trend: W1 vs W7 (skip partial W8)
+    const v1 = stRows[0]?.[5]||0, v7 = stRows[6]?.[5]||0;
+    const diff = v7 - v1;
+    const arrow = diff > 10 ? `<span style="color:#dc2626">▲ ${diff.toFixed(0)}pp</span>` :
+                  diff < -10 ? `<span style="color:#16a34a">▼ ${Math.abs(diff).toFixed(0)}pp</span>` :
+                  `<span style="color:#64748b">↔ ${diff>0?'+':''}${diff.toFixed(0)}pp</span>`;
+    html += `<td>${arrow}</td></tr>`;
+  });
+
+  html += `</tbody></table></div></div>`;
+
+  // Second table: pickup_within_24h_rate (col 6)
+  html += `<div class="card">
+    <div class="card-title">Week-on-Week Pickup-within-24hr Rate <span>% of store-packed orders picked up by LMD within 24 hrs · target: 70%+</span></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th style="text-align:left">State</th>
+        ${wkLabels.map(w=>`<th>${w.split('\n')[0]}<br><span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8">${w.split('\n')[1]}</span></th>`).join('')}
+        <th>Trend</th>
+      </tr></thead><tbody>`;
+
+  filtStates.forEach(state => {
+    const stRows = STATIC_DATA.wowStages.filter(r=>r[1]===state);
+    html += `<tr><td>${state}</td>`;
+    weeks.forEach(wk => {
+      const row = stRows.find(r=>r[0]===wk);
+      if (!row) { html += `<td>—</td>`; return; }
+      const v = row[6];
+      const cls = v >= 30 ? 'rate-green' : v >= 20 ? 'rate-amber' : 'rate-red';
+      html += `<td><span class="rate-pill ${cls}">${v}%</span></td>`;
+    });
+    const v1 = stRows[0]?.[6]||0, v7 = stRows[6]?.[6]||0;
+    const diff = v7 - v1;
+    const arrow = diff > 5 ? `<span style="color:#16a34a">▲ ${diff.toFixed(0)}pp</span>` :
+                  diff < -5 ? `<span style="color:#dc2626">▼ ${Math.abs(diff).toFixed(0)}pp</span>` :
+                  `<span style="color:#64748b">↔</span>`;
+    html += `<td>${arrow}</td></tr>`;
+  });
+  html += `</tbody></table></div></div>`;
+
+  el.innerHTML = html;
+}
+
 function switchTab(name, el) {
   if (el.classList.contains('disabled')) return;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -2713,9 +3165,10 @@ function switchTab(name, el) {
     funnel:  renderFunnelTab,
     partner: renderPartnerTab,
     ops:     renderOpsTab,
-    lmd:     renderLmdTab,
-    mpd:     renderMpdTab,
-    deeper:  renderDeeperTab
+    lmd:      renderLmdTab,
+    mpd:      renderMpdTab,
+    deeper:   renderDeeperTab,
+    pipeline: renderPipelineTab
   };
   if (renderers[name]) renderers[name]();
 }
