@@ -6,3 +6,5 @@
 
 # Sensitive / personal notes
 *.private.md
+charts/stuck_orders_detail.csv
+restock_detail_data.js
