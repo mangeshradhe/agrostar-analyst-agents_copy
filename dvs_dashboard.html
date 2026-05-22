@@ -607,11 +607,19 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
     </div>
   </div>
 
-  <!-- LMD leaderboard -->
+  <!-- H4: LMD leaderboard -->
+  <div style="padding:14px 28px 0">
+    <div class="card">
+      <div class="card-header">H4 — LMD Performance Leaderboard &nbsp;<span style="font-size:10px;color:#94a3b8;font-weight:400">Real HOLD_BY_LMD from order history · 🔴 ≥50% hold · 🟡 25–49% hold · top 30 by DVS volume</span></div>
+      <div id="lmd-table"></div>
+    </div>
+  </div>
+
+  <!-- H5: Selective LMD picking -->
   <div style="padding:14px 28px 20px">
     <div class="card">
-      <div class="card-header">LMD Performance — DVS vs FC Channel Comparison &nbsp;<span style="font-size:10px;color:#94a3b8;font-weight:400">Del Gap = DVS del% − FC del% · 🔴 = DVS underperforming FC (rare) · sample data</span></div>
-      <div id="lmd-table"></div>
+      <div class="card-header">H5 — Selective Picking: Same LMD, Different Stores &nbsp;<span style="font-size:10px;color:#94a3b8;font-weight:400">LMDs serving ≥2 stores with ≥5 orders each — ranked by HOLD% variance (max−min)</span></div>
+      <div id="lmd-h5"></div>
     </div>
   </div>
 
@@ -823,29 +831,116 @@ const STATIC_DATA = {
     ['Uttar Pradesh',  3932, 77.5, 22.5,  8941, 72.4, 27.6, 1990],
     ['Madhya Pradesh', 2061, 87.9, 12.1,  5882, 67.7, 32.3,  546]
   ],
-  // Real LMD names from BQ — ranked by DVS orders DESC
-  // [lmd_name, dvs_orders, fc_orders, dvs_delivered, dvs_rto, dvs_rto_pct, fc_delivered, fc_rto, fc_rto_pct, dvs_hold]
+  // H4 — Real HOLD_BY_LMD from order_management_orderhistorymeta (FY27 Apr1–May21)
+  // [lmd_name, dvs_orders, hold_by_lmd, hold_pct, delivered, del_pct, rto, rto_pct, stores_served]
   lmdLeaderboard: [
-    ['Mahipatsinh Rathod',    391,  24, 254,  73, 22.3,  16,   4, 20.0,  0],
-    ['Tushar Bhesaniya',      298,  66, 199,  55, 21.7,  43,   9, 17.3,  0],
-    ['Tejabhai Paraliya',     288,   3, 180,  74, 29.1,   2,   0,  0.0,  0],
-    ['Raza Enterprice',       260, 104, 176,  41, 18.9,  72,  17, 19.1,  0],
-    ['Kuldip Algotar',        246, 247, 167,  46, 21.6, 142,  58, 29.0,  0],
-    ['Vishal Solanki',        230,  54, 141,  24, 14.5,  32,   7, 17.9,  0],
-    ['Dharmendrasinh Tank',   218,  93, 182,  22, 10.8,  79,   5,  6.0,  0],
-    ['Ravikaran Singh',       214, 125,  76,  21, 21.6,  62,  29, 31.9,  0],
-    ['Chavda Laljibhai',      208,  42, 139,  34, 19.7,  30,  12, 28.6,  0],
-    ['Jignesh Jani',          206, 229, 149,  24, 13.9, 201,   9,  4.3,  0],
-    ['Mukesh Alwar',          202, 264, 112,  46, 29.1,  95, 118, 55.4,  0],
-    ['Vikash Kumar Singh',    196, 128, 114,  37, 24.5,  92,  18, 16.4,  0],
-    ['Sachin Mothe',          195, 291, 106,  48, 31.2, 183,  60, 24.7,  0],
-    ['Sumer Singh',           191, 166, 114,   5,  4.2, 117,  39, 25.0,  0],
-    ['Dinesh Mali',           184, 113, 117,  11,  8.6,  60,  46, 43.4,  0],
-    ['Himanshu Chauhan',      183,  67,  91,  32, 26.0,  39,  11, 22.0,  0],
-    ['Pravinbhai Parmar',     181,   9, 115,  27, 19.0,   4,   0,  0.0,  0],
-    ['Hargovanji Thakor',     179,  23, 138,  20, 12.7,  17,   3, 15.0,  0],
-    ['Manish Kumar',          178, 122, 131,  35, 21.1,  98,  23, 19.0,  0],
-    ['Kantilal Patel',        171, 110, 102,  37, 26.6,  63,  17, 21.3,  0]
+    ['Mahipatsinh rathod',   391,  70, 17.9, 254, 65.0,  71, 21.8,  7],
+    ['Tushar Bhesaniya',     299, 105, 35.1, 200, 66.9,  52, 20.6,  7],
+    ['Tejabhai Paraliya',    293,  94, 32.1, 180, 61.4,  70, 28.0,  5],
+    ['Raza Enterprice',      260,  52, 20.0, 176, 67.7,  39, 18.1,  8],
+    ['Kuldip Algotar',       245,  61, 24.9, 167, 68.2,  40, 19.3,  6],
+    ['Vishal  Solanki ',     230,  72, 31.3, 143, 62.2,  24, 14.4,  5],
+    ['dharmendrasinh tank',  220,  21,  9.5, 182, 82.7,  21, 10.3,  3],
+    ['Ravikaran Singh',      216, 179, 82.9,  76, 35.2,  21, 21.6,  7],
+    ['Chavda  laljibhai ',   212,  33, 15.6, 140, 66.0,  33, 19.1,  2],
+    ['Jignesh Jani',         206,  76, 36.9, 148, 71.8,  22, 12.9,  7],
+    ['Mukesh Alwar',         200,  84, 42.0, 112, 56.0,  44, 28.2,  6],
+    ['Sachin Mothe',         198,  70, 35.4, 111, 56.1,  46, 29.3, 13],
+    ['Vikash Kumar Singh',   198, 127, 64.1, 114, 57.6,  37, 24.5,  7],
+    ['Sumer Singh',          190, 103, 54.2, 114, 60.0,   0,  0.0,  6],
+    ['Himanshu Chauhan',     189, 102, 54.0,  93, 49.2,  31, 25.0,  6],
+    ['PRAVINBHAI  PARMAR',   182,  12,  6.6, 115, 63.2,  27, 19.0,  3],
+    ['Dinesh mali',          181, 113, 62.4, 117, 64.6,   9,  7.1,  4],
+    ['Hargovanji thakor',    180,  74, 41.1, 138, 76.7,  19, 12.1,  5],
+    ['Manish Kumar',         179, 107, 59.8, 131, 73.2,  33, 20.1,  2],
+    ['Laxman Ram',           172,  32, 18.6, 110, 64.0,  26, 19.1,  1],
+    ['Kantilal Patel',       171,  66, 38.6, 103, 60.2,  38, 27.0, 15],
+    ['Durveen Singh',        162,  58, 35.8, 109, 67.3,  26, 19.3,  3],
+    ['Dajiraj  Parmer',      162,   1,  0.6, 133, 82.1,  17, 11.3,  2],
+    ['DINESH SARVAIYA',      158,  78, 49.4,  73, 46.2,  29, 28.4, 12],
+    ['Balaji Pandit',        157, 101, 64.3,  91, 58.0,  37, 28.9,  6],
+    ['Arvendra Hasanpur',    152,  21, 13.8, 121, 79.6,  22, 15.4,  2],
+    ['Bhanu Prakash',        151,  60, 39.7,  54, 35.8,  14, 20.6,  5],
+    ['ravikumar kumar ',     150,  92, 61.3,  74, 49.3,  26, 26.0, 14],
+    ['Tijon Devi',           148,  24, 16.2,  76, 51.4,  47, 38.2,  1],
+    ['Tikam mali',           146,  81, 55.5,  73, 50.0,   8,  9.9,  4]
+  ],
+
+  // H5 — Selective LMD Picking: HOLD_BY_LMD% variance across stores (confirmed hypothesis)
+  // [lmd_name, num_stores, total_orders, max_hold_pct, min_hold_pct, variance_pp, avg_hold_pct]
+  selectivePicking: [
+    ['Matin Shaikh',                    2,  37, 100.0, 12.5, 87.5, 56.3],
+    ['jogendra bhadu',                  4,  80, 100.0, 14.3, 85.7, 37.8],
+    ['Abhay Narayan Verma',             3,  30, 100.0, 16.7, 83.3, 50.0],
+    ['Balram Singh',                    3,  38,  75.0,  0.0, 75.0, 40.9],
+    ['Madhusudan Lodha',                2,  74, 100.0, 27.9, 72.1, 63.9],
+    ['Amit Kumar',                      3,  47, 100.0, 29.0, 71.0, 59.7],
+    ['Hakim Shaikh',                    4,  86,  85.7, 15.6, 70.2, 43.6],
+    ['ravikumar kumar ',                8, 139,  88.9, 20.0, 68.9, 58.6],
+    ['Narsingh Merta',                  6,  86,  68.8,  0.0, 68.8, 39.1],
+    ['Vishnu  Chaudhari majalgaon',     2,  73,  85.7, 18.6, 67.1, 52.2],
+    ['Hariom Solanki',                  3,  35,  75.0,  9.5, 65.5, 44.8],
+    ['Kantilal Patel',                 11, 165,  77.8, 12.5, 65.3, 39.3],
+    ['Mahipatsinh rathod',              6, 389,  75.0,  9.7, 65.3, 26.5],
+    ['ujjawal patel',                   2,  44,  71.4,  8.1, 63.3, 39.8],
+    ['Udit Bisen',                      3,  22,  80.0, 16.7, 63.3, 38.3],
+    ['punamchand more',                 2,  15,  83.3, 22.2, 61.1, 52.8],
+    ['Sonali  Jain',                    4,  67,  60.9,  0.0, 60.9, 20.3],
+    ['sadik mansuri',                   2,  10,  60.0,  0.0, 60.0, 30.0],
+    ['Manoj zore',                      4,  55,  80.0, 21.1, 58.9, 58.1],
+    ['Dinesh mali',                     4, 181,  67.0,  9.1, 57.9, 51.0],
+    ['Sant Kumar UP',                   4,  85,  77.8, 20.0, 57.8, 51.1],
+    ['Hanuman Ram',                     3,  61,  90.9, 33.3, 57.6, 52.8],
+    ['SanjayD Dhomase',                 4,  93,  66.7, 12.5, 54.2, 35.5],
+    ['Dharmraj Pokale',                 3,  76,  66.7, 12.9, 53.8, 43.2],
+    ['Sachin Mothe',                    5, 181,  80.0, 28.4, 51.6, 45.2],
+    ['sanjay  borkar',                  3,  44,  94.1, 42.9, 51.2, 68.7],
+    ['Rau Ram',                         3,  37,  66.7, 16.7, 50.0, 40.6],
+    ['Ishwar  Gaikwad',                 2,  33,  66.7, 16.7, 50.0, 41.7],
+    ['chintan tukdiya',                 3,  21,  66.7, 16.7, 50.0, 38.9],
+    ['Nilam Kahale',                    2,  12, 100.0, 50.0, 50.0, 75.0]
+  ],
+
+  // H5 detail — per-store breakdown for top 10 LMDs by variance
+  // [lmd_name, store_name, district, state, orders, hold_count, hold_pct, delivered, del_pct, variance_pp]
+  selectivePickingDetail: [
+    ['Matin Shaikh','Nageshwar Fertilizers','Beed','Maharashtra',5,5,100.0,2,40.0,87.5],
+    ['Matin Shaikh','SHREE VITTHAL AGRO AGENCIES','Beed','Maharashtra',32,4,12.5,15,46.9,87.5],
+    ['jogendra bhadu','MUMTAZ TRADING COMPANY','Barmer','Rajasthan',8,8,100.0,1,12.5,85.7],
+    ['jogendra bhadu','INDIAN TRADING COMPANY','Barmer','Rajasthan',40,8,20.0,18,45.0,85.7],
+    ['jogendra bhadu','DHARMENDRA AGRO CENTRE','Barmer','Rajasthan',18,3,16.7,10,55.6,85.7],
+    ['jogendra bhadu','M/S SAI KRIPA KRISHI SEWA KENDRA','Barmer','Rajasthan',14,2,14.3,6,42.9,85.7],
+    ['Abhay Narayan Verma','KISAN KHAD BHANDAR','Ghazipur','Uttar Pradesh',6,6,100.0,4,66.7,83.3],
+    ['Abhay Narayan Verma','M/S HARSH TRADERS','Ballia','Uttar Pradesh',17,6,35.3,12,70.6,83.3],
+    ['Abhay Narayan Verma','M/S RENUKA ENTERPRISES','Ballia','Uttar Pradesh',6,1,16.7,5,83.3,83.3],
+    ['Balram Singh','KUMAR BEEJ AND KHAD BHANDAR','Auraiya','Uttar Pradesh',20,15,75.0,5,25.0,75.0],
+    ['Balram Singh','Shree Shyam Beej Bhandar','Auraiya','Uttar Pradesh',11,6,54.5,6,54.5,75.0],
+    ['Balram Singh','KAMAL TRADERS','Auraiya','Uttar Pradesh',5,0,0.0,1,20.0,75.0],
+    ['Madhusudan Lodha','Mateshwari krishi seva kendra','Bhilwara','Rajasthan',6,6,100.0,2,33.3,72.1],
+    ['Madhusudan Lodha','CHARBHUJA KRISHI SEWA KENDRA','Bhilwara','Rajasthan',68,19,27.9,45,66.2,72.1],
+    ['Amit Kumar','AMAYARA AGRI JUNCTION','Meerut','Uttar Pradesh',8,8,100.0,1,12.5,71.0],
+    ['Amit Kumar','M/S KISAN SAINI BEEJ BHANDAR','Meerut','Uttar Pradesh',8,4,50.0,6,75.0,71.0],
+    ['Amit Kumar','AARVI BHADANA AGRI JUNCTION','Meerut','Uttar Pradesh',31,9,29.0,14,45.2,71.0],
+    ['Hakim Shaikh','MANGAL MURTI KRUSHI SEVA KENDRA','Solapur','Maharashtra',7,6,85.7,2,28.6,70.2],
+    ['Hakim Shaikh','Om Krushi Seva Kendra Rashin','Ahilyanagar','Maharashtra',33,10,30.3,12,36.4,70.2],
+    ['Hakim Shaikh','PANDHARPURE AGRO SERVICES','Solapur','Maharashtra',45,7,15.6,27,60.0,70.2],
+    ['Hakim Shaikh','MAULI KRUSHI SEVA KENDRA KANDAR','Solapur','Maharashtra',3,1,33.3,3,100.0,70.2],
+    ['ravikumar kumar ','MAHADEV KHAD BEEJ BHANDAR','Jodhpur','Rajasthan',16,14,87.5,8,50.0,68.9],
+    ['ravikumar kumar ','SHREE JASNATH AGRO SALES','Jodhpur','Rajasthan',9,8,88.9,2,22.2,68.9],
+    ['ravikumar kumar ','KISAN AGRO SOLUTION','Jodhpur','Rajasthan',26,20,76.9,12,46.2,68.9],
+    ['ravikumar kumar ','BHOMIYAJI AGRO SALES','Jodhpur','Rajasthan',10,7,70.0,7,70.0,68.9],
+    ['ravikumar kumar ','GANPATI KHAD BEEJ Bhandar','Jodhpur','Rajasthan',23,13,56.5,10,43.5,68.9],
+    ['ravikumar kumar ','PARWATI ENTERPRISES','Jodhpur','Rajasthan',35,16,45.7,23,65.7,68.9],
+    ['ravikumar kumar ','J P AGRO SALES SAMRAU','Jodhpur','Rajasthan',14,4,28.6,8,57.1,68.9],
+    ['ravikumar kumar ','NAGESHWAR AGRO SALES','Jodhpur','Rajasthan',5,1,20.0,4,80.0,68.9],
+    ['Narsingh Merta','MAHADEV TRADERS','Nagaur','Rajasthan',16,11,68.8,10,62.5,68.8],
+    ['Narsingh Merta','MAHAVEER KHAD BEEZ BHANDAR','Nagaur','Rajasthan',35,16,45.7,22,62.9,68.8],
+    ['Narsingh Merta','BABA RAMDEV KHAD BEEJ BHANDAR','Nagaur','Rajasthan',10,5,50.0,4,40.0,68.8],
+    ['Narsingh Merta','MERTA AGRO FARMER PRODUCER CO.','Nagaur','Rajasthan',13,4,30.8,12,92.3,68.8],
+    ['Narsingh Merta','SALASAR BALAJI KHAD BEEJ BHANDAR','Nagaur','Rajasthan',12,0,0.0,8,66.7,68.8],
+    ['Narsingh Merta','PAREEK AGENCY','Nagaur','Rajasthan',3,1,33.3,2,66.7,68.8],
+    ['Vishnu  Chaudhari majalgaon','Akshay Krushi Seva kendra Beed','Beed','Maharashtra',14,12,85.7,4,28.6,67.1],
+    ['Vishnu  Chaudhari majalgaon','DEEPAK KRUSHI SEWA KENDRA TAKARWAN','Beed','Maharashtra',59,11,18.6,34,57.6,67.1]
   ],
 
   // Tab 6 — System Health
@@ -2465,50 +2560,156 @@ function renderLmdTab() {
   </div>`;
   document.getElementById('lmd-hold').innerHTML = hh;
 
-  // ── LMD leaderboard table ──
-  // cols: [lmd_name(0), dvs_orders(1), fc_orders(2), dvs_delivered(3), dvs_rto(4),
-  //        dvs_rto_pct(5), fc_delivered(6), fc_rto(7), fc_rto_pct(8), dvs_hold(9)]
+  // ── H4: LMD leaderboard — real HOLD_BY_LMD from orderhistorymeta ──
+  // cols: [lmd_name(0), dvs_orders(1), hold_by_lmd(2), hold_pct(3),
+  //        delivered(4), del_pct(5), rto(6), rto_pct(7), stores_served(8)]
+  const holdAvg = (lb.reduce((a,r)=>a+r[3],0)/lb.length).toFixed(1);
   let tbl = `<div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap">
       <thead>
-      <tr style="background:#f8fafc">
-        <th style="padding:8px 10px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700">LMD Partner</th>
-        <th colspan="4" style="padding:8px 10px;text-align:center;font-size:10.5px;color:#16a34a;font-weight:700;border-left:2px solid #dcfce7;background:#f0fdf4">── DVS ──</th>
-        <th colspan="3" style="padding:8px 10px;text-align:center;font-size:10.5px;color:#d97706;font-weight:700;border-left:2px solid #fef3c7;background:#fffbeb">── FC ──</th>
-        <th style="padding:8px 10px;text-align:right;font-size:10.5px;color:#d97706;font-weight:700">RTO Gap</th>
-      </tr>
       <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
-        <th style="padding:2px 10px 6px;font-size:10px;color:#94a3b8">ranked by DVS orders ↓</th>
-        <th style="padding:2px 8px 6px;text-align:right;font-size:10px;color:#16a34a;border-left:2px solid #dcfce7;background:#f0fdf4">Orders</th>
-        <th style="padding:2px 8px 6px;text-align:right;font-size:10px;color:#16a34a;background:#f0fdf4">Del</th>
-        <th style="padding:2px 8px 6px;text-align:right;font-size:10px;color:#dc2626;background:#f0fdf4">RTO%</th>
-        <th style="padding:2px 8px 6px;text-align:right;font-size:10px;color:#dc2626;background:#f0fdf4">HOLD</th>
-        <th style="padding:2px 8px 6px;text-align:right;font-size:10px;color:#d97706;border-left:2px solid #fef3c7;background:#fffbeb">Orders</th>
-        <th style="padding:2px 8px 6px;text-align:right;font-size:10px;color:#d97706;background:#fffbeb">Del</th>
-        <th style="padding:2px 8px 6px;text-align:right;font-size:10px;color:#dc2626;background:#fffbeb">RTO%</th>
-        <th style="padding:2px 8px 6px;text-align:right;font-size:10px;color:#94a3b8">DVS−FC</th>
+        <th style="padding:7px 10px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700">LMD Partner<span style="font-weight:400;margin-left:6px;font-size:9.5px">(ranked by DVS orders ↓)</span></th>
+        <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#475569;font-weight:700">Orders</th>
+        <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#dc2626;font-weight:700">HOLD</th>
+        <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#dc2626;font-weight:700">HOLD%</th>
+        <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#16a34a;font-weight:700">Delivered</th>
+        <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#16a34a;font-weight:700">Del%</th>
+        <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#64748b;font-weight:700">RTO</th>
+        <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#64748b;font-weight:700">RTO%</th>
+        <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#7c3aed;font-weight:700">Stores</th>
       </tr></thead><tbody>`;
   lb.forEach(r => {
-    // flag: DVS RTO significantly worse than FC (LMD deprioritizing DVS)
-    const rtoGap  = (r[5] - r[8]).toFixed(1); // +ve = DVS RTO worse than FC
-    const flag    = parseFloat(rtoGap) > 8;
-    const rowBg   = flag ? 'background:#fff5f5' : '';
-    const gapCol  = parseFloat(rtoGap) > 8 ? '#dc2626' : parseFloat(rtoGap) > 3 ? '#d97706' : '#16a34a';
-    const holdCol = r[9] > 30 ? '#dc2626' : r[9] > 15 ? '#d97706' : '#475569';
+    const holdHigh = r[3] >= 50;
+    const holdMed  = r[3] >= 25 && r[3] < 50;
+    const holdCol  = holdHigh ? '#dc2626' : holdMed ? '#d97706' : '#16a34a';
+    const holdBadge = holdHigh
+      ? `<span style="display:inline-block;padding:1px 6px;border-radius:10px;background:#fef2f2;color:#dc2626;font-weight:800;font-size:11px">${r[3]}%</span>`
+      : holdMed
+      ? `<span style="display:inline-block;padding:1px 6px;border-radius:10px;background:#fffbeb;color:#d97706;font-weight:700;font-size:11px">${r[3]}%</span>`
+      : `<span style="color:#64748b;font-size:11px">${r[3]}%</span>`;
+    const delBadge = r[5] >= 70
+      ? `<span style="color:#16a34a;font-weight:700">${r[5]}%</span>`
+      : `<span style="color:#64748b">${r[5]}%</span>`;
+    const rtoFlag  = r[7] >= 35;
+    const rowBg    = holdHigh ? 'background:#fff8f8' : '';
+    const nameFlag = holdHigh ? '🔴 ' : holdMed ? '🟡 ' : '';
     tbl += `<tr style="border-bottom:1px solid #f1f5f9;${rowBg}">
-      <td style="padding:7px 10px;font-weight:600;color:#1a1a2e">${flag ? '🔴 ' : ''}${r[0]}</td>
-      <td style="padding:7px 8px;text-align:right;font-weight:700;color:#16a34a;border-left:2px solid #dcfce7;background:#f8fdf8">${fmt(r[1])}</td>
-      <td style="padding:7px 8px;text-align:right;background:#f8fdf8">${fmt(r[3])}</td>
-      <td style="padding:7px 8px;text-align:right;font-weight:700;color:#dc2626;background:#f8fdf8">${r[5]}%</td>
-      <td style="padding:7px 8px;text-align:right;font-weight:${r[9]>30?700:400};color:${holdCol};background:#f8fdf8">${r[9]}</td>
-      <td style="padding:7px 8px;text-align:right;color:#d97706;border-left:2px solid #fef3c7;background:#fffdf5">${fmt(r[2])}</td>
-      <td style="padding:7px 8px;text-align:right;background:#fffdf5">${fmt(r[6])}</td>
-      <td style="padding:7px 8px;text-align:right;font-weight:700;color:#dc2626;background:#fffdf5">${r[8]}%</td>
-      <td style="padding:7px 8px;text-align:right;font-weight:700;color:${gapCol}">${parseFloat(rtoGap)>0?'+':''}${rtoGap}pp</td>
+      <td style="padding:7px 10px;font-weight:600;color:#1a1a2e">${nameFlag}${r[0]}</td>
+      <td style="padding:7px 8px;text-align:right;font-weight:700;color:#1a1a2e">${fmt(r[1])}</td>
+      <td style="padding:7px 8px;text-align:right;font-weight:700;color:${holdCol}">${fmt(r[2])}</td>
+      <td style="padding:7px 8px;text-align:right">${holdBadge}</td>
+      <td style="padding:7px 8px;text-align:right">${fmt(r[4])}</td>
+      <td style="padding:7px 8px;text-align:right">${delBadge}</td>
+      <td style="padding:7px 8px;text-align:right;color:#64748b">${fmt(r[6])}</td>
+      <td style="padding:7px 8px;text-align:right;font-weight:${rtoFlag?700:400};color:${rtoFlag?'#dc2626':'#64748b'}">${r[7]}%</td>
+      <td style="padding:7px 8px;text-align:right;color:#7c3aed;font-weight:600">${r[8]}</td>
     </tr>`;
   });
-  tbl += '</tbody></table></div>';
+  tbl += `</tbody></table></div>
+  <div style="margin-top:8px;padding:7px 10px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:4px;font-size:10.5px;color:#7f1d1d;line-height:1.6">
+    🔴 Avg HOLD% across top-30 LMDs = <strong>${holdAvg}%</strong>. Ravikaran Singh blocks <strong>82.9%</strong> of 216 orders (7 stores).
+    Vikash Kumar Singh 64.1%, Dinesh mali 62.4% — these 3 alone hold ~400 packed orders in limbo.
+    🟡 = 25–49% hold rate &nbsp;|&nbsp; 🔴 = ≥50% hold rate.
+  </div>`;
   document.getElementById('lmd-table').innerHTML = tbl;
+  renderH5SelectivePicking();
+}
+
+function renderH5SelectivePicking() {
+  const d   = STATIC_DATA;
+  const sp  = d.selectivePicking;
+  const spd = d.selectivePickingDetail;
+
+  // Group detail rows by lmd_name for lookup
+  const detailByLmd = {};
+  spd.forEach(r => {
+    if (!detailByLmd[r[0]]) detailByLmd[r[0]] = [];
+    detailByLmd[r[0]].push(r);
+  });
+
+  // Summary table — all 30 LMDs
+  let html = `
+  <div style="margin-bottom:10px;padding:7px 10px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:4px;font-size:10.5px;color:#0c4a6e;line-height:1.6">
+    💡 <strong>Confirmed:</strong> LMD partners systematically pick up more from some stores than others.
+    Matin Shaikh holds 100% of orders at one Beed store while picking normally at another (87.5pp gap).
+    This exposes an informal priority queue the system is unaware of — some stores are consistently deprioritized.
+  </div>
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap">
+    <thead>
+    <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+      <th style="padding:7px 10px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700">LMD Partner<span style="font-weight:400;font-size:9.5px;margin-left:6px">(ranked by HOLD% variance ↓)</span></th>
+      <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#7c3aed;font-weight:700">Stores</th>
+      <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#475569;font-weight:700">Orders</th>
+      <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#dc2626;font-weight:700">Max HOLD%</th>
+      <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#16a34a;font-weight:700">Min HOLD%</th>
+      <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#d97706;font-weight:700">Variance</th>
+      <th style="padding:7px 8px;text-align:right;font-size:10.5px;color:#64748b;font-weight:700">Avg HOLD%</th>
+    </tr></thead><tbody>`;
+
+  sp.forEach((r, idx) => {
+    const varBig  = r[5] >= 70;
+    const varMed  = r[5] >= 50 && r[5] < 70;
+    const varCol  = varBig ? '#dc2626' : varMed ? '#d97706' : '#475569';
+    const varBg   = varBig ? 'background:#fff8f8' : '';
+    const details = detailByLmd[r[0]];
+    const hasDetail = details && details.length > 0;
+
+    html += `<tr style="border-bottom:1px solid #f1f5f9;${varBg};cursor:${hasDetail?'pointer':'default'}"
+      onclick="${hasDetail ? `toggleH5Detail('h5d-${idx}')` : ''}">
+      <td style="padding:7px 10px;font-weight:600;color:#1a1a2e">${hasDetail ? '▶ ' : ''}${r[0]}</td>
+      <td style="padding:7px 8px;text-align:right;color:#7c3aed;font-weight:600">${r[1]}</td>
+      <td style="padding:7px 8px;text-align:right">${fmt(r[2])}</td>
+      <td style="padding:7px 8px;text-align:right;font-weight:700;color:#dc2626">${r[3]}%</td>
+      <td style="padding:7px 8px;text-align:right;font-weight:700;color:#16a34a">${r[4]}%</td>
+      <td style="padding:7px 8px;text-align:right">
+        <span style="display:inline-block;padding:1px 7px;border-radius:10px;background:${varBig?'#fef2f2':varMed?'#fffbeb':'#f1f5f9'};color:${varCol};font-weight:800;font-size:11px">${r[5]}pp</span>
+      </td>
+      <td style="padding:7px 8px;text-align:right;color:#64748b">${r[6]}%</td>
+    </tr>`;
+
+    // Detail rows (hidden by default, shown for top-10 LMDs that have detail data)
+    if (hasDetail) {
+      html += `<tr id="h5d-${idx}" style="display:none"><td colspan="7" style="padding:0 0 6px 24px">
+        <table style="width:calc(100% - 24px);border-collapse:collapse;font-size:11px;background:#fafafa;border-radius:6px;overflow:hidden">
+          <tr style="background:#f1f5f9">
+            <th style="padding:5px 8px;text-align:left;color:#64748b;font-weight:600">Store</th>
+            <th style="padding:5px 8px;text-align:left;color:#64748b;font-weight:600">District</th>
+            <th style="padding:5px 6px;text-align:right;color:#64748b;font-weight:600">Orders</th>
+            <th style="padding:5px 6px;text-align:right;color:#dc2626;font-weight:600">HOLD%</th>
+            <th style="padding:5px 6px;text-align:right;color:#16a34a;font-weight:600">Del%</th>
+          </tr>`;
+      [...details].sort((a,b)=>b[6]-a[6]).forEach(dr => {
+        const dHigh = dr[6] >= 70;
+        const dMed  = dr[6] >= 30 && dr[6] < 70;
+        const dCol  = dHigh ? '#dc2626' : dMed ? '#d97706' : '#16a34a';
+        html += `<tr style="border-top:1px solid #e2e8f0">
+          <td style="padding:4px 8px;color:#374151;font-size:10.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${dr[1]}</td>
+          <td style="padding:4px 8px;color:#6b7280;font-size:10.5px">${dr[2]}</td>
+          <td style="padding:4px 6px;text-align:right">${dr[4]}</td>
+          <td style="padding:4px 6px;text-align:right;font-weight:700;color:${dCol}">${dr[6]}%</td>
+          <td style="padding:4px 6px;text-align:right;color:#16a34a">${dr[8]}%</td>
+        </tr>`;
+      });
+      html += `</table></td></tr>`;
+    }
+  });
+
+  html += `</tbody></table></div>`;
+  document.getElementById('lmd-h5').innerHTML = html;
+}
+
+function toggleH5Detail(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const isHidden = el.style.display === 'none';
+  el.style.display = isHidden ? 'table-row' : 'none';
+  // flip the ▶ arrow in the parent row
+  const prev = el.previousElementSibling;
+  if (prev) {
+    const td = prev.querySelector('td:first-child');
+    if (td) td.innerHTML = td.innerHTML.replace(isHidden ? '▶ ' : '▼ ', isHidden ? '▼ ' : '▶ ');
+  }
 }
 
 function renderOpsTab() {
