@@ -2768,7 +2768,7 @@ function renderH5SelectivePicking() {
     const labels   = ['S','M','T','W','T','F','S'];
     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     if (!dow || dow.every(v => v === 0)) {
-      return `<span style="font-size:9px;color:#dc2626;font-style:italic;white-space:nowrap">✖ never&nbsp;picked</span>`;
+      return `<span style="font-size:9px;color:#94a3b8;font-style:italic;white-space:nowrap" title="Pickup events exist but day pattern could not be computed — LMD–package join incomplete">pattern&nbsp;unknown</span>`;
     }
     const maxPct = Math.max(...dow);
     return dow.map((pct, i) => {
