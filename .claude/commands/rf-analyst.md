@@ -184,6 +184,37 @@ SELECT * FROM partners WHERE rn = 1
 | `address_district` | District |
 | `address_taluka` | Taluka |
 
+### Google Sheet — Rupifi Onboarding Tracker (Manual, Daily Updated)
+**File:** `1pBblSZATtXO-ussR7bs12mIjPPZ9zhnRS2xSSVMujUg` (Google Drive)
+**Sheet:** `RupiFi Onboarding` (gid=1058010114)
+
+This sheet is maintained **manually every day** by the Portfolio Manager. It is the **only source of lender-side credit limit and available balance** — this data does NOT exist in BigQuery.
+
+**Key columns:**
+
+| Column | Meaning |
+|---|---|
+| `Partner Id` | ✅ AgroStar `farmer_id` — join key to all BQ tables |
+| `CREDITLINE ID` | Rupifi's internal UUID for the credit line |
+| `BUSINESS ID` | Rupifi's internal business ID — **NOT the same as Partner Id** |
+| `LIMIT` | Total lender credit limit sanctioned for this partner (₹) |
+| `BALANCE` | **Available limit right now** — how much can be disbursed or BT'd today |
+| `CRM LIMIT` | AgroStar's OCP credit limit for this partner |
+| `STATUS` | ACTIVE / INACTIVE on Rupifi's platform |
+| `Agrostar Status` | ACTIVE / INACTIVE in AgroStar's system |
+| `CREATED ON` | Date partner was activated on Rupifi |
+| `Month` | Onboarding month label |
+
+**Critical rules:**
+- `BALANCE` is the **hard cap** on BT — you cannot push more invoices than the available `BALANCE`
+- `LIMIT - BALANCE` = amount currently outstanding with lender (already disbursed, not yet repaid)
+- `BALANCE = LIMIT` → fully available, nothing outstanding
+- `BALANCE = 0` → limit fully consumed, NO BT possible regardless of invoice eligibility
+- `BALANCE < 0` → overdrawn (should not happen but flag if seen)
+- Always use `Partner Id` (not `BUSINESS ID`) to join with BigQuery data
+
+**BT opportunity = eligible invoices (≤45 days, finbox IS NULL) capped by BALANCE from this sheet**
+
 ### `offline_team.okr_data_live` — Sales Territory
 Maps each partner to their territory and sales hierarchy.
 **Join:** `okr_data_live.farmer_id` = `institution.reference_customer_id`
@@ -527,6 +558,9 @@ ORDER BY total_partners DESC
 | BT is a daily running window | BT is not a one-time activation event. Portfolio Manager runs this scan every day — any RF partner with open lender limit + unpushed invoices ≤ 45 days old is a live opportunity. |
 | `wallet_user_id` → `farmer_id` join | `wallet_creditwallettransaction.wallet_user_id` = `csr_farmer.user_id` (NOT `farmer_id`). Always join via `csr_farmer` to get `reference_customer_id` for the partner. |
 | Always filter `cancelled = 0` | `cancelled = 1` entries are void/reversed — never include in any metric. |
+| Lender LIMIT & BALANCE not in BigQuery | `LIMIT` and `BALANCE` per partner live only in the Google Sheet tracker. For BT opportunity analysis, fetch the sheet first and cross-reference by `Partner Id`. BQ queries alone cannot enforce the BALANCE cap. |
+| `BUSINESS ID` ≠ `Partner Id` in Sheet | Rupifi's `BUSINESS ID` is their internal reference. Always use `Partner Id` column (= AgroStar `farmer_id`) to join sheet data with BigQuery. |
+| Sheet data is as-of today only | The sheet is updated daily — it reflects the current day's BALANCE. There is no historical BALANCE series in the sheet. |
 
 ---
 
