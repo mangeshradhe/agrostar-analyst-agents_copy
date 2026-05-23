@@ -5457,12 +5457,6 @@ function renderRestockTab() {
         ${card('#2563eb','B2B In Transit',s.b2b_in_transit,'#2563eb',`
           <div style="font-size:12px;color:#64748b;line-height:1.5">active B2B for all UNFULFILLABLE SKUs<br>
           <span style="color:#94a3b8;font-size:11px">no action needed</span></div>`)}
-        ${card('#ea580c','Ground Ops',s.ground_ops,'#c2410c',`
-          <div style="font-size:12px;color:#64748b;line-height:1.5">partner has stock but not packing<br>
-          <span style="color:#ea580c;font-size:11px;font-weight:600">→ call partner to pack</span></div>`)}
-        ${card('#0891b2','CC Team',s.cc_team,'#0e7490',`
-          <div style="font-size:12px;color:#64748b;line-height:1.5">82 confirm farmer · 95 rerouting failed<br>
-          <span style="color:#0891b2;font-size:11px;font-weight:600">→ call farmer / edit order / category team</span></div>`)}
       </div>
 
       <!-- Row 2: Actionable -->
@@ -5511,6 +5505,32 @@ function renderRestockTab() {
         ${card('#0f172a','Truly Stuck',s.truly_stuck,'#0f172a',`
           <div style="font-size:12px;color:#64748b;line-height:1.5">B2B was placed but cancelled<br>
           <span style="color:#0f172a;font-size:11px;font-weight:600">→ place new B2B or reroute</span></div>`)}
+
+        <!-- Partner / CC Actions — 493 combined -->
+        <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
+                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #64748b;
+                    padding:24px 32px;gap:6px;min-width:320px;flex:2">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">Partner / CC Actions</div>
+          <div style="font-size:48px;font-weight:900;color:#475569;line-height:1;letter-spacing:-1px">${fmt(s.ground_ops + s.cc_team)}</div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:4px">no UNFULFILLABLE restock issue — different action streams</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="flex:1;min-width:90px;background:#fff7ed;border-radius:10px;padding:10px 12px">
+              <div style="font-size:20px;font-weight:800;color:#c2410c">${fmt(s.ground_ops)}</div>
+              <div style="font-size:11px;color:#9a3412;font-weight:700;margin-top:2px">Ground Ops</div>
+              <div style="font-size:10px;color:#c2410c;margin-top:4px;line-height:1.5">Has stock, not packing<br>→ call partner to pack</div>
+            </div>
+            <div style="flex:1;min-width:90px;background:#ecfeff;border-radius:10px;padding:10px 12px">
+              <div style="font-size:20px;font-weight:800;color:#0e7490">${fmt(s.cc_team - 95)}</div>
+              <div style="font-size:11px;color:#155e75;font-weight:700;margin-top:2px">CC · Confirm Farmer</div>
+              <div style="font-size:10px;color:#0e7490;margin-top:4px;line-height:1.5">CONFIRM_ON_HOLD<br>→ call farmer to confirm</div>
+            </div>
+            <div style="flex:1;min-width:90px;background:#f0f9ff;border-radius:10px;padding:10px 12px">
+              <div style="font-size:20px;font-weight:800;color:#0369a1">95</div>
+              <div style="font-size:11px;color:#0c4a6e;font-weight:700;margin-top:2px">CC · Rerouting Failed</div>
+              <div style="font-size:10px;color:#0369a1;margin-top:4px;line-height:1.5">Edit order or<br>→ escalate to category</div>
+            </div>
+          </div>
+        </div>
 
       </div>
 
