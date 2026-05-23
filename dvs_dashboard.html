@@ -1557,8 +1557,9 @@ const STATIC_DATA = {
     restock_tomorrow: 219, restock_window_passed: 1396,
     b2b_in_transit: 499,
     // Actionable (orderhold-based, window passed, not FIFO-covered)
-    actionable: 410, system_tried_failed: 270, never_triggered: 140,
-    err_fc19: 260, err_cc19: 187, err_fc09: 108, err_cc17: 94, err_fc08: 67,
+    // system_tried_failed bifurcated at (store, sku, restock-window-date) level
+    actionable: 410, system_tried_failed: 246, never_triggered: 140,
+    stf_reroute: 167, stf_finance: 54, stf_supply: 25,
     // No orderhold entry — too fresh to classify
     no_orderhold: 487,
     oldest_days: 50, avg_days: 5.7
@@ -5497,25 +5498,32 @@ function renderRestockTab() {
           <div style="font-size:52px;font-weight:900;color:#d97706;line-height:1;letter-spacing:-1px">
             ${fmt(s.actionable)}
           </div>
-          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-            <div style="flex:1;min-width:120px;background:#fef3c7;border-radius:10px;padding:10px 14px">
-              <div style="font-size:20px;font-weight:800;color:#92400e">${fmt(s.system_tried_failed)}</div>
-              <div style="font-size:11px;color:#78350f;font-weight:600;margin-top:2px">System tried, failed</div>
-              <div style="font-size:10.5px;color:#92400e;margin-top:6px;line-height:1.6">
-                FC19: ${fmt(s.err_fc19)} orders<br>
-                CC19: ${fmt(s.err_cc19)} orders<br>
-                FC09: ${fmt(s.err_fc09)} orders<br>
-                CC17: ${fmt(s.err_cc17)} orders
+          <div style="font-size:11px;color:#92400e;margin-top:2px">
+            ${fmt(s.system_tried_failed)} system tried &amp; failed · ${fmt(s.never_triggered)} never triggered
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <div style="flex:1;min-width:100px;background:#fee2e2;border-radius:10px;padding:10px 14px">
+              <div style="font-size:22px;font-weight:800;color:#991b1b">${fmt(s.stf_reroute)}</div>
+              <div style="font-size:11px;color:#7f1d1d;font-weight:700;margin-top:2px">Re-route to FC</div>
+              <div style="font-size:10.5px;color:#991b1b;margin-top:5px;line-height:1.5">
+                OCP / credit block<br>
+                → Ops reroutes order
               </div>
             </div>
-            <div style="flex:1;min-width:120px;background:#fee2e2;border-radius:10px;padding:10px 14px">
-              <div style="font-size:20px;font-weight:800;color:#991b1b">${fmt(s.never_triggered)}</div>
-              <div style="font-size:11px;color:#7f1d1d;font-weight:600;margin-top:2px">Never triggered</div>
-              <div style="font-size:10.5px;color:#991b1b;margin-top:6px;line-height:1.6">
-                Restock window passed<br>
-                No B2B placed<br>
-                No failure log<br>
-                <strong>→ Central Ops to investigate</strong>
+            <div style="flex:1;min-width:100px;background:#fef3c7;border-radius:10px;padding:10px 14px">
+              <div style="font-size:22px;font-weight:800;color:#92400e">${fmt(s.stf_finance)}</div>
+              <div style="font-size:11px;color:#78350f;font-weight:700;margin-top:2px">Finance / Credit</div>
+              <div style="font-size:10.5px;color:#92400e;margin-top:5px;line-height:1.5">
+                Credit limit exhausted<br>
+                → Increase limit
+              </div>
+            </div>
+            <div style="flex:1;min-width:100px;background:#eff6ff;border-radius:10px;padding:10px 14px">
+              <div style="font-size:22px;font-weight:800;color:#1d4ed8">${fmt(s.stf_supply)}</div>
+              <div style="font-size:11px;color:#1e40af;font-weight:700;margin-top:2px">Supply</div>
+              <div style="font-size:10.5px;color:#1d4ed8;margin-top:5px;line-height:1.5">
+                FC inventory blocked<br>
+                → Adjust threshold
               </div>
             </div>
           </div>
@@ -5539,14 +5547,13 @@ function renderRestockTab() {
 
       </div>
 
-      <!-- Error code legend -->
+      <!-- Action routing legend -->
       <div style="margin-top:20px;background:#f8fafc;border-radius:12px;padding:14px 18px;
-                  display:flex;flex-wrap:wrap;gap:16px;align-items:center">
-        <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px">Error codes</span>
-        <span style="font-size:12px;color:#475569"><strong>FC19</strong> — FC inventory below threshold (Supply team)</span>
-        <span style="font-size:12px;color:#475569"><strong>CC19</strong> — Chronic OCP overdue &gt;90 days (Finance team)</span>
-        <span style="font-size:12px;color:#475569"><strong>FC09</strong> — Product not available at FC (Supply team)</span>
-        <span style="font-size:12px;color:#475569"><strong>CC17</strong> — Low credit limit (Finance team)</span>
+                  display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+        <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;align-self:center">Action routing</span>
+        <span style="font-size:12px;color:#475569"><strong style="color:#991b1b">Re-route to FC</strong> — CC15, CC16, CC19, CC20, CC21, CC22, CC04, FC03 · OCP block / product disabled / license gap</span>
+        <span style="font-size:12px;color:#475569"><strong style="color:#92400e">Finance / Credit</strong> — CC17 · credit limit exhausted · increase limit</span>
+        <span style="font-size:12px;color:#1d4ed8"><strong>Supply</strong> — FC08, FC09, FC19 · FC inventory at threshold · adjust or replenish</span>
       </div>
 
     </div>
