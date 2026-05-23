@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FLAGFILE=\"/tmp/agrostar_agents_$(date +%Y%m%d)\"; [ -f \"$FLAGFILE\" ] || (git -C \"$(git rev-parse --show-toplevel 2>/dev/null)\" pull --ff-only origin main -q 2>/dev/null && touch \"$FLAGFILE\")"
+          }
+        ]
+      }
+    ]
+  }
+}

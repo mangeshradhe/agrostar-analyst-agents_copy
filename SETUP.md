@@ -1,129 +1,80 @@
 # Agrostar Analyst Agents — Team Setup Guide
 
-There are two types of people:
-- **Users** — use the analysts to answer business questions (everyone)
-- **Editors** — update analyst context files (2–3 people only)
+These are AI analysts that answer business questions directly from our BigQuery data warehouse.
+Available analysts: `/dvs-analyst`, `/sales-analyst`, `/wms-analyst`, `/b2b-ledger`, `/saathi-app`
+
+> **Updates are automatic.** Once you set this up, any improvements pushed to the repo are silently pulled at the start of each session. No action needed from you.
 
 ---
 
-## Step 1 — Admin Only (Do Once)
+## Prerequisites (do once)
 
-> **Who does this:** Darpan (or whoever manages the Drive)
-
-1. Open [Google Drive](https://drive.google.com)
-2. Create a new **Shared Drive** (not "My Drive") called: `Agrostar Analyst Agents`
-3. Inside it, create this folder structure:
+1. **Install Claude Code CLI**
+   ```bash
+   npm install -g @anthropic-ai/claude-code
    ```
-   Agrostar Analyst Agents/
-   ├── CLAUDE.md
-   └── commands/
-       └── dvs-analyst.md
+   Then run `claude login` and sign in with your Anthropic account.
+
+2. **Set up BigQuery MCP** — this gives Claude access to our data warehouse
+   ```bash
+   claude mcp add bigquery -- npx -y @modelcontextprotocol/server-bigquery --project-id agrostar-data
    ```
-4. Upload `CLAUDE.md` and `dvs-analyst.md` from this repo into the correct folders
-5. Set permissions on the Shared Drive:
-   - **Editors** (people allowed to update files): `Content manager` role
-   - **Everyone else** (users): `Viewer` role
-6. Share the Drive link with the whole team
+   When prompted, authenticate with your Agrostar Google account.
+
+3. **Allow BigQuery queries in your local settings** — run this once to pre-approve the data tools:
+   ```bash
+   mkdir -p "$(pwd)/.claude"
+   ```
+   Then open `~/.claude/settings.json` and add your BigQuery MCP tool IDs to the allow list.
+   *(Ask Darpan if you need help finding your MCP tool IDs — run `claude mcp list` to see them.)*
 
 ---
 
-## Step 2 — Every Team Member (Do Once on Your Machine)
+## Setup (5 minutes)
 
-### 2a. Install Google Drive for Desktop
-Download and install: https://www.google.com/drive/download
-
-Sign in with your Agrostar Google account. This will sync the shared Drive to your computer automatically.
-
-### 2b. Find your local Drive path
-
-After installing, open **Finder** (Mac) or **File Explorer** (Windows) and locate the synced folder. It will look like one of these:
-
-**Mac:**
-```
-/Users/YOUR_NAME/Library/CloudStorage/GoogleDrive-YOUR_EMAIL/Shared drives/Agrostar Analyst Agents
-```
-
-**Windows:**
-```
-G:\Shared drives\Agrostar Analyst Agents
-```
-
-Copy this path — you'll need it in the next step.
-
-### 2c. Set up Claude Code to use the shared analysts
-
-Open **Terminal** (Mac) or **Command Prompt** (Windows) and run:
-
-**Mac:**
+**Step 1 — Clone the repo**
 ```bash
-mkdir -p ~/.claude/commands
-ln -sf "/Users/YOUR_NAME/Library/CloudStorage/GoogleDrive-YOUR_EMAIL/Shared drives/Agrostar Analyst Agents/commands/dvs-analyst.md" ~/.claude/commands/dvs-analyst.md
-ln -sf "/Users/YOUR_NAME/Library/CloudStorage/GoogleDrive-YOUR_EMAIL/Shared drives/Agrostar Analyst Agents/CLAUDE.md" ~/.claude/CLAUDE.md
+git clone https://github.com/rudra124/agrostar-analyst-agents.git
+cd agrostar-analyst-agents
 ```
 
-> Replace `YOUR_NAME` and `YOUR_EMAIL` with your actual values.
-
-**Windows (run as Administrator):**
-```cmd
-mklink "C:\Users\YOUR_NAME\.claude\commands\dvs-analyst.md" "G:\Shared drives\Agrostar Analyst Agents\commands\dvs-analyst.md"
-mklink "C:\Users\YOUR_NAME\.claude\CLAUDE.md" "G:\Shared drives\Agrostar Analyst Agents\CLAUDE.md"
-```
-
-**What this does:** Creates a live link — whenever an Editor updates the file in Google Drive, your local Claude automatically gets the latest version. No manual downloads ever.
-
-### 2d. Verify it worked
-
-Open Terminal and run:
+**Step 2 — Open Claude Code in this folder**
 ```bash
-ls ~/.claude/commands/
+claude
 ```
-You should see `dvs-analyst.md` listed.
+
+That's it. All analysts are now available as slash commands.
 
 ---
 
-## Step 3 — Using the Analyst (Everyone)
+## Using an Analyst
 
-1. Open **Terminal**
-2. Type `claude` and press Enter
-3. Type `/dvs-analyst` to activate the DVS analyst
-4. Ask your question in plain English
-
-**Examples:**
 ```
 /dvs-analyst
-> What is the health of the DVS program for May 2026?
-> Which stores have breached the 1-hour first action SLA this week?
-> Show me state-wise B2C fulfillment breakdown for this month
+> What is the overall DVS program health for May 2026?
+
+/sales-analyst
+> Show me top 10 SKUs by revenue this month
+
+/wms-analyst
+> Which warehouses have the highest pending order backlog?
 ```
+
+Ask in plain English. The analyst writes and runs the BigQuery SQL, then gives you the answer with insights.
 
 ---
 
-## Step 4 — Updating Analyst Context (Editors Only)
+## How Updates Work
 
-When you want to add new business context, fix a wrong table join, or add a new metric:
-
-1. Open the file directly in **Google Drive** (web browser)
-2. Edit it — Google Docs won't work, use the `.md` file directly or download → edit → re-upload
-3. Or if you have Google Drive for Desktop, edit the file in your synced local folder using any text editor (Notepad, TextEdit, VS Code)
-4. Save — the change syncs to everyone's machine within 30–60 seconds
-
-> **Rule:** Always test your change locally before saving to Drive. Ask a question through Claude that exercises the context you changed and verify the query and answer are correct.
+Every time you start a session (first prompt of the day), the agents **silently pull the latest version** from GitHub. If Darpan improves an analyst — better SQL, new metrics, new business context — you get it automatically with no action required.
 
 ---
 
 ## Adding a New Analyst
 
-When a new analyst is ready (e.g., `sales-analyst.md`):
-
-1. Editor adds the new `.md` file to the `commands/` folder in Drive
-2. Every team member runs ONE new command in Terminal:
-
-**Mac:**
-```bash
-ln -sf "/Users/YOUR_NAME/Library/CloudStorage/GoogleDrive-YOUR_EMAIL/Shared drives/Agrostar Analyst Agents/commands/sales-analyst.md" ~/.claude/commands/sales-analyst.md
-```
-
-After that, the new analyst auto-updates just like the others.
+When Darpan ships a new analyst (e.g. `/procurement-analyst`):
+- It appears automatically at the start of your next session
+- No setup required
 
 ---
 
@@ -131,7 +82,7 @@ After that, the new analyst auto-updates just like the others.
 
 | Problem | Fix |
 |---------|-----|
-| `/dvs-analyst` command not found | Run `ls ~/.claude/commands/` — if empty, redo Step 2c |
-| Getting old answers after an update | Wait 60 seconds for Drive to sync, then restart Claude |
-| Drive path not found | Open Finder → look for "Google Drive" in the left sidebar → right-click the file → "Get Info" to see the full path |
-| Symlink command fails on Mac | Make sure `~/.claude/commands/` folder exists: run `mkdir -p ~/.claude/commands` first |
+| Slash command not found | Make sure you opened `claude` from inside the `agrostar-analyst-agents` folder |
+| BigQuery permission denied | Re-run `claude mcp add bigquery ...` and re-authenticate |
+| Getting stale answers | Run `git pull origin main` manually in the folder, then restart claude |
+| MCP not connected | Run `claude mcp list` to verify the BigQuery MCP shows as connected |
