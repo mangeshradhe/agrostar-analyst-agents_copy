@@ -61,6 +61,187 @@ Use `LIKE '%Collection%'` or `REGEXP_CONTAINS` to filter by reason category.
 
 ---
 
+## B2B Revenue — `order_management_order`
+
+**⚠ This table is unpartitioned and expensive (~840 MB for a single month). Always filter by `DATE(created_on)` or `DATE(confirmed_on)`.**
+
+B2B orders: `initiating_source LIKE 'B2B%'`  
+Join to partner: `owner_id = okr_data_live.farmer_id`
+
+| Column | Notes |
+|--------|-------|
+| `grand_total` | Total order GMV (use for order-level revenue) |
+| `used_b2bcredit_cash` | Amount paid via B2B credit wallet (most B2B orders) |
+| `used_real_cash` | Amount paid from real cash wallet |
+| `online_paid_amount` | Pre-payment via UPI/bank |
+| `cash_on_delivery` | 1 = COD, 0 = prepaid/credit |
+| `status` / `unicommerce_status` | Always exclude: `cancelled`, `error`, `payment_pending`, `edited` |
+
+**For accurate invoiced revenue**, use `pristine_wms_views.invoiced_report` joined via `unicommerce_id → DisplayOrderCode`. `grand_total` is GMV at order creation and may differ from invoiced value.
+
+**Active B2B order status values:** `DELIVERED`, `DISPATCHED`, `DELIVERED_AT_GODOWN`, `RETURNED`
+
+Standard B2B order filter:
+```sql
+WHERE initiating_source LIKE 'B2B%'
+  AND DATE(created_on) BETWEEN @start_date AND @end_date
+  AND NOT REGEXP_CONTAINS(LOWER(COALESCE(status, '')), r'cancelled|mob_app_unverified|error|payment_pending|edited')
+  AND NOT REGEXP_CONTAINS(LOWER(COALESCE(unicommerce_status, '')), r'cancelled|mob_app_unverified|error|payment_pending|edited')
+```
+
+---
+
+## Collections — `wallet_transaction`
+
+For B2C / general wallet payments. Join: `wallet_user_id` = farmer/partner user ID.
+
+| Field | Values | Meaning |
+|-------|--------|---------|
+| `type` | `1` | Credit — money coming IN |
+| `type` | `0` | Debit — money going OUT |
+| `cash_type` | `0` | Real cash |
+| `cash_type` | `1` | Pseudo cash (cashback) |
+| `cancelled` | `0` | Valid transaction (always filter `cancelled = 0`) |
+
+**Key `reason_id` values for collections:**
+
+| reason_id | type | Description |
+|-----------|------|-------------|
+| `14` | 1 | **Main collection channel** — Pay Advance (UPI, bank transfer, VAN) |
+| `20` | 1 | KSY Payment (Krishi Seva Yojana) |
+| `3`  | 0 | Debit for order (wallet used to pay for order) |
+| `16` | 1 | Order cancelled — real cash credited back |
+| `5`  | 1 | Reverted real cash (cancellation reversal) |
+| `22` | 1/0 | AgroPlus PromoCode credit/debit |
+| `23` | 1 | Order referral commission |
+| `21` | 0 | Transfer between ledgers (advance → normal wallet) |
+
+**Collection query (Pay Advance inflows):**
+```sql
+SELECT
+  wallet_user_id AS partner_id,
+  DATE(created_on) AS collection_date,
+  SUM(amount) AS collected_amount,
+  COUNT(*) AS txn_count
+FROM `agrostar-data.prod_db_views.wallet_transaction`
+WHERE DATE(created_on) BETWEEN @start_date AND @end_date
+  AND type = 1
+  AND cash_type = 0
+  AND reason_id = 14
+  AND cancelled = 0
+GROUP BY 1, 2
+ORDER BY collection_date DESC
+```
+
+---
+
+## Collections — `wallet_creditwallettransaction` (B2B Credit Ledger)
+
+This is the **primary B2B payment ledger**. Partners buy on credit; payments come in here.  
+Join: `wallet_user_id` = `order_management_order.owner_id` (partner_id)
+
+| Column | Notes |
+|--------|-------|
+| `transaction_type` | `1` = credit (payment received / limit up), `0` = debit (purchase / limit down) |
+| `reason_id` | See table below |
+| `reference_type` | Source of transaction (ORDER, RAZORPAYPAYMENT_APP, VAN, MANUAL, WAC, etc.) |
+| `reference_id` | Order ID or payment reference |
+| `amount` | Transaction amount |
+| `due_date` | Credit due date (for order debits) |
+| `wallet_user_id` | Partner ID |
+| `cancelled` | Always filter `cancelled = 0` |
+
+**Key `reason_id` values:**
+
+| reason_id | transaction_type | reference_type | Meaning |
+|-----------|-----------------|----------------|---------|
+| `3` | 0 | ORDER | **Order debit** — credit used for purchase (GMV on credit) |
+| `4` | 1 | RAZORPAYPAYMENT_APP / VAN / MANUAL | **Cash collection** — payment received from partner |
+| `2` | 0 | MANUAL | Credit limit decreased (manual admin adjustment) |
+| `2` | 1 | MANUAL | Credit limit increased (manual admin adjustment) |
+| `5` | 1 | WAC | WAC return credit |
+| `9` | 1 | CASH_DISCOUNT | Cash discount earned (early payment) |
+| `10`| 0 | CASH_DISCOUNT | Interest charged for late payment |
+| `7` | 1 | TURNOVEROFFER | Turnover offer / TOD credit |
+| `6` | 0/1 | MANUAL | CN/freight credit or debit |
+| `25`| 1 | MANUAL | Security deposit adjusted |
+| `12`| 1 | ORDER | Advance amount used for order |
+| `34`| 0 | OFFERBREAK | Debit note for breaking offer terms |
+
+**B2B credit collection query (payments received from partners):**
+```sql
+SELECT
+  cwt.wallet_user_id AS partner_id,
+  okr.name AS partner_name,
+  okr.territory,
+  okr.cluster,
+  DATE(cwt.created_on) AS payment_date,
+  cwt.reference_type AS payment_channel,
+  cwt.reference_id,
+  cwt.amount AS collected_amount,
+  cwt.description
+FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` cwt
+LEFT JOIN `agrostar-data.offline_team.okr_data_live` okr
+  ON okr.farmer_id = cwt.wallet_user_id
+WHERE DATE(cwt.created_on) BETWEEN @start_date AND @end_date
+  AND cwt.transaction_type = 1
+  AND cwt.reason_id = 4
+  AND cwt.cancelled = 0
+ORDER BY payment_date DESC
+```
+
+**B2B credit exposure (orders placed on credit, not yet paid):**
+```sql
+-- Outstanding credit = SUM of order debits (reason_id=3) minus collections (reason_id=4)
+SELECT
+  cwt.wallet_user_id AS partner_id,
+  okr.name AS partner_name,
+  ROUND(SUM(CASE WHEN cwt.transaction_type = 0 AND cwt.reason_id = 3 THEN cwt.amount ELSE 0 END), 0) AS total_credit_used,
+  ROUND(SUM(CASE WHEN cwt.transaction_type = 1 AND cwt.reason_id = 4 THEN cwt.amount ELSE 0 END), 0) AS total_collected,
+  ROUND(SUM(CASE WHEN cwt.transaction_type = 0 AND cwt.reason_id = 3 THEN cwt.amount ELSE 0 END)
+      - SUM(CASE WHEN cwt.transaction_type = 1 AND cwt.reason_id = 4 THEN cwt.amount ELSE 0 END), 0) AS outstanding
+FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` cwt
+LEFT JOIN `agrostar-data.offline_team.okr_data_live` okr
+  ON okr.farmer_id = cwt.wallet_user_id
+WHERE DATE(cwt.created_on) BETWEEN @start_date AND @end_date
+  AND cwt.cancelled = 0
+GROUP BY 1, 2
+ORDER BY outstanding DESC
+```
+
+**P2P verification — did a partner actually pay after a visit promise?**
+```sql
+-- Check if payment came through within X days of P2P date
+WITH promises AS (
+  SELECT store_id, promise_to_pay_date__p2p_, amount_promised, tm, sm
+  FROM `agrostar-data.offline_team.store_visit_summary`
+  WHERE promise_to_pay_date__p2p_ IS NOT NULL AND amount_promised > 0
+    AND date BETWEEN @start_date AND @end_date
+),
+payments AS (
+  SELECT wallet_user_id AS partner_id, DATE(created_on) AS payment_date, SUM(amount) AS paid
+  FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction`
+  WHERE transaction_type = 1 AND reason_id = 4 AND cancelled = 0
+    AND DATE(created_on) BETWEEN @start_date AND DATE_ADD(@end_date, INTERVAL 30 DAY)
+  GROUP BY 1, 2
+)
+SELECT
+  p.store_id,
+  p.promise_to_pay_date__p2p_,
+  p.amount_promised,
+  p.tm,
+  COALESCE(SUM(pay.paid), 0) AS actual_collected,
+  CASE WHEN COALESCE(SUM(pay.paid), 0) >= p.amount_promised * 0.9 THEN 'PAID' ELSE 'OUTSTANDING' END AS status
+FROM promises p
+LEFT JOIN payments pay
+  ON pay.partner_id = p.store_id
+  AND pay.payment_date BETWEEN p.promise_to_pay_date__p2p_ AND DATE_ADD(p.promise_to_pay_date__p2p_, INTERVAL 7 DAY)
+GROUP BY 1, 2, 3, 4
+ORDER BY p.promise_to_pay_date__p2p_
+```
+
+---
+
 ## Key Joins
 
 ### Store territory hierarchy (from okr_data_live)
@@ -70,7 +251,7 @@ LEFT JOIN `agrostar-data.offline_team.okr_data_live` okr
 ```
 Use this to get: `okr.revised_state`, `okr.revised_district`, `okr.territory`, `okr.cluster`, `okr.name` (partner name), `okr.saathi_profiling`
 
-### Sales data (to measure visit impact)
+### Sales data (invoiced revenue — preferred over grand_total)
 ```sql
 JOIN `agrostar-data.pristine_wms_views.invoiced_report` inv
   ON CAST(o.unicommerce_id AS STRING) = inv.DisplayOrderCode
