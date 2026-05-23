@@ -5490,13 +5490,13 @@ function renderRestockTab() {
   const gtTotal = gtCols.reduce((s,v) => s+v, 0);
   const gtOldest = Math.max(...allHeatRows.map(r => r[6]));
   const gtRevenue = allHeatRows.reduce((s,r) => s+r[7], 0);
-  const heatGrandTotal = `<tr style="background:#1e293b;border-top:2px solid #334155">
-    <td style="padding:6px 14px;white-space:nowrap">
+  const heatGrandTotal = `<tr style="border-top:2px solid #334155">
+    <td style="padding:6px 14px;white-space:nowrap;background:#1e293b">
       <div style="font-size:12px;font-weight:800;color:#f1f5f9;letter-spacing:.3px">Grand Total <span style="font-size:10px;font-weight:400;color:#94a3b8">(heat table scope — see note)</span></div>
       <div style="font-size:10px;color:#94a3b8;font-weight:500;margin-top:2px">${fmtInr(gtRevenue)} · ↑${gtOldest}d oldest</div>
     </td>
     ${gtCols.map((v,i) => `<td style="padding:5px 10px;text-align:center;background:${colBg[i]};font-size:13px;font-weight:800;color:${colFg[i]}">${fmt(v)}</td>`).join('')}
-    <td style="padding:5px 10px;text-align:center;font-size:13px;font-weight:900;color:#f1f5f9">${fmt(gtTotal)}</td>
+    <td style="padding:5px 10px;text-align:center;font-size:13px;font-weight:900;color:#f1f5f9;background:#1e293b">${fmt(gtTotal)}</td>
   </tr>`;
 
   const stfOldest = Math.max(a.stf_reroute[6], a.stf_finance[6], a.stf_supply[6]);
