@@ -190,23 +190,56 @@ WHERE DATE(cwt.created_on) BETWEEN @start_date AND @end_date
 ORDER BY payment_date DESC
 ```
 
-**B2B credit exposure (orders placed on credit, not yet paid):**
+**B2B credit exposure (outstanding = unreconciled debit amount):**
+
+Outstanding is NOT simply debit − payments. The correct model:
+1. Each order debit (reason_id=3) creates an exposure record in `wallet_creditwallettransaction`
+2. That debit gets **reconciled** against any credit — cash payment (reason_id=4), WAC return (reason_id=5), cash discount (reason_id=9), credit note (reason_id=6/7/13), etc.
+3. **Reconciliation is tracked in `wallet_creditwallettransactionreconciliation`** — this table links debit transactions to the credits that settled them
+4. **Outstanding** = debit amount not yet reconciled (no matching entry in reconciliation table, or partially matched)
+5. **reason_id=4 (payments)** = actual cash received from the partner — useful separately to measure cash inflows, NOT a proxy for what's settled
+
 ```sql
--- Outstanding credit = SUM of order debits (reason_id=3) minus collections (reason_id=4)
+-- Outstanding exposure: debit transactions not yet reconciled
 SELECT
   cwt.wallet_user_id AS partner_id,
   okr.name AS partner_name,
-  ROUND(SUM(CASE WHEN cwt.transaction_type = 0 AND cwt.reason_id = 3 THEN cwt.amount ELSE 0 END), 0) AS total_credit_used,
-  ROUND(SUM(CASE WHEN cwt.transaction_type = 1 AND cwt.reason_id = 4 THEN cwt.amount ELSE 0 END), 0) AS total_collected,
-  ROUND(SUM(CASE WHEN cwt.transaction_type = 0 AND cwt.reason_id = 3 THEN cwt.amount ELSE 0 END)
-      - SUM(CASE WHEN cwt.transaction_type = 1 AND cwt.reason_id = 4 THEN cwt.amount ELSE 0 END), 0) AS outstanding
+  okr.territory,
+  okr.cluster,
+  COUNT(DISTINCT cwt.id) AS open_debit_txns,
+  ROUND(SUM(cwt.amount), 0) AS total_debit,
+  ROUND(SUM(COALESCE(rec.reconciled_amount, 0)), 0) AS reconciled_amount,
+  ROUND(SUM(cwt.amount) - SUM(COALESCE(rec.reconciled_amount, 0)), 0) AS outstanding
+FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` cwt
+LEFT JOIN `agrostar-data.prod_db_views.wallet_creditwallettransactionreconciliation` rec
+  ON rec.debit_transaction_id = cwt.id
+LEFT JOIN `agrostar-data.offline_team.okr_data_live` okr
+  ON okr.farmer_id = cwt.wallet_user_id
+WHERE cwt.transaction_type = 0   -- debits only
+  AND cwt.reason_id = 3          -- order debits only
+  AND cwt.cancelled = 0
+GROUP BY 1, 2, 3, 4
+ORDER BY outstanding DESC
+```
+
+**Cash collections separately (actual money received):**
+```sql
+-- How much real cash has come in from each partner (irrespective of reconciliation)
+SELECT
+  cwt.wallet_user_id AS partner_id,
+  okr.name AS partner_name,
+  DATE(cwt.created_on) AS payment_date,
+  cwt.reference_type AS channel,   -- RAZORPAYPAYMENT_APP / VAN / MANUAL
+  SUM(cwt.amount) AS cash_received
 FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` cwt
 LEFT JOIN `agrostar-data.offline_team.okr_data_live` okr
   ON okr.farmer_id = cwt.wallet_user_id
 WHERE DATE(cwt.created_on) BETWEEN @start_date AND @end_date
+  AND cwt.transaction_type = 1
+  AND cwt.reason_id = 4
   AND cwt.cancelled = 0
-GROUP BY 1, 2
-ORDER BY outstanding DESC
+GROUP BY 1, 2, 3, 4
+ORDER BY payment_date DESC
 ```
 
 **P2P verification — did a partner actually pay after a visit promise?**
