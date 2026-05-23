@@ -5561,19 +5561,22 @@ function renderRestockTab() {
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
             <div style="flex:1;min-width:90px;background:#fee2e2;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#991b1b">${fmt(s.stf_reroute)}</div>
-              <div style="font-size:11px;color:#7f1d1d;font-weight:700;margin-top:2px">Re-route to FC</div>
+              <div style="font-size:10px;font-weight:700;color:#991b1b;margin-top:1px">${fmtInr(a.stf_reroute[7])}</div>
+              <div style="font-size:11px;color:#7f1d1d;font-weight:700;margin-top:4px">Re-route to FC</div>
               <div style="font-size:10px;color:#991b1b;margin-top:4px;line-height:1.5">OCP / credit block<br>→ Ops reroutes</div>
               ${subAge(a.stf_reroute[6])}
             </div>
             <div style="flex:1;min-width:90px;background:#fef3c7;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#92400e">${fmt(s.stf_finance)}</div>
-              <div style="font-size:11px;color:#78350f;font-weight:700;margin-top:2px">Finance</div>
+              <div style="font-size:10px;font-weight:700;color:#92400e;margin-top:1px">${fmtInr(a.stf_finance[7])}</div>
+              <div style="font-size:11px;color:#78350f;font-weight:700;margin-top:4px">Finance</div>
               <div style="font-size:10px;color:#92400e;margin-top:4px;line-height:1.5">Credit limit<br>→ Increase limit</div>
               ${subAge(a.stf_finance[6])}
             </div>
             <div style="flex:1;min-width:90px;background:#eff6ff;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#1d4ed8">${fmt(s.stf_supply)}</div>
-              <div style="font-size:11px;color:#1e40af;font-weight:700;margin-top:2px">Supply</div>
+              <div style="font-size:10px;font-weight:700;color:#1d4ed8;margin-top:1px">${fmtInr(a.stf_supply[7])}</div>
+              <div style="font-size:11px;color:#1e40af;font-weight:700;margin-top:4px">Supply</div>
               <div style="font-size:10px;color:#1d4ed8;margin-top:4px;line-height:1.5">FC threshold<br>→ Adjust / replenish</div>
               ${subAge(a.stf_supply[6])}
             </div>
@@ -5608,19 +5611,22 @@ function renderRestockTab() {
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
             <div style="flex:1;min-width:90px;background:#fff7ed;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#c2410c">${fmt(s.ground_ops)}</div>
-              <div style="font-size:11px;color:#9a3412;font-weight:700;margin-top:2px">Ground Ops</div>
+              <div style="font-size:10px;font-weight:700;color:#c2410c;margin-top:1px">${fmtInr(a.ground_ops[7])}</div>
+              <div style="font-size:11px;color:#9a3412;font-weight:700;margin-top:4px">Ground Ops</div>
               <div style="font-size:10px;color:#c2410c;margin-top:4px;line-height:1.5">Has stock, not packing<br>→ call partner to pack</div>
               ${subAge(a.ground_ops[6])}
             </div>
             <div style="flex:1;min-width:90px;background:#ecfeff;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#0e7490">${fmt(s.cc_team - 95)}</div>
-              <div style="font-size:11px;color:#155e75;font-weight:700;margin-top:2px">CC · Confirm Farmer</div>
+              <div style="font-size:10px;font-weight:700;color:#0e7490;margin-top:1px">${fmtInr(a.cc_confirm[7])}</div>
+              <div style="font-size:11px;color:#155e75;font-weight:700;margin-top:4px">CC · Confirm Farmer</div>
               <div style="font-size:10px;color:#0e7490;margin-top:4px;line-height:1.5">CONFIRM_ON_HOLD<br>→ call farmer to confirm</div>
               ${subAge(a.cc_confirm[6])}
             </div>
             <div style="flex:1;min-width:90px;background:#f0f9ff;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#0369a1">95</div>
-              <div style="font-size:11px;color:#0c4a6e;font-weight:700;margin-top:2px">CC · Rerouting Failed</div>
+              <div style="font-size:10px;font-weight:700;color:#0369a1;margin-top:1px">${fmtInr(a.cc_rerouting[7])}</div>
+              <div style="font-size:11px;color:#0c4a6e;font-weight:700;margin-top:4px">CC · Rerouting Failed</div>
               <div style="font-size:10px;color:#0369a1;margin-top:4px;line-height:1.5">Edit order or<br>→ escalate to category</div>
               ${subAge(a.cc_rerouting[6])}
             </div>
