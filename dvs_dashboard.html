@@ -1553,9 +1553,14 @@ const STATIC_DATA = {
 
   // ── RESTOCK HEALTH TAB DATA (snapshot: 2026-05-23) ──
   restockSummary: {
-    stores: 497, orders: 1664, skus: 4732,
-    in_transit: 1059, restocked: 112, fc_no_stock: 448,
-    restock_failed: 747, not_triggered: 2366,
+    stores: 497, orders: 1615, skus: 4732,
+    restock_tomorrow: 219, restock_window_passed: 1396,
+    b2b_in_transit: 499,
+    // Actionable (orderhold-based, window passed, not FIFO-covered)
+    actionable: 410, system_tried_failed: 270, never_triggered: 140,
+    err_fc19: 260, err_cc19: 187, err_fc09: 108, err_cc17: 94, err_fc08: 67,
+    // No orderhold entry — too fresh to classify
+    no_orderhold: 487,
     oldest_days: 50, avg_days: 5.7
   },
 
@@ -5420,254 +5425,136 @@ function renderPipelinePlan(sf) {
 // ══════════════════════════════════════════════════════════
 //  RESTOCK HEALTH TAB
 // ══════════════════════════════════════════════════════════
-let _restockFilters = { state: 'ALL', status: 'ALL' };
-let _restockExpanded = {};
-
 function renderRestockTab() {
-  const d = STATIC_DATA;
-  const s = d.restockSummary;
-  const stores = d.restockStores || [];
-  const orders = d.restockOrders || [];
+  const s = STATIC_DATA.restockSummary;
 
-  // Group orders by store_code
-  const ordersByStore = {};
-  orders.forEach(r => {
-    const sc = r[0];
-    if (!ordersByStore[sc]) ordersByStore[sc] = [];
-    ordersByStore[sc].push(r);
-  });
+  const fmt = n => n.toLocaleString('en-IN');
 
-  // ── Summary cards ──
-  function summaryCard(label, value, sub, borderColor, bgColor, textColor, prominent) {
-    const padding = prominent ? '18px 20px' : '14px 18px';
-    const valSize = prominent ? '28px' : '22px';
-    const border = prominent ? `3px solid ${borderColor}` : `3px solid ${borderColor}`;
-    return `<div style="background:#fff;border-radius:10px;padding:${padding};box-shadow:0 1px 4px rgba(0,0,0,.08);border-top:${border};background:${bgColor || '#fff'};flex:1;min-width:160px">
-      <div style="font-size:10.5px;font-weight:700;color:${textColor||'#94a3b8'};text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${label}</div>
-      <div style="font-size:${valSize};font-weight:800;color:${textColor || '#0f172a'};line-height:1.1">${value}</div>
-      <div style="font-size:11px;color:${textColor ? textColor+'cc' : '#64748b'};margin-top:5px">${sub}</div>
-    </div>`;
-  }
+  const html = `
+    <div style="padding:28px 32px">
 
-  let html = `<div style="padding:16px 28px 0">`;
-
-  // 5 summary cards
-  html += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
-    ${summaryCard('Stores with ON_HOLD', fmt(s.stores), '529 stores have ≥1 blocked order', '#2563eb', '#eff6ff', '#1e3a8a', false)}
-    ${summaryCard('Total ON_HOLD Orders', fmt(s.orders), `${fmt(s.skus)} SKUs blocked`, '#7c3aed', '#f5f3ff', '#4c1d95', false)}
-    ${summaryCard('In Transit (B2B)', fmt(s.in_transit), 'Restock on the way — monitor', '#2563eb', '#fff', '#2563eb', false)}
-    ${summaryCard('FC Has No Stock', fmt(s.fc_no_stock), 'Escalate supply chain now', '#dc2626', '#fff1f2', '#991b1b', false)}
-    ${summaryCard('NOT TRIGGERED', fmt(s.not_triggered), 'No restock attempt — biggest gap', '#991b1b', '#fef2f2', '#7f1d1d', true)}
-  </div>`;
-
-  // Restock failed + restocked secondary row
-  html += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
-    <div style="background:#fff;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-top:3px solid #d97706;flex:1">
-      <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px">Restock Failed</div>
-      <div style="font-size:20px;font-weight:800;color:#92400e">${fmt(s.restock_failed)}</div>
-      <div style="font-size:11px;color:#64748b">OCP / credit / disabled SKU blocked auto-restock</div>
-    </div>
-    <div style="background:#fff;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-top:3px solid #16a34a;flex:1">
-      <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px">Restocked (Ready to Pack)</div>
-      <div style="font-size:20px;font-weight:800;color:#166534">${fmt(s.restocked)}</div>
-      <div style="font-size:11px;color:#64748b">B2B delivered to store — pack now</div>
-    </div>
-    <div style="background:#fff;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-top:3px solid #64748b;flex:2">
-      <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Age of Holds</div>
-      <div style="display:flex;align-items:baseline;gap:20px;margin-top:6px">
-        <div><div style="font-size:20px;font-weight:800;color:#dc2626">${s.oldest_days}d</div><div style="font-size:11px;color:#64748b">oldest hold</div></div>
-        <div><div style="font-size:20px;font-weight:800;color:#d97706">${s.avg_days}d</div><div style="font-size:11px;color:#64748b">avg hold</div></div>
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:28px">
+        <span style="font-size:18px;font-weight:800;color:#0f172a">Restock Health</span>
+        <span style="font-size:12px;color:#94a3b8;font-weight:500">FY27 · Apr 1 – May 23, 2026 · orders currently ON_HOLD</span>
       </div>
+
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
+
+        <!-- Widget 1: Total ON_HOLD -->
+        <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
+                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #dc2626;
+                    padding:28px 40px;gap:8px;min-width:280px">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">
+            Orders ON_HOLD
+          </div>
+          <div style="font-size:52px;font-weight:900;color:#0f172a;line-height:1;letter-spacing:-1px">
+            ${fmt(s.orders)}
+          </div>
+          <div style="font-size:14px;color:#64748b;font-weight:500;margin-top:4px">
+            across&nbsp;<strong style="color:#0f172a">${fmt(s.stores)}</strong>&nbsp;stores
+          </div>
+        </div>
+
+        <!-- Widget 2: Restock tomorrow -->
+        <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
+                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #16a34a;
+                    padding:28px 40px;gap:8px;min-width:280px">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">
+            Restock Tomorrow
+          </div>
+          <div style="font-size:52px;font-weight:900;color:#16a34a;line-height:1;letter-spacing:-1px">
+            ${fmt(s.restock_tomorrow)}
+          </div>
+          <div style="font-size:13px;color:#64748b;font-weight:500;margin-top:4px;line-height:1.5">
+            marked ON_HOLD after 3:30 PM today<br>
+            <span style="color:#94a3b8;font-size:11.5px">auto-restock fires tomorrow · no action needed</span>
+          </div>
+        </div>
+
+        <!-- Widget 3: B2B In Transit -->
+        <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
+                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #2563eb;
+                    padding:28px 40px;gap:8px;min-width:280px">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">
+            B2B Restock In Transit
+          </div>
+          <div style="font-size:52px;font-weight:900;color:#2563eb;line-height:1;letter-spacing:-1px">
+            ${fmt(s.b2b_in_transit)}
+          </div>
+          <div style="font-size:13px;color:#64748b;font-weight:500;margin-top:4px;line-height:1.5">
+            all UNFULFILLABLE SKUs + quantities covered<br>
+            <span style="color:#94a3b8;font-size:11.5px">FIFO-allocated · no action needed</span>
+          </div>
+        </div>
+
+        <!-- Widget 4: Actionable — needs attention -->
+        <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
+                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #d97706;
+                    padding:28px 40px;gap:8px;min-width:320px">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">
+            Needs Action
+          </div>
+          <div style="font-size:52px;font-weight:900;color:#d97706;line-height:1;letter-spacing:-1px">
+            ${fmt(s.actionable)}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <div style="flex:1;min-width:120px;background:#fef3c7;border-radius:10px;padding:10px 14px">
+              <div style="font-size:20px;font-weight:800;color:#92400e">${fmt(s.system_tried_failed)}</div>
+              <div style="font-size:11px;color:#78350f;font-weight:600;margin-top:2px">System tried, failed</div>
+              <div style="font-size:10.5px;color:#92400e;margin-top:6px;line-height:1.6">
+                FC19: ${fmt(s.err_fc19)} orders<br>
+                CC19: ${fmt(s.err_cc19)} orders<br>
+                FC09: ${fmt(s.err_fc09)} orders<br>
+                CC17: ${fmt(s.err_cc17)} orders
+              </div>
+            </div>
+            <div style="flex:1;min-width:120px;background:#fee2e2;border-radius:10px;padding:10px 14px">
+              <div style="font-size:20px;font-weight:800;color:#991b1b">${fmt(s.never_triggered)}</div>
+              <div style="font-size:11px;color:#7f1d1d;font-weight:600;margin-top:2px">Never triggered</div>
+              <div style="font-size:10.5px;color:#991b1b;margin-top:6px;line-height:1.6">
+                Restock window passed<br>
+                No B2B placed<br>
+                No failure log<br>
+                <strong>→ Central Ops to investigate</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Widget 5: No orderhold entry — too fresh -->
+        <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
+                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #94a3b8;
+                    padding:28px 40px;gap:8px;min-width:260px">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">
+            Pending Classification
+          </div>
+          <div style="font-size:52px;font-weight:900;color:#64748b;line-height:1;letter-spacing:-1px">
+            ${fmt(s.no_orderhold)}
+          </div>
+          <div style="font-size:13px;color:#64748b;font-weight:500;margin-top:4px;line-height:1.5">
+            no UNFULFILLABLE declaration yet<br>
+            <span style="color:#94a3b8;font-size:11.5px">partner still deciding · check back in a few hours</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Error code legend -->
+      <div style="margin-top:20px;background:#f8fafc;border-radius:12px;padding:14px 18px;
+                  display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+        <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px">Error codes</span>
+        <span style="font-size:12px;color:#475569"><strong>FC19</strong> — FC inventory below threshold (Supply team)</span>
+        <span style="font-size:12px;color:#475569"><strong>CC19</strong> — Chronic OCP overdue &gt;90 days (Finance team)</span>
+        <span style="font-size:12px;color:#475569"><strong>FC09</strong> — Product not available at FC (Supply team)</span>
+        <span style="font-size:12px;color:#475569"><strong>CC17</strong> — Low credit limit (Finance team)</span>
+      </div>
+
     </div>
-    <div style="background:#fffbeb;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:3px solid #d97706;flex:2;font-size:11.5px;color:#78350f;line-height:1.7">
-      <strong>52% of blocked SKUs (2,659) have no restock trigger at all.</strong> These orders are silently waiting.
-      Supply chain must investigate why auto_restock_logs is not firing for these SKUs.
-    </div>
-  </div>`;
-
-  // ── Filter bar ──
-  const states = ['ALL','Maharashtra','Madhya Pradesh','Rajasthan','Uttar Pradesh','Gujarat'];
-  const stateLabels = {'ALL':'All States','Maharashtra':'MH','Madhya Pradesh':'MP','Rajasthan':'RJ','Uttar Pradesh':'UP','Gujarat':'GJ'};
-  const statusOpts = [
-    {val:'ALL', label:'All'},
-    {val:'FC_NO_STOCK', label:'Has FC No Stock'},
-    {val:'NOT_TRIGGERED', label:'Has Not Triggered'},
-    {val:'RESTOCK_FAILED', label:'Has Restock Failed'}
-  ];
-
-  html += `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 16px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:6px">
-      <span style="font-size:10.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">State</span>
-      ${states.map(st => `<span onclick="restockFilterState('${st}',this)" data-rst-state="${st}"
-        style="padding:4px 12px;border-radius:20px;border:1.5px solid ${_restockFilters.state===st?'#0f172a':'#e2e8f0'};background:${_restockFilters.state===st?'#0f172a':'#fff'};color:${_restockFilters.state===st?'#fff':'#475569'};cursor:pointer;font-size:11.5px;font-weight:600;user-select:none">${stateLabels[st]||st}</span>`).join('')}
-    </div>
-    <div style="width:1px;height:22px;background:#e2e8f0"></div>
-    <div style="display:flex;align-items:center;gap:6px">
-      <span style="font-size:10.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Filter</span>
-      ${statusOpts.map(o => `<span onclick="restockFilterStatus('${o.val}',this)" data-rst-status="${o.val}"
-        style="padding:4px 12px;border-radius:20px;border:1.5px solid ${_restockFilters.status===o.val?'#0f172a':'#e2e8f0'};background:${_restockFilters.status===o.val?'#0f172a':'#fff'};color:${_restockFilters.status===o.val?'#fff':'#475569'};cursor:pointer;font-size:11.5px;font-weight:600;user-select:none">${o.label}</span>`).join('')}
-    </div>
-  </div>`;
-
-  // ── Store table ──
-  // Apply filters
-  let filteredStores = stores.filter(r => {
-    if (_restockFilters.state !== 'ALL' && r[2] !== _restockFilters.state) return false;
-    if (_restockFilters.status === 'FC_NO_STOCK' && r[8] === 0) return false;
-    if (_restockFilters.status === 'NOT_TRIGGERED' && r[10] === 0) return false;
-    if (_restockFilters.status === 'RESTOCK_FAILED' && r[9] === 0) return false;
-    return true;
-  });
-
-  html += `<div style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;margin-bottom:20px">
-    <div style="padding:14px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px">Store-Level ON_HOLD Detail — ${filteredStores.length} stores</span>
-      <span style="font-size:11px;color:#94a3b8">Click a row to see order-level breakdown</span>
-    </div>
-    <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead>
-        <tr style="background:#f8fafc;position:sticky;top:0;z-index:1">
-          <th style="padding:8px 10px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">Store</th>
-          <th style="padding:8px 10px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">State</th>
-          <th style="padding:8px 10px;text-align:left;font-size:10.5px;color:#64748b;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">District</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10.5px;color:#7c3aed;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">ON_HOLD Orders</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10.5px;color:#64748b;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">SKUs</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10.5px;color:#2563eb;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">In Transit</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10.5px;color:#dc2626;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">FC No Stock</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10.5px;color:#d97706;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">Failed</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10.5px;color:#991b1b;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">Not Triggered</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10.5px;color:#64748b;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">Max Wait</th>
-          <th style="padding:8px 10px;text-align:center;font-size:10.5px;color:#64748b;font-weight:700;white-space:nowrap;border-bottom:2px solid #e2e8f0">Action</th>
-        </tr>
-      </thead>
-      <tbody id="restock-tbody">`;
-
-  filteredStores.forEach(r => {
-    const [sc, sname, state, district, orders_n, total_skus, in_transit, restocked, fc_no_stock, restock_failed, not_triggered, max_days, avg_days, top_reason] = r;
-    const isExpanded = _restockExpanded[sc];
-
-    // Action badge
-    let action = '';
-    if (fc_no_stock > 0) {
-      action = `<span style="background:#fee2e2;color:#991b1b;padding:3px 8px;border-radius:12px;font-size:10.5px;font-weight:700;white-space:nowrap">🔴 Escalate FC</span>`;
-    } else if (restock_failed > 0) {
-      action = `<span style="background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:12px;font-size:10.5px;font-weight:700;white-space:nowrap">⚠️ Fix Block</span>`;
-    } else if (not_triggered > 0) {
-      action = `<span style="background:#fef2f2;color:#7f1d1d;padding:3px 8px;border-radius:12px;font-size:10.5px;font-weight:700;white-space:nowrap">🚨 Trigger Restock</span>`;
-    } else if (in_transit > 0) {
-      action = `<span style="background:#eff6ff;color:#1e40af;padding:3px 8px;border-radius:12px;font-size:10.5px;font-weight:700;white-space:nowrap">✅ Monitor</span>`;
-    }
-
-    // Status mini bar for quick visual breakdown
-    const totalBars = total_skus || 1;
-    const barHtml = `<div style="display:flex;gap:2px;align-items:center;height:8px;min-width:60px">
-      ${in_transit > 0 ? `<div style="flex:${in_transit};background:#2563eb;border-radius:2px;height:100%" title="In Transit: ${in_transit}"></div>` : ''}
-      ${restocked > 0 ? `<div style="flex:${restocked};background:#16a34a;border-radius:2px;height:100%" title="Restocked: ${restocked}"></div>` : ''}
-      ${fc_no_stock > 0 ? `<div style="flex:${fc_no_stock};background:#dc2626;border-radius:2px;height:100%" title="FC No Stock: ${fc_no_stock}"></div>` : ''}
-      ${restock_failed > 0 ? `<div style="flex:${restock_failed};background:#d97706;border-radius:2px;height:100%" title="Failed: ${restock_failed}"></div>` : ''}
-      ${not_triggered > 0 ? `<div style="flex:${not_triggered};background:#991b1b;border-radius:2px;height:100%" title="Not Triggered: ${not_triggered}"></div>` : ''}
-    </div>`;
-
-    const rowBg = isExpanded ? '#f8fafc' : '#fff';
-    const maxWaitColor = max_days >= 20 ? '#dc2626' : max_days >= 10 ? '#d97706' : '#64748b';
-
-    html += `<tr onclick="toggleRestockStore('${sc}')" style="cursor:pointer;background:${rowBg};border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='${isExpanded?'#f8fafc':'#fff'}'">
-      <td style="padding:8px 10px;font-weight:600;color:#0f172a;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-        ${isExpanded ? '▼' : '▶'} <span style="font-size:10px;color:#94a3b8">#${sc}</span><br>
-        <span style="font-size:11.5px">${sname}</span>
-      </td>
-      <td style="padding:8px 10px;color:#475569">${state}</td>
-      <td style="padding:8px 10px;color:#64748b;text-transform:capitalize">${district}</td>
-      <td style="padding:8px 10px;text-align:right;font-weight:700;color:#7c3aed">${orders_n}</td>
-      <td style="padding:8px 10px;text-align:right;color:#475569">${total_skus}${barHtml}</td>
-      <td style="padding:8px 10px;text-align:right;color:#2563eb;font-weight:${in_transit>0?'700':'400'}">${in_transit || '—'}</td>
-      <td style="padding:8px 10px;text-align:right;color:${fc_no_stock>0?'#dc2626':'#94a3b8'};font-weight:${fc_no_stock>0?'700':'400'}">${fc_no_stock || '—'}</td>
-      <td style="padding:8px 10px;text-align:right;color:${restock_failed>0?'#d97706':'#94a3b8'};font-weight:${restock_failed>0?'700':'400'}">${restock_failed || '—'}</td>
-      <td style="padding:8px 10px;text-align:right;color:${not_triggered>0?'#991b1b':'#94a3b8'};font-weight:${not_triggered>0?'700':'400'}">${not_triggered || '—'}</td>
-      <td style="padding:8px 10px;text-align:right;font-weight:700;color:${maxWaitColor}">${max_days}d</td>
-      <td style="padding:8px 10px;text-align:center">${action}</td>
-    </tr>`;
-
-    // Drilldown rows
-    if (isExpanded) {
-      const storeOrders = ordersByStore[sc] || [];
-      const statusStyle = {
-        'B2B_IN_TRANSIT': {bg:'#eff6ff', color:'#1e40af', label:'In Transit'},
-        'RESTOCKED':      {bg:'#f0fdf4', color:'#15803d', label:'Restocked'},
-        'FC_NO_STOCK':    {bg:'#fee2e2', color:'#991b1b', label:'FC No Stock'},
-        'RESTOCK_FAILED': {bg:'#fef3c7', color:'#92400e', label:'Restock Failed'},
-        'NOT_TRIGGERED':  {bg:'#fef2f2', color:'#7f1d1d', label:'Not Triggered'}
-      };
-
-      if (storeOrders.length === 0) {
-        html += `<tr style="background:#fafafa"><td colspan="11" style="padding:10px 20px;font-size:11.5px;color:#94a3b8;font-style:italic">No order-level data for this store</td></tr>`;
-      } else {
-        // Header for drilldown
-        html += `<tr style="background:#f0f4ff">
-          <td colspan="11" style="padding:0">
-            <table style="width:100%;border-collapse:collapse;font-size:11px">
-              <tr style="background:#e8edf8">
-                <td style="padding:5px 30px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase">Order ID</td>
-                <td style="padding:5px 10px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase">On Hold Since</td>
-                <td style="padding:5px 10px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;text-align:right">Days Waiting</td>
-                <td style="padding:5px 10px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;text-align:right">SKUs</td>
-                <td style="padding:5px 10px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase">Status Breakdown</td>
-                <td style="padding:5px 10px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase">Block Reason</td>
-              </tr>`;
-
-        storeOrders.forEach(ord => {
-          const [, order_id, hold_since, days_wait, t_skus, s_tr, s_re, s_fc, s_fail, s_nt, worst, reason] = ord;
-          const ws = statusStyle[worst] || {bg:'#f1f5f9', color:'#64748b', label: worst};
-          const daysColor = days_wait >= 20 ? '#dc2626' : days_wait >= 10 ? '#d97706' : '#64748b';
-
-          // Mini status pills
-          let pills = '';
-          if (s_tr > 0) pills += `<span style="background:#eff6ff;color:#1e40af;padding:2px 6px;border-radius:10px;font-size:9.5px;font-weight:600;margin-right:3px">${s_tr} Transit</span>`;
-          if (s_re > 0) pills += `<span style="background:#f0fdf4;color:#15803d;padding:2px 6px;border-radius:10px;font-size:9.5px;font-weight:600;margin-right:3px">${s_re} Restocked</span>`;
-          if (s_fc > 0) pills += `<span style="background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:10px;font-size:9.5px;font-weight:600;margin-right:3px">${s_fc} FC NoStock</span>`;
-          if (s_fail > 0) pills += `<span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;font-size:9.5px;font-weight:600;margin-right:3px">${s_fail} Failed</span>`;
-          if (s_nt > 0) pills += `<span style="background:#fef2f2;color:#7f1d1d;padding:2px 6px;border-radius:10px;font-size:9.5px;font-weight:600;margin-right:3px">${s_nt} Not Triggered</span>`;
-
-          html += `<tr style="border-bottom:1px solid #eef2ff;background:#f8f9ff">
-            <td style="padding:6px 30px;font-weight:600;color:#0f172a;white-space:nowrap">${order_id}
-              <span style="background:${ws.bg};color:${ws.color};padding:2px 7px;border-radius:10px;font-size:9.5px;font-weight:700;margin-left:6px">${ws.label}</span>
-            </td>
-            <td style="padding:6px 10px;color:#64748b;white-space:nowrap">${hold_since}</td>
-            <td style="padding:6px 10px;text-align:right;font-weight:700;color:${daysColor}">${days_wait}d</td>
-            <td style="padding:6px 10px;text-align:right;color:#475569">${t_skus}</td>
-            <td style="padding:6px 10px">${pills}</td>
-            <td style="padding:6px 10px;color:#64748b;font-size:10.5px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${reason}">${reason || '—'}</td>
-          </tr>`;
-        });
-
-        html += `</table></td></tr>`;
-      }
-    }
-  });
-
-  html += `</tbody></table></div></div>`;
-
-  // Close the outer padding div
-  html += `</div>`;
+  `;
 
   document.getElementById('restock-root').innerHTML = html;
 }
 
-function toggleRestockStore(sc) {
-  _restockExpanded[sc] = !_restockExpanded[sc];
-  renderRestockTab();
-}
-
-function restockFilterState(val, el) {
-  _restockFilters.state = val;
-  renderRestockTab();
-}
-
-function restockFilterStatus(val, el) {
-  _restockFilters.status = val;
-  renderRestockTab();
-}
 
 function switchTab(name, el) {
   if (el.classList.contains('disabled')) return;
