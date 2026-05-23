@@ -1553,16 +1553,14 @@ const STATIC_DATA = {
 
   // ── RESTOCK HEALTH TAB DATA (snapshot: 2026-05-23) ──
   restockSummary: {
-    stores: 497, orders: 1615, skus: 4732,
-    restock_tomorrow: 219, restock_window_passed: 1396,
-    b2b_in_transit: 499,
-    // Actionable (orderhold-based, window passed, not FIFO-covered)
-    // system_tried_failed bifurcated at (store, sku, restock-window-date) level
-    actionable: 410, system_tried_failed: 246, never_triggered: 140,
-    stf_reroute: 167, stf_finance: 54, stf_supply: 25,
-    // No orderhold entry — too fresh to classify
-    no_orderhold: 487,
-    oldest_days: 50, avg_days: 5.7
+    stores: 494, orders: 1665,
+    restock_tomorrow: 253,
+    b2b_in_transit: 335,
+    system_tried_failed: 189, stf_reroute: 100, stf_finance: 50, stf_supply: 18,
+    never_triggered: 298,
+    partial_coverage: 78,
+    truly_stuck: 19,
+    no_orderhold: 493,
   },
 
   // Cols: [store_code, store_name, state, district, on_hold_orders, total_skus, in_transit, restocked, fc_no_stock, restock_failed, not_triggered, max_days_on_hold, avg_days_on_hold, top_failure_reason]
@@ -5428,132 +5426,96 @@ function renderPipelinePlan(sf) {
 // ══════════════════════════════════════════════════════════
 function renderRestockTab() {
   const s = STATIC_DATA.restockSummary;
-
   const fmt = n => n.toLocaleString('en-IN');
+
+  const card = (borderColor, label, count, countColor, sub) => `
+    <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
+                box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid ${borderColor};
+                padding:24px 32px;gap:6px;min-width:240px;flex:1">
+      <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">${label}</div>
+      <div style="font-size:48px;font-weight:900;color:${countColor};line-height:1;letter-spacing:-1px">${fmt(count)}</div>
+      ${sub}
+    </div>`;
 
   const html = `
     <div style="padding:28px 32px">
 
-      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:28px">
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:24px">
         <span style="font-size:18px;font-weight:800;color:#0f172a">Restock Health</span>
         <span style="font-size:12px;color:#94a3b8;font-weight:500">FY27 · Apr 1 – May 23, 2026 · orders currently ON_HOLD</span>
       </div>
 
-      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
+      <!-- Row 1: Overview -->
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+        ${card('#dc2626','Orders ON_HOLD',s.orders,'#0f172a',`
+          <div style="font-size:13px;color:#64748b;font-weight:500">across <strong style="color:#0f172a">${fmt(s.stores)}</strong> stores</div>`)}
+        ${card('#16a34a','Restock Tomorrow',s.restock_tomorrow,'#16a34a',`
+          <div style="font-size:12px;color:#64748b;line-height:1.5">marked ON_HOLD after 3:30 PM today<br>
+          <span style="color:#94a3b8;font-size:11px">auto-restock fires tomorrow · no action needed</span></div>`)}
+        ${card('#2563eb','B2B In Transit',s.b2b_in_transit,'#2563eb',`
+          <div style="font-size:12px;color:#64748b;line-height:1.5">active B2B for all UNFULFILLABLE SKUs<br>
+          <span style="color:#94a3b8;font-size:11px">no action needed</span></div>`)}
+        ${card('#94a3b8','Pending Classification',s.no_orderhold,'#64748b',`
+          <div style="font-size:12px;color:#94a3b8;line-height:1.5">no UNFULFILLABLE declaration yet<br>
+          <span style="font-size:11px">partner still deciding</span></div>`)}
+      </div>
 
-        <!-- Widget 1: Total ON_HOLD -->
-        <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
-                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #dc2626;
-                    padding:28px 40px;gap:8px;min-width:280px">
-          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">
-            Orders ON_HOLD
-          </div>
-          <div style="font-size:52px;font-weight:900;color:#0f172a;line-height:1;letter-spacing:-1px">
-            ${fmt(s.orders)}
-          </div>
-          <div style="font-size:14px;color:#64748b;font-weight:500;margin-top:4px">
-            across&nbsp;<strong style="color:#0f172a">${fmt(s.stores)}</strong>&nbsp;stores
-          </div>
-        </div>
+      <!-- Row 2: Actionable -->
+      <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">
+        Needs Action
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
 
-        <!-- Widget 2: Restock tomorrow -->
-        <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
-                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #16a34a;
-                    padding:28px 40px;gap:8px;min-width:280px">
-          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">
-            Restock Tomorrow
-          </div>
-          <div style="font-size:52px;font-weight:900;color:#16a34a;line-height:1;letter-spacing:-1px">
-            ${fmt(s.restock_tomorrow)}
-          </div>
-          <div style="font-size:13px;color:#64748b;font-weight:500;margin-top:4px;line-height:1.5">
-            marked ON_HOLD after 3:30 PM today<br>
-            <span style="color:#94a3b8;font-size:11.5px">auto-restock fires tomorrow · no action needed</span>
-          </div>
-        </div>
-
-        <!-- Widget 3: B2B In Transit -->
-        <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
-                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #2563eb;
-                    padding:28px 40px;gap:8px;min-width:280px">
-          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">
-            B2B Restock In Transit
-          </div>
-          <div style="font-size:52px;font-weight:900;color:#2563eb;line-height:1;letter-spacing:-1px">
-            ${fmt(s.b2b_in_transit)}
-          </div>
-          <div style="font-size:13px;color:#64748b;font-weight:500;margin-top:4px;line-height:1.5">
-            all UNFULFILLABLE SKUs + quantities covered<br>
-            <span style="color:#94a3b8;font-size:11.5px">FIFO-allocated · no action needed</span>
-          </div>
-        </div>
-
-        <!-- Widget 4: Actionable — needs attention -->
+        <!-- System Tried & Failed -->
         <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
                     box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #d97706;
-                    padding:28px 40px;gap:8px;min-width:320px">
-          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">
-            Needs Action
-          </div>
-          <div style="font-size:52px;font-weight:900;color:#d97706;line-height:1;letter-spacing:-1px">
-            ${fmt(s.actionable)}
-          </div>
-          <div style="font-size:11px;color:#92400e;margin-top:2px">
-            ${fmt(s.system_tried_failed)} system tried &amp; failed · ${fmt(s.never_triggered)} never triggered
-          </div>
-          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <div style="flex:1;min-width:100px;background:#fee2e2;border-radius:10px;padding:10px 14px">
-              <div style="font-size:22px;font-weight:800;color:#991b1b">${fmt(s.stf_reroute)}</div>
+                    padding:24px 32px;gap:6px;min-width:320px;flex:2">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">System Tried &amp; Failed</div>
+          <div style="font-size:48px;font-weight:900;color:#d97706;line-height:1;letter-spacing:-1px">${fmt(s.system_tried_failed)}</div>
+          <div style="font-size:12px;color:#92400e;margin-bottom:4px">restock attempted on window date but blocked</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="flex:1;min-width:90px;background:#fee2e2;border-radius:10px;padding:10px 12px">
+              <div style="font-size:20px;font-weight:800;color:#991b1b">${fmt(s.stf_reroute)}</div>
               <div style="font-size:11px;color:#7f1d1d;font-weight:700;margin-top:2px">Re-route to FC</div>
-              <div style="font-size:10.5px;color:#991b1b;margin-top:5px;line-height:1.5">
-                OCP / credit block<br>
-                → Ops reroutes order
-              </div>
+              <div style="font-size:10px;color:#991b1b;margin-top:4px;line-height:1.5">OCP / credit block<br>→ Ops reroutes</div>
             </div>
-            <div style="flex:1;min-width:100px;background:#fef3c7;border-radius:10px;padding:10px 14px">
-              <div style="font-size:22px;font-weight:800;color:#92400e">${fmt(s.stf_finance)}</div>
-              <div style="font-size:11px;color:#78350f;font-weight:700;margin-top:2px">Finance / Credit</div>
-              <div style="font-size:10.5px;color:#92400e;margin-top:5px;line-height:1.5">
-                Credit limit exhausted<br>
-                → Increase limit
-              </div>
+            <div style="flex:1;min-width:90px;background:#fef3c7;border-radius:10px;padding:10px 12px">
+              <div style="font-size:20px;font-weight:800;color:#92400e">${fmt(s.stf_finance)}</div>
+              <div style="font-size:11px;color:#78350f;font-weight:700;margin-top:2px">Finance</div>
+              <div style="font-size:10px;color:#92400e;margin-top:4px;line-height:1.5">Credit limit<br>→ Increase limit</div>
             </div>
-            <div style="flex:1;min-width:100px;background:#eff6ff;border-radius:10px;padding:10px 14px">
-              <div style="font-size:22px;font-weight:800;color:#1d4ed8">${fmt(s.stf_supply)}</div>
+            <div style="flex:1;min-width:90px;background:#eff6ff;border-radius:10px;padding:10px 12px">
+              <div style="font-size:20px;font-weight:800;color:#1d4ed8">${fmt(s.stf_supply)}</div>
               <div style="font-size:11px;color:#1e40af;font-weight:700;margin-top:2px">Supply</div>
-              <div style="font-size:10.5px;color:#1d4ed8;margin-top:5px;line-height:1.5">
-                FC inventory blocked<br>
-                → Adjust threshold
-              </div>
+              <div style="font-size:10px;color:#1d4ed8;margin-top:4px;line-height:1.5">FC threshold<br>→ Adjust / replenish</div>
             </div>
           </div>
         </div>
 
-        <!-- Widget 5: No orderhold entry — too fresh -->
-        <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
-                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #94a3b8;
-                    padding:28px 40px;gap:8px;min-width:260px">
-          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">
-            Pending Classification
-          </div>
-          <div style="font-size:52px;font-weight:900;color:#64748b;line-height:1;letter-spacing:-1px">
-            ${fmt(s.no_orderhold)}
-          </div>
-          <div style="font-size:13px;color:#64748b;font-weight:500;margin-top:4px;line-height:1.5">
-            no UNFULFILLABLE declaration yet<br>
-            <span style="color:#94a3b8;font-size:11.5px">partner still deciding · check back in a few hours</span>
-          </div>
-        </div>
+        <!-- Never Triggered -->
+        ${card('#ef4444','Never Triggered',s.never_triggered,'#dc2626',`
+          <div style="font-size:12px;color:#64748b;line-height:1.5">window passed · no B2B · no failure log<br>
+          <span style="color:#ef4444;font-size:11px;font-weight:600">→ Central Ops to investigate</span></div>`)}
+
+        <!-- Partial Coverage -->
+        ${card('#7c3aed','Partial Coverage',s.partial_coverage,'#7c3aed',`
+          <div style="font-size:12px;color:#64748b;line-height:1.5">some SKUs covered · others have no B2B<br>
+          <span style="color:#7c3aed;font-size:11px;font-weight:600">→ check uncovered SKUs</span></div>`)}
+
+        <!-- Truly Stuck -->
+        ${card('#0f172a','Truly Stuck',s.truly_stuck,'#0f172a',`
+          <div style="font-size:12px;color:#64748b;line-height:1.5">B2B was placed but cancelled<br>
+          <span style="color:#0f172a;font-size:11px;font-weight:600">→ place new B2B or reroute</span></div>`)}
 
       </div>
 
-      <!-- Action routing legend -->
-      <div style="margin-top:20px;background:#f8fafc;border-radius:12px;padding:14px 18px;
-                  display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
-        <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;align-self:center">Action routing</span>
-        <span style="font-size:12px;color:#475569"><strong style="color:#991b1b">Re-route to FC</strong> — CC15, CC16, CC19, CC20, CC21, CC22, CC04, FC03 · OCP block / product disabled / license gap</span>
-        <span style="font-size:12px;color:#475569"><strong style="color:#92400e">Finance / Credit</strong> — CC17 · credit limit exhausted · increase limit</span>
-        <span style="font-size:12px;color:#1d4ed8"><strong>Supply</strong> — FC08, FC09, FC19 · FC inventory at threshold · adjust or replenish</span>
+      <!-- Legend -->
+      <div style="margin-top:16px;background:#f8fafc;border-radius:12px;padding:12px 16px;
+                  display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+        <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px">Error codes</span>
+        <span style="font-size:12px;color:#475569"><strong style="color:#991b1b">Re-route</strong> — CC15, CC16, CC19, CC20, CC21, CC22, CC04, FC03</span>
+        <span style="font-size:12px;color:#475569"><strong style="color:#92400e">Finance</strong> — CC17 · credit limit exhausted</span>
+        <span style="font-size:12px;color:#1d4ed8"><strong>Supply</strong> — FC08, FC09, FC19 · FC threshold / no stock</span>
       </div>
 
     </div>
