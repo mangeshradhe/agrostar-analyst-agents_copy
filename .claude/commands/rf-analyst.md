@@ -48,12 +48,32 @@ BT is a **daily Portfolio Manager job** — scan every RF partner every day for 
 2. Partner has open lender credit limit (repaid something, limit freed up)
 3. There exist invoices that are ≤ 45 days old AND not yet pushed to lender (`finbox_transaction_id IS NULL`)
 
-**BT eligibility rules:**
-- Invoice age ≤ 45 days — measured from **invoice creation date** (`pristine_wms_views.invoiced_report.CreatedOn`) — NOT ledger `created_on` or `due_date`
-- Ledger entry must have `finbox_transaction_id IS NULL` (not yet raised to lender)
-- Value must be ≤ available open lender credit limit
+**BT eligibility rules — ALL four conditions must pass:**
 
-**BT opportunity = open lender limit + unpushed invoices where invoice CreatedOn ≥ TODAY − 45 days**
+| # | Condition | Detail |
+|---|---|---|
+| 1 | `finbox_transaction_id IS NULL` | Debit not yet raised to lender |
+| 2 | `is_reconciled = 0` | Partner hasn't repaid this debit — if `is_reconciled = 1`, skip (already settled) |
+| 3 | Total order amount > ₹200 | `SUM(amount)` across ALL debits for the order must exceed ₹200 |
+| 4 | Invoice age ≤ 45 days | Measured from `invoiced_report.CreatedOn` — NOT ledger `created_on` or `due_date` |
+
+**Additional gate — long credit term (>150 days):**
+- Compute `credit_term = DATE_DIFF(MAX(due_date), invoice_created_date, DAY)` per order
+- If `credit_term > 150` → wait 30 days from invoice date before BT is allowed
+- Filter: `NOT (credit_term > 150 AND invoice_age_days < 30)`
+
+**A debit entry is BT-able if:** `cancelled = 0` AND `finbox_transaction_id IS NULL` AND `is_reconciled = 0`
+**An order is BT-eligible if:** at least one BT-able debit + total_order_amount > ₹200 + invoice age + credit term rules pass
+
+**BT is capped by BALANCE from the Google Sheet** — never push more than available balance.
+
+**Greedy allocation (order-level):** When a partner has multiple eligible orders and limited balance:
+- Sort orders by `invoice_age_days DESC` (oldest first — most urgent, closest to 45-day expiry)
+- Pick full orders greedily until balance is exhausted
+- Partially-fitting orders are skipped (BT is raised at full order level, not partial)
+- `actionable_bt_amount = sum of picked orders ≤ available_balance`
+
+**BT opportunity = eligible orders (all 4 rules) capped by BALANCE, allocated oldest-first**
 
 **Join chain to get invoice date:**
 ```
@@ -103,6 +123,7 @@ WHERE reason_id = 3          -- B2B purchase debit
 | `amount` | Amount of this ledger entry (₹) |
 | `due_date` | Due date for this specific debit entry |
 | `finbox_transaction_id` | **`NULL`** = disbursement NOT raised to lender; **UUID string** = disbursement raised to lender |
+| `is_reconciled` | **`0`** = outstanding (partner hasn't paid back yet); **`1`** = partner has repaid this debit to AgroStar — skip for BT |
 | `cancelled` | `1` = void/reversed — always filter `cancelled = 0` |
 | `created_on` | When this ledger entry was created |
 
@@ -298,7 +319,7 @@ WITH partners AS (
     status,
     ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
   FROM `agrostar-data.galaxy_views.institution`
-  WHERE lendingProvider IN ('Rupifi', 'Tyger Capital', 'BlackSoil')
+  WHERE lendingProvider IN ('RUPIFI', 'TYGER_CAPITAL', 'BLACKSOIL')
 )
 SELECT
   p.reference_customer_id AS partner_id,
@@ -340,13 +361,13 @@ SELECT
   p.reference_customer_id AS partner_id,
   p.store_name,
   p.partner_name,
-  COALESCE(p.lendingProvider, 'Agrostar') AS lending_provider,
+  COALESCE(p.lendingProvider, 'AGROSTAR') AS lending_provider,
   p.status,
   p.address_state,
   p.address_district
 FROM partners p
 WHERE p.rn = 1
-  AND (p.lendingProvider = 'Agrostar' OR p.lendingProvider IS NULL)
+  AND (p.lendingProvider = 'AGROSTAR' OR p.lendingProvider IS NULL)
   AND p.status = 'ACTIVE'
 ORDER BY p.address_state
 ```
@@ -359,7 +380,7 @@ WITH rf_partners AS (
     lendingProvider,
     ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
   FROM `agrostar-data.galaxy_views.institution`
-  WHERE lendingProvider IN ('Rupifi', 'Tyger Capital', 'BlackSoil')
+  WHERE lendingProvider IN ('RUPIFI', 'TYGER_CAPITAL', 'BLACKSOIL')
 ),
 partner_wallet AS (
   -- Resolve wallet_user_id → reference_customer_id via csr_farmer
@@ -404,82 +425,127 @@ ORDER BY 1, 2
 ```
 
 ### 6. Balance Transfer Opportunities — Daily Scan (Portfolio Manager)
-Finds all RF partners with unpushed invoices (`finbox_transaction_id IS NULL`) where the **invoice was created within the last 45 days**.
-This is the Portfolio Manager's daily BT opportunity report.
+Returns **one row per eligible order** for all active RUPIFI partners.
+Apply all 4 BT eligibility conditions + long credit term gate.
+Then do greedy allocation in Python (oldest-first, capped by sheet BALANCE).
+
+**BQ returns order-level rows. Python does the greedy allocation per partner.**
 
 ```sql
-WITH rf_partners AS (
+WITH
+rf_partners AS (
   SELECT
-    reference_customer_id,
+    reference_customer_id AS farmer_id,
     name AS store_name,
     partner_name,
-    lendingProvider,
     address_state,
+    address_district,
     ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
   FROM `agrostar-data.galaxy_views.institution`
-  WHERE lendingProvider IN ('Rupifi', 'Tyger Capital', 'BlackSoil')
+  WHERE lendingProvider = 'RUPIFI'   -- change to 'TYGER_CAPITAL' for Tyger Capital
     AND status = 'ACTIVE'
 ),
 partner_wallet AS (
-  SELECT f.id AS farmer_id, f.user_id
+  SELECT f.farmer_id, f.user_id AS wallet_user_id
   FROM `agrostar-data.prod_db_views.csr_farmer` f
+  JOIN rf_partners p ON p.farmer_id = f.farmer_id AND p.rn = 1
 ),
--- Step 1: Find unpushed ledger entries for RF partners
-unpushed_ledger AS (
+-- ALL active debits for these partners (for total_amount + max_due_date per order)
+order_all_debits AS (
   SELECT
-    t.id                AS ledger_entry_id,
-    t.reference_id      AS order_id,
+    CAST(t.reference_id AS STRING) AS order_id,
     t.wallet_user_id,
-    t.amount
+    t.amount,
+    t.due_date,
+    t.finbox_transaction_id,
+    t.is_reconciled
   FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` t
+  JOIN partner_wallet pw ON pw.wallet_user_id = t.wallet_user_id
   WHERE t.reason_id = 3
     AND t.transaction_type = 0
     AND t.cancelled = 0
-    AND t.finbox_transaction_id IS NULL     -- not yet raised to lender
 ),
--- Step 2: Get invoice creation date — this defines the 45-day window
+-- Per-order aggregates
+order_summary AS (
+  SELECT
+    order_id,
+    wallet_user_id,
+    SUM(amount)                                                              AS total_order_amount,
+    -- BT-able amount: unpushed AND unreconciled
+    SUM(CASE WHEN finbox_transaction_id IS NULL AND is_reconciled = 0
+             THEN amount ELSE 0 END)                                         AS bt_amount,
+    -- C1+C2: at least one debit that is unpushed + unreconciled
+    COUNTIF(finbox_transaction_id IS NULL AND is_reconciled = 0)            AS bt_eligible_debits,
+    MAX(due_date)                                                            AS max_due_date
+  FROM order_all_debits
+  GROUP BY 1, 2
+),
+-- Invoice date per order (via order → invoiced_report)
 invoice_dates AS (
   SELECT
-    CAST(o.unicommerce_id AS STRING)  AS display_order_code,
-    o.sales_order_id,
+    CAST(o.sales_order_id AS STRING) AS order_id,
     MIN(DATE(inv.CreatedOn))          AS invoice_created_date
   FROM `agrostar-data.prod_db_views.order_management_order` o
   JOIN `agrostar-data.pristine_wms_views.invoiced_report` inv
     ON CAST(o.unicommerce_id AS STRING) = inv.DisplayOrderCode
   WHERE inv.line_status != 'CANCELLED'
     AND inv.is_return = 0
-  GROUP BY 1, 2
+  GROUP BY 1
 ),
--- Step 3: Join ledger → order → invoice, apply 45-day window on invoice date
-bt_eligible AS (
+-- Apply all BT eligibility conditions
+eligible_orders AS (
   SELECT
-    ul.ledger_entry_id,
-    ul.order_id,
-    ul.wallet_user_id,
-    ul.amount,
+    os.order_id,
+    os.wallet_user_id,
+    os.bt_amount,
+    os.total_order_amount,
     id.invoice_created_date,
-    DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) AS invoice_age_days
-  FROM unpushed_ledger ul
-  JOIN invoice_dates id ON CAST(ul.order_id AS STRING) = CAST(id.sales_order_id AS STRING)
-  WHERE DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) BETWEEN 0 AND 45
+    DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY)  AS invoice_age_days,
+    DATE_DIFF(DATE(os.max_due_date), id.invoice_created_date, DAY)         AS credit_term_days
+  FROM order_summary os
+  JOIN invoice_dates id ON os.order_id = id.order_id
+  WHERE
+    os.bt_eligible_debits > 0                   -- C1+C2: unpushed + unreconciled debit exists
+    AND os.total_order_amount > 200              -- C3: total order > ₹200
+    AND DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) BETWEEN 0 AND 45  -- C4: ≤45 days
+    AND NOT (                                    -- Long credit term gate: wait 30 days
+      DATE_DIFF(DATE(os.max_due_date), id.invoice_created_date, DAY) > 150
+      AND DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) < 30
+    )
 )
+-- Final: one row per eligible order
 SELECT
-  p.lendingProvider                               AS lender,
+  pw.farmer_id                          AS partner_id,
   p.store_name,
   p.partner_name,
-  p.reference_customer_id                         AS partner_id,
-  p.address_state                                 AS state,
-  COUNT(DISTINCT bt.order_id)                    AS bt_eligible_orders,
-  COUNT(bt.ledger_entry_id)                      AS bt_eligible_entries,
-  ROUND(SUM(bt.amount), 0)                       AS bt_eligible_amount,
-  MIN(bt.invoice_age_days)                       AS min_invoice_age_days,
-  MAX(bt.invoice_age_days)                       AS max_invoice_age_days
-FROM bt_eligible bt
-JOIN partner_wallet pw ON pw.user_id = bt.wallet_user_id
-JOIN rf_partners p ON p.reference_customer_id = pw.farmer_id AND p.rn = 1
-GROUP BY 1, 2, 3, 4, 5
-ORDER BY bt_eligible_amount DESC
+  p.address_state                       AS state,
+  p.address_district                    AS district,
+  eo.order_id,
+  ROUND(eo.bt_amount, 0)                AS order_bt_amount,
+  eo.invoice_created_date,
+  eo.invoice_age_days,
+  eo.credit_term_days
+FROM eligible_orders eo
+JOIN partner_wallet pw ON pw.wallet_user_id = eo.wallet_user_id
+JOIN rf_partners p ON p.farmer_id = pw.farmer_id AND p.rn = 1
+ORDER BY pw.farmer_id, eo.invoice_age_days DESC
 ```
+
+**Python greedy allocation (run after BQ):**
+```python
+# Load BQ rows + sheet CSV (Partner Id, BALANCE)
+# Group rows by partner_id
+# For each partner:
+#   Sort orders by invoice_age_days DESC  (oldest = most urgent, first)
+#   remaining = sheet BALANCE
+#   For each order:
+#     if order_bt_amount <= remaining: select it, remaining -= order_bt_amount
+#     else: skip (can't partially raise)
+#   actionable_bt_amount = sum of selected orders
+```
+
+**Output columns to produce:**
+`partner_id | store_name | state | available_balance | total_bt_eligible_amount | actionable_bt_amount | actionable_orders / total_eligible_orders | oldest_invoice_age_days | selected_order_ids`
 
 ### 7. CXO — Disbursement Rate (Disbursed ÷ Total B2B Billed)
 ```sql
@@ -487,7 +553,7 @@ WITH rf_partners AS (
   SELECT reference_customer_id, lendingProvider,
     ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
   FROM `agrostar-data.galaxy_views.institution`
-  WHERE lendingProvider IN ('Rupifi', 'Tyger Capital', 'BlackSoil')
+  WHERE lendingProvider IN ('RUPIFI', 'TYGER_CAPITAL', 'BLACKSOIL')
 ),
 partner_wallet AS (
   SELECT f.id AS farmer_id, f.user_id
@@ -528,7 +594,7 @@ WITH partners AS (
     status,
     ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
   FROM `agrostar-data.galaxy_views.institution`
-  WHERE lendingProvider IN ('Rupifi', 'Tyger Capital', 'BlackSoil')
+  WHERE lendingProvider IN ('RUPIFI', 'TYGER_CAPITAL', 'BLACKSOIL')
 )
 SELECT
   address_state AS state,
@@ -558,6 +624,11 @@ ORDER BY total_partners DESC
 | BT is a daily running window | BT is not a one-time activation event. Portfolio Manager runs this scan every day — any RF partner with open lender limit + unpushed invoices ≤ 45 days old is a live opportunity. |
 | `wallet_user_id` → `farmer_id` join | `wallet_creditwallettransaction.wallet_user_id` = `csr_farmer.user_id` (NOT `farmer_id`). Always join via `csr_farmer` to get `reference_customer_id` for the partner. |
 | Always filter `cancelled = 0` | `cancelled = 1` entries are void/reversed — never include in any metric. |
+| `is_reconciled = 1` means already paid back | If `is_reconciled = 1`, the partner has repaid that specific debit to AgroStar. These entries must be excluded from BT — there is nothing to push to the lender. Only `is_reconciled = 0` debits are BT-able. |
+| BT requires BOTH `finbox IS NULL` AND `is_reconciled = 0` | An entry being unpushed (`finbox IS NULL`) is not enough — it also must be unreconciled. An order is BT-eligible only if it has at least one debit that is BOTH conditions simultaneously. |
+| Total order amount > ₹200 for BT | `SUM(amount)` across ALL debits of the order must exceed ₹200. Orders below this threshold are not raised to lender regardless of other conditions. |
+| Long credit term gate (>150 days) | If `DATE_DIFF(MAX(due_date), invoice_created_date, DAY) > 150`, the order is only BT-eligible after the invoice is 30+ days old. Filter: `NOT (credit_term > 150 AND invoice_age_days < 30)`. |
+| BT greedy allocation: oldest-first, full orders only | When a partner has multiple eligible orders exceeding their balance, pick orders oldest-first (highest invoice_age_days first). Only include orders that fit entirely within remaining balance — no partial order raises. |
 | Lender LIMIT & BALANCE not in BigQuery | `LIMIT` and `BALANCE` per partner live only in the Google Sheet tracker. For BT opportunity analysis, fetch the sheet first and cross-reference by `Partner Id`. BQ queries alone cannot enforce the BALANCE cap. |
 | `BUSINESS ID` ≠ `Partner Id` in Sheet | Rupifi's `BUSINESS ID` is their internal reference. Always use `Partner Id` column (= AgroStar `farmer_id`) to join sheet data with BigQuery. |
 | Sheet data is as-of today only | The sheet is updated daily — it reflects the current day's BALANCE. There is no historical BALANCE series in the sheet. |
