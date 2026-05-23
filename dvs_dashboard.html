@@ -1565,6 +1565,18 @@ const STATIC_DATA = {
     cc_team: 177,      // CONFIRM_ON_HOLD (82) confirm farmer + REROUTING_FAILED (95) edit order / category escalation
   },
 
+  // Aging per bucket — [1d, 2d, 3d, 4d, 5d, gt5d, oldest_days, newest_days]
+  // Source: BQ query on order_management_orderhistorymeta first ON_HOLD time, as of May 23 2026
+  restockAging: {
+    ground_ops:      [87,  49, 20,  22,  6,  18,  19, 0],
+    cc_confirm:      [1,    0,  0,   2,  9,  74,  43, 1],
+    cc_rerouting:    [5,    3, 12,   6,  4,  65,  41, 0],
+    stf_reroute:     [34,  27, 26,  43, 10,  54,  17, 0],
+    stf_finance:     [14,   9,  0,   6,  6,  27,  23, 0],
+    stf_supply:      [8,    2,  9,   2,  9,   4,  24, 0],
+    never_triggered: [199, 96, 97, 110, 58, 248,  41, 0],
+  },
+
   // Cols: [store_code, store_name, state, district, on_hold_orders, total_skus, in_transit, restocked, fc_no_stock, restock_failed, not_triggered, max_days_on_hold, avg_days_on_hold, top_failure_reason]
   restockStores: [
     ['729179','PRABHUDEV KRUSHI SEVA KENDRA','Maharashtra','nanded',47,139,57,0,13,35,34,3,1.8,'Product: Sanchaar (Bio-Enriched Organic Manure) 25 kg is Unfulfillable'],
@@ -5428,6 +5440,7 @@ function renderPipelinePlan(sf) {
 // ══════════════════════════════════════════════════════════
 function renderRestockTab() {
   const s = STATIC_DATA.restockSummary;
+  const a = STATIC_DATA.restockAging;
   const fmt = n => n.toLocaleString('en-IN');
 
   const card = (borderColor, label, count, countColor, sub) => `
@@ -5438,6 +5451,60 @@ function renderRestockTab() {
       <div style="font-size:48px;font-weight:900;color:${countColor};line-height:1;letter-spacing:-1px">${fmt(count)}</div>
       ${sub}
     </div>`;
+
+  const ageBadge = (oldest, newest) => `
+    <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <span style="background:#fee2e2;color:#dc2626;font-weight:700;padding:2px 8px;border-radius:5px;font-size:11px">↑ ${oldest}d oldest</span>
+      <span style="background:#d1fae5;color:#16a34a;font-weight:700;padding:2px 8px;border-radius:5px;font-size:11px">↓ ${newest}d newest</span>
+    </div>`;
+
+  const subAge = (oldest, newest) => `
+    <div style="font-size:10px;margin-top:5px;display:flex;gap:4px;align-items:center">
+      <span style="color:#dc2626;font-weight:700">↑${oldest}d</span>
+      <span style="color:#94a3b8">·</span>
+      <span style="color:#16a34a;font-weight:700">↓${newest}d</span>
+    </div>`;
+
+  const colBg = ['#d1fae5','#fef9c3','#fde68a','#ffedd5','#fee2e2','#fca5a5'];
+  const colFg = ['#065f46','#854d0e','#92400e','#c2410c','#991b1b','#7f1d1d'];
+
+  const heatRow = (dot, label, data, note) => {
+    const [d1,d2,d3,d4,d5,d6,oldest,newest] = data;
+    const total = d1+d2+d3+d4+d5+d6;
+    return `<tr style="border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+      <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap">
+        <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${dot};margin-right:7px"></span>${label}${note ? `<span style="font-size:10px;color:#94a3b8;font-weight:400;margin-left:5px">${note}</span>` : ''}
+      </td>
+      ${[d1,d2,d3,d4,d5,d6].map((v,i) => `<td style="padding:8px 14px;text-align:center;background:${v>0?colBg[i]:'#f8fafc'};font-size:13px;font-weight:${v>0?'700':'400'};color:${v>0?colFg[i]:'#cbd5e1'}">${v>0?v:'—'}</td>`).join('')}
+      <td style="padding:8px 14px;text-align:center;font-size:12px;font-weight:700;color:#475569">${fmt(total)}</td>
+      <td style="padding:6px 10px;white-space:nowrap">
+        <span style="background:#fee2e2;color:#dc2626;font-weight:700;padding:2px 7px;border-radius:5px;font-size:11px">↑${oldest}d</span>
+        <span style="background:#d1fae5;color:#16a34a;font-weight:700;padding:2px 7px;border-radius:5px;font-size:11px;margin-left:4px">↓${newest}d</span>
+      </td>
+    </tr>`;
+  };
+
+  const allHeatRows = [a.ground_ops, a.cc_confirm, a.cc_rerouting, a.stf_reroute, a.stf_finance, a.stf_supply, a.never_triggered];
+  const gtCols = [0,1,2,3,4,5].map(i => allHeatRows.reduce((s,r) => s+r[i], 0));
+  const gtTotal = gtCols.reduce((s,v) => s+v, 0);
+  const gtOldest = Math.max(...allHeatRows.map(r => r[6]));
+  const gtNewest = Math.min(...allHeatRows.map(r => r[7]));
+  const heatGrandTotal = `<tr style="background:#1e293b;border-top:2px solid #334155">
+    <td style="padding:10px 16px;font-size:12px;font-weight:800;color:#f1f5f9;white-space:nowrap;letter-spacing:.3px">Grand Total</td>
+    ${gtCols.map((v,i) => `<td style="padding:8px 14px;text-align:center;background:${colBg[i]};font-size:13px;font-weight:800;color:${colFg[i]}">${fmt(v)}</td>`).join('')}
+    <td style="padding:8px 14px;text-align:center;font-size:13px;font-weight:900;color:#f1f5f9">${fmt(gtTotal)}</td>
+    <td style="padding:6px 10px;white-space:nowrap">
+      <span style="background:#7f1d1d;color:#fecaca;font-weight:800;padding:2px 7px;border-radius:5px;font-size:11px">↑${gtOldest}d</span>
+      <span style="background:#14532d;color:#bbf7d0;font-weight:800;padding:2px 7px;border-radius:5px;font-size:11px;margin-left:4px">↓${gtNewest}d</span>
+    </td>
+  </tr>`;
+
+  const stfOldest = Math.max(a.stf_reroute[6], a.stf_finance[6], a.stf_supply[6]);
+  const stfNewest = Math.min(a.stf_reroute[7], a.stf_finance[7], a.stf_supply[7]);
+  const ccOldest  = Math.max(a.cc_confirm[6], a.cc_rerouting[6]);
+  const ccNewest  = Math.min(a.cc_confirm[7], a.cc_rerouting[7]);
+  const allOldest = Math.max(a.ground_ops[6], ccOldest);
+  const allNewest = Math.min(a.ground_ops[7], ccNewest);
 
   const html = `
     <div style="padding:28px 32px">
@@ -5488,22 +5555,26 @@ function renderRestockTab() {
                     padding:24px 32px;gap:6px;min-width:320px;flex:2">
           <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">System Tried &amp; Failed</div>
           <div style="font-size:48px;font-weight:900;color:#d97706;line-height:1;letter-spacing:-1px">${fmt(s.system_tried_failed)}</div>
-          <div style="font-size:12px;color:#92400e;margin-bottom:4px">restock attempted on window date but blocked</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="font-size:12px;color:#92400e;margin-bottom:2px">restock attempted on window date but blocked</div>
+          ${ageBadge(stfOldest, stfNewest)}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
             <div style="flex:1;min-width:90px;background:#fee2e2;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#991b1b">${fmt(s.stf_reroute)}</div>
               <div style="font-size:11px;color:#7f1d1d;font-weight:700;margin-top:2px">Re-route to FC</div>
               <div style="font-size:10px;color:#991b1b;margin-top:4px;line-height:1.5">OCP / credit block<br>→ Ops reroutes</div>
+              ${subAge(a.stf_reroute[6], a.stf_reroute[7])}
             </div>
             <div style="flex:1;min-width:90px;background:#fef3c7;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#92400e">${fmt(s.stf_finance)}</div>
               <div style="font-size:11px;color:#78350f;font-weight:700;margin-top:2px">Finance</div>
               <div style="font-size:10px;color:#92400e;margin-top:4px;line-height:1.5">Credit limit<br>→ Increase limit</div>
+              ${subAge(a.stf_finance[6], a.stf_finance[7])}
             </div>
             <div style="flex:1;min-width:90px;background:#eff6ff;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#1d4ed8">${fmt(s.stf_supply)}</div>
               <div style="font-size:11px;color:#1e40af;font-weight:700;margin-top:2px">Supply</div>
               <div style="font-size:10px;color:#1d4ed8;margin-top:4px;line-height:1.5">FC threshold<br>→ Adjust / replenish</div>
+              ${subAge(a.stf_supply[6], a.stf_supply[7])}
             </div>
           </div>
         </div>
@@ -5511,7 +5582,8 @@ function renderRestockTab() {
         <!-- Never Triggered -->
         ${card('#ef4444','Never Triggered',s.never_triggered,'#dc2626',`
           <div style="font-size:12px;color:#64748b;line-height:1.5">window passed · no B2B · no failure log<br>
-          <span style="color:#ef4444;font-size:11px;font-weight:600">→ Central Ops to investigate</span></div>`)}
+          <span style="color:#ef4444;font-size:11px;font-weight:600">→ Central Ops to investigate</span></div>
+          ${ageBadge(a.never_triggered[6], a.never_triggered[7])}`)}
 
         <!-- Partial Coverage -->
         ${card('#7c3aed','Partial Coverage',s.partial_coverage,'#7c3aed',`
@@ -5529,26 +5601,64 @@ function renderRestockTab() {
                     padding:24px 32px;gap:6px;min-width:320px;flex:2">
           <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">Partner / CC Actions</div>
           <div style="font-size:48px;font-weight:900;color:#475569;line-height:1;letter-spacing:-1px">${fmt(s.ground_ops + s.cc_team)}</div>
-          <div style="font-size:12px;color:#64748b;margin-bottom:4px">no UNFULFILLABLE restock issue — different action streams</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="font-size:12px;color:#64748b;margin-bottom:2px">no UNFULFILLABLE restock issue — different action streams</div>
+          ${ageBadge(Math.max(a.ground_ops[6], ccOldest), Math.min(a.ground_ops[7], ccNewest))}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
             <div style="flex:1;min-width:90px;background:#fff7ed;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#c2410c">${fmt(s.ground_ops)}</div>
               <div style="font-size:11px;color:#9a3412;font-weight:700;margin-top:2px">Ground Ops</div>
               <div style="font-size:10px;color:#c2410c;margin-top:4px;line-height:1.5">Has stock, not packing<br>→ call partner to pack</div>
+              ${subAge(a.ground_ops[6], a.ground_ops[7])}
             </div>
             <div style="flex:1;min-width:90px;background:#ecfeff;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#0e7490">${fmt(s.cc_team - 95)}</div>
               <div style="font-size:11px;color:#155e75;font-weight:700;margin-top:2px">CC · Confirm Farmer</div>
               <div style="font-size:10px;color:#0e7490;margin-top:4px;line-height:1.5">CONFIRM_ON_HOLD<br>→ call farmer to confirm</div>
+              ${subAge(a.cc_confirm[6], a.cc_confirm[7])}
             </div>
             <div style="flex:1;min-width:90px;background:#f0f9ff;border-radius:10px;padding:10px 12px">
               <div style="font-size:20px;font-weight:800;color:#0369a1">95</div>
               <div style="font-size:11px;color:#0c4a6e;font-weight:700;margin-top:2px">CC · Rerouting Failed</div>
               <div style="font-size:10px;color:#0369a1;margin-top:4px;line-height:1.5">Edit order or<br>→ escalate to category</div>
+              ${subAge(a.cc_rerouting[6], a.cc_rerouting[7])}
             </div>
           </div>
         </div>
 
+      </div>
+
+      <!-- Row 3: Aging Heat Table -->
+      <div style="margin-top:16px">
+        <div style="font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;padding-left:2px">
+          ↳ Aging breakdown — days since first ON_HOLD
+        </div>
+        <div style="background:#fff;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,.09);overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+                <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.6px">Team / Queue</th>
+                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#065f46;text-align:center;background:#d1fae5">1d</th>
+                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#854d0e;text-align:center;background:#fef9c3">2d</th>
+                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#92400e;text-align:center;background:#fde68a">3d</th>
+                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#c2410c;text-align:center;background:#ffedd5">4d</th>
+                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#991b1b;text-align:center;background:#fee2e2">5d</th>
+                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#7f1d1d;text-align:center;background:#fca5a5">&gt;5d</th>
+                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#64748b;text-align:center">Total</th>
+                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#64748b;text-align:center;min-width:140px">Oldest / Newest</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${heatRow('#c2410c', 'Ground Ops',           a.ground_ops,      '')}
+              ${heatRow('#0e7490', 'CC — Confirm Farmer',  a.cc_confirm,      '')}
+              ${heatRow('#0369a1', 'CC — Rerouting Failed',a.cc_rerouting,    '')}
+              ${heatRow('#dc2626', 'STF — Ops Reroute',    a.stf_reroute,     '')}
+              ${heatRow('#b45309', 'STF — Finance',         a.stf_finance,     '')}
+              ${heatRow('#1d4ed8', 'STF — Supply',          a.stf_supply,      '')}
+              ${heatRow('#6b7280', 'Never Triggered',       a.never_triggered, '(incl. B2B in transit)')}
+              ${heatGrandTotal}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Legend -->
