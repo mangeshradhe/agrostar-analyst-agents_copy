@@ -1,0 +1,451 @@
+==========================================================================================
+BALANCE TRANSFER (BT) SCAN RESULTS — Rupifi | RF Program | 23-May-2026
+==========================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 1 — SCAN SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Total partners in BQ with eligible orders:          417
+  Partners with eligible BT orders (all 4 rules):     417
+  Partners with available balance (sheet, Bal > 0):   1369
+  Actionable partners (eligible + balance, overlap):  415
+  Partners eligible but no balance in sheet:           2
+
+  Total eligible order amount (all BQ rows):          Rs.8,12,33,328
+  Total actionable BT amount (greedy + cap):          Rs.4,73,59,567
+  Balance utilization ratio:                          58.3% of eligible amt
+
+  Scan cost — bytes processed: 2.76 GB
+  Scan cost — bytes billed:    2.76 GB
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 2 — PARTNER-LEVEL BT TABLE (Actionable: 415 partners)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  partner_id | store_name                             | state         |    avail_bal |   total_elig |     actbl_bt |  orders |  oldest
+--------------------------------------------------------------------------------------------------------------------------------------
+     7382115 | PANDHARPURE AGRO SERVICES              | Maharashtra   | Rs.10,00,000 | Rs. 9,57,602 | Rs. 9,57,602 |   16/16 |     43d
+    11627449 | BHUMI AGRO TRADERS  .                  | Madhya Prade  | Rs.10,00,000 | Rs. 8,47,252 | Rs. 8,47,252 |     4/4 |     31d
+    11099333 | PRIYANSHI TRADERS .                    | Madhya Prade  | Rs. 8,75,000 | Rs. 9,31,695 | Rs. 8,01,268 |     5/6 |     30d
+     7137774 | SAPTASHRUNGI AGRO SERVICES             | Maharashtra   | Rs. 7,36,000 | Rs. 8,91,754 | Rs. 7,09,792 |     3/6 |      0d
+     3296968 | GAURAV BEEJ BHANDAR                    | Maharashtra   | Rs.10,00,000 | Rs. 5,93,798 | Rs. 5,93,798 |     4/4 |      5d
+     9824298 | MAA GAYATRI KRISHI SEWA KENDRA .       | Madhya Prade  | Rs. 5,00,000 | Rs.15,99,679 | Rs. 4,99,945 |   10/16 |     33d
+    11370554 | Durga beej bhandar .                   | Uttar Prades  | Rs. 5,00,000 | Rs. 5,67,079 | Rs. 4,99,441 |    8/11 |     29d
+    11916233 | M/S SHRI RAM RAJA BEEJ BHANDAR .       | Uttar Prades  | Rs. 5,06,000 | Rs.12,08,892 | Rs. 4,96,840 |     2/4 |      7d
+     9463317 | M/s Balaji Traders . .                 | Madhya Prade  | Rs. 5,00,000 | Rs.19,99,187 | Rs. 4,83,641 |     4/8 |     36d
+    11942139 | RANGREJ Agrotech                       | Rajasthan     | Rs. 5,00,000 | Rs. 4,66,469 | Rs. 4,66,469 |     6/6 |     28d
+     8797419 | SHANKAR BEEJ BHANDAR .                 | Uttar Prades  | Rs. 5,00,000 | Rs. 4,59,578 | Rs. 4,59,578 |     4/4 |     18d
+    11954964 | SHRIRAM KRUSHI SEVA KENDRA .           | Maharashtra   | Rs. 5,00,000 | Rs. 4,43,065 | Rs. 4,43,065 |     3/3 |      9d
+    12010066 | Sarang krashi seva kendra kamth multa  | Madhya Prade  | Rs. 4,17,000 | Rs.13,55,763 | Rs. 4,14,483 |    8/15 |     45d
+     8034585 | AMIT BEEJ BHANDAR                      | Madhya Prade  | Rs. 4,38,000 | Rs. 7,29,193 | Rs. 3,99,442 |     5/7 |     30d
+    11445464 | POONAM KRUSHI KENDRA .                 | Maharashtra   | Rs. 4,10,000 | Rs. 5,78,637 | Rs. 3,83,637 |     6/7 |      7d
+     2627005 | Bamboria Krishi Clinic .               | Madhya Prade  | Rs. 3,76,000 | Rs. 4,46,925 | Rs. 3,72,188 |    7/10 |     43d
+    12315880 | VITTHAL BEEJ BHANDAR                   | Maharashtra   | Rs. 3,72,000 | Rs. 8,16,928 | Rs. 3,67,187 |    8/14 |     35d
+     7741552 | LAXMI KRUSHI SEVA KENDRA .             | Maharashtra   | Rs.10,00,000 | Rs. 3,64,944 | Rs. 3,64,944 |     6/6 |     26d
+    11794095 | MAULI KRUSHI VIKAS KENDRA GHARNI       | Maharashtra   | Rs. 5,00,000 | Rs. 3,63,075 | Rs. 3,63,075 |     6/6 |     29d
+     9101356 | OM SAI KRUSHI SEVA KENDRA VADEL . . .  | Maharashtra   | Rs. 5,07,000 | Rs. 3,52,181 | Rs. 3,52,181 |     1/1 |      1d
+     3255294 | DADHICH KRASI SEWA KENDRA DEI .        | Rajasthan     | Rs. 5,00,000 | Rs. 3,50,220 | Rs. 3,50,220 |     1/1 |      8d
+    12326538 | Om Agro Agencies                       | Maharashtra   | Rs. 4,86,000 | Rs. 3,48,811 | Rs. 3,48,811 |     3/3 |      1d
+     6051812 | VAISHALI KRISHI BAZAR KENDRA . .       | Madhya Prade  | Rs. 5,00,000 | Rs.11,88,667 | Rs. 3,47,261 |     2/3 |      3d
+    12128054 | Shivshakti krishi seva kendra  . .     | Madhya Prade  | Rs. 3,50,000 | Rs.17,99,065 | Rs. 3,46,295 |    7/11 |     23d
+    10344028 | Jai Kishan Krashi seva Kendra          | Madhya Prade  | Rs. 4,57,000 | Rs. 6,80,084 | Rs. 3,45,602 |   11/12 |      9d
+    11809017 | BAKODE KRISHI KENDRA                   | Madhya Prade  | Rs. 4,62,000 | Rs. 5,28,233 | Rs. 3,43,593 |     1/2 |     23d
+    11537385 | NEW SHRI SHANAISHWAR KRUSHI SEVA KEND  | Maharashtra   | Rs.10,00,000 | Rs. 3,43,152 | Rs. 3,43,152 |     3/3 |      2d
+    11922765 | SAIVIGHNAHARTA KRUSHI SEVA KENDRA .    | Maharashtra   | Rs. 3,50,000 | Rs. 6,32,205 | Rs. 3,38,486 |    9/11 |     33d
+    10150068 | SHRI PANDURANG AGRO AGENCIES SHEWDI    | Maharashtra   | Rs. 4,61,000 | Rs. 3,36,940 | Rs. 3,36,940 |   11/11 |     42d
+     7905586 | VITTHAL AGRO CENTER TEMBHURNI .        | Maharashtra   | Rs. 5,25,000 | Rs. 3,35,243 | Rs. 3,35,243 |     6/6 |     26d
+     8361900 | Sai Agro Seed Sailana .                | Madhya Prade  | Rs. 5,00,000 | Rs. 3,23,470 | Rs. 3,23,470 |     1/1 |     15d
+    11996146 | OM AGRITECH                            | Gujarat       | Rs. 3,30,000 | Rs. 3,78,096 | Rs. 3,21,909 |   12/14 |     37d
+    11920334 | NIDHI KRISHI KENDRA . . .              | Uttar Prades  | Rs. 4,42,000 | Rs. 3,14,568 | Rs. 3,14,568 |     9/9 |     10d
+    11931555 | Maa Tuljai krushi seva kendra          | Maharashtra   | Rs. 3,13,000 | Rs. 5,19,375 | Rs. 3,03,135 |     6/8 |      9d
+    12023080 | Kisan Enterprises .                    | Madhya Prade  | Rs. 5,00,000 | Rs. 3,02,202 | Rs. 3,02,202 |     1/1 |      8d
+    10617060 | OM AGRO AGENCY .                       | Maharashtra   | Rs. 6,61,000 | Rs. 2,96,447 | Rs. 2,96,447 |     1/1 |     10d
+    11858414 | M/S HARSH TRADERS . .                  | Uttar Prades  | Rs. 4,00,000 | Rs. 8,15,811 | Rs. 2,91,891 |   13/14 |     23d
+    10107812 | WAGHMARE KRISHI SEVA KENDRA            | Madhya Prade  | Rs. 3,50,000 | Rs. 5,47,416 | Rs. 2,91,096 |     8/9 |     45d
+    11719165 | Shree Basweshwar Krushi Seva Kendra    | Maharashtra   | Rs. 3,00,000 | Rs. 4,14,756 | Rs. 2,90,776 |   18/20 |     38d
+     7009413 | SADGURU KRISHI KENDRA BAMHANGAON       | Madhya Prade  | Rs. 4,38,000 | Rs. 2,90,514 | Rs. 2,90,514 |     4/4 |     12d
+     7345401 | SHREE RAM AGRO CENTER                  | Gujarat       | Rs.10,00,000 | Rs. 2,89,117 | Rs. 2,89,117 |   13/13 |     35d
+     6801814 | Prayag Krishi beej bhandar             | Uttar Prades  | Rs. 3,50,000 | Rs. 2,87,737 | Rs. 2,87,737 |   11/11 |     44d
+      289115 | NEW PANKAJ KRISHI SEVA KENDRA          | Maharashtra   | Rs. 3,18,000 | Rs. 6,89,594 | Rs. 2,84,594 |     4/6 |     33d
+    11946049 | ANUSHA FERTILIZER, SEEDS & PESTICIDES  | Telangana     | Rs. 3,77,000 | Rs. 8,46,228 | Rs. 2,83,728 |     1/2 |      5d
+     9208523 | M/S HRISHABH KRISHI KENDRA             | Madhya Prade  | Rs. 7,54,000 | Rs. 2,78,340 | Rs. 2,78,340 |     5/5 |      9d
+      219538 | Yogeshwar Krushi Seva Kendra Jamadi    | Maharashtra   | Rs. 3,00,000 | Rs. 3,31,866 | Rs. 2,75,476 |     7/8 |     35d
+    11096240 | Bajrang krishi seva kendar .           | Rajasthan     | Rs. 5,00,000 | Rs. 2,74,117 | Rs. 2,74,117 |     7/7 |      3d
+      541480 | JAGDAMB KRUSHI KENDRA .                | Maharashtra   | Rs. 3,00,000 | Rs. 3,22,000 | Rs. 2,68,000 |     3/4 |      8d
+    11349552 | M/S AGRI JUNCTION KENDRA               | Uttar Prades  | Rs. 3,00,000 | Rs. 2,64,172 | Rs. 2,64,172 |     9/9 |     25d
+     1211457 | SANT GANGAGIRI KRUSHI SEVA KENDRA      | Maharashtra   | Rs. 3,78,000 | Rs. 2,62,809 | Rs. 2,62,809 |     7/7 |     32d
+     1119099 | Nandini Agro Agency                    | Maharashtra   | Rs. 4,31,000 | Rs. 2,59,532 | Rs. 2,59,532 |     7/7 |     45d
+    11435716 | SAWATA AGRO SERVICES                   | Maharashtra   | Rs. 2,94,000 | Rs. 2,52,536 | Rs. 2,52,536 |     4/4 |      8d
+    11292789 | M/S HINDUSTAN KRISHI SEVA KENDER .     | Uttar Prades  | Rs. 5,00,000 | Rs. 2,42,860 | Rs. 2,42,860 |     1/1 |     29d
+    11443515 | AARAV TRADESR                          | Madhya Prade  | Rs. 2,69,000 | Rs. 2,42,004 | Rs. 2,42,004 |     5/5 |      9d
+    11023472 | HUDALI KRUSHI KENDRA                   | Karnataka     | Rs.10,00,000 | Rs. 2,37,140 | Rs. 2,37,140 |     2/2 |      0d
+     9342400 | SHREE VALLABH AGRO CENTER              | Gujarat       | Rs. 2,40,000 | Rs. 2,73,515 | Rs. 2,36,664 |     5/6 |     32d
+     9804945 | LAXMI AGENCY                           | Maharashtra   | Rs. 4,62,000 | Rs. 2,36,476 | Rs. 2,36,476 |     6/6 |      9d
+    11330000 | M/S DILASHAD TRADERS .                 | Uttar Prades  | Rs. 3,13,000 | Rs. 2,35,200 | Rs. 2,35,200 |     2/2 |      7d
+    11071901 | R K TRADERS                            | Madhya Prade  | Rs. 5,00,000 | Rs. 9,13,533 | Rs. 2,32,229 |     3/4 |     24d
+    11560821 | Khatushyam krishi sewa kendra tolakhe  | Madhya Prade  | Rs. 4,50,000 | Rs. 2,30,038 | Rs. 2,30,038 |     1/1 |      0d
+     2569368 | GAYATRI KRISHI SEVA KENDRA JI .        | Madhya Prade  | Rs. 3,80,000 | Rs. 2,29,670 | Rs. 2,29,670 |     1/1 |      5d
+     2565541 | SATGURU SEEDS . .                      | Uttar Prades  | Rs. 3,50,000 | Rs. 2,29,380 | Rs. 2,29,380 |     3/3 |     29d
+     2147843 | M/s Paras Krushi Krushi Kendra Arali   | Maharashtra   | Rs. 7,62,000 | Rs. 2,26,048 | Rs. 2,26,048 |     3/3 |      9d
+     8731825 | Shree Marwar Khaad Beej Bhandar . .    | Rajasthan     | Rs. 7,40,000 | Rs. 2,25,844 | Rs. 2,25,844 |     8/8 |     30d
+    10958623 | NAVJYOT AGRO INDUSTRIES .              | Maharashtra   | Rs. 2,55,000 | Rs. 3,21,967 | Rs. 2,24,467 |     5/6 |     10d
+    12112333 | AYUSHMAN KRISHI TRADERS                | Madhya Prade  | Rs. 2,28,000 | Rs. 2,23,186 | Rs. 2,23,186 |     4/4 |     36d
+    11025616 | RAJA LINGESHWAR KRUSHI UDYOG SAMUH     | Maharashtra   | Rs. 3,00,000 | Rs. 2,22,779 | Rs. 2,22,779 |     2/2 |      8d
+    11814909 | CHAUHAN KHAD BEEJ BHANDAR              | Uttar Prades  | Rs. 2,24,000 | Rs. 2,20,656 | Rs. 2,20,656 |     2/2 |     19d
+      122572 | ANIKET AGRO AGENCY                     | Maharashtra   | Rs. 2,26,000 | Rs. 3,80,876 | Rs. 2,20,150 |    6/10 |      9d
+     2682302 | DWARKADHISH KRISHI SEVA KENDRA         | Maharashtra   | Rs. 2,21,000 | Rs. 7,21,624 | Rs. 2,20,035 |     4/9 |      9d
+     2315247 | SHRI SIDHIVINAYAK KRUSHI SEVA KENDRA   | Maharashtra   | Rs. 3,13,000 | Rs. 4,59,325 | Rs. 2,16,055 |     5/6 |     31d
+    12090999 | ANAND TRADERS                          | Uttar Prades  | Rs. 4,92,000 | Rs. 2,15,163 | Rs. 2,15,163 |     7/7 |     31d
+     8118971 | Shree Krushi Kendra Shegaon            | Maharashtra   | Rs. 3,00,000 | Rs. 2,14,480 | Rs. 2,14,480 |     1/1 |      2d
+      230066 | SHRIKRISHNA KRISHI KENDRA .            | Maharashtra   | Rs. 3,45,000 | Rs. 2,13,459 | Rs. 2,13,459 |     6/6 |     36d
+    11763804 | M/S SHRI MANGLAM TRADERS               | Madhya Prade  | Rs. 3,30,000 | Rs. 2,13,388 | Rs. 2,13,388 |     8/8 |     30d
+    12125530 | M/S SRI LAXMI VINAYAKA AGRO AGENCIES   | Telangana     | Rs. 2,37,000 | Rs. 2,13,140 | Rs. 2,13,140 |     2/2 |     19d
+     7621499 | Shivkrupa Krushi Seva Kendra, Mandane  | Maharashtra   | Rs. 4,15,000 | Rs. 2,10,964 | Rs. 2,10,964 |     5/5 |      9d
+    11069230 | SAURASTRA KRUSHI KENDRA                | Gujarat       | Rs. 2,99,000 | Rs. 2,09,065 | Rs. 2,09,065 |     1/1 |     14d
+    11149930 | NIKKI KRASHI KENDRA & TRADERS .        | Madhya Prade  | Rs. 4,33,000 | Rs. 2,07,727 | Rs. 2,07,727 |     2/2 |      4d
+    11388309 | Balaji krishi sewa kander ( Koshithal  | Rajasthan     | Rs. 3,30,000 | Rs. 4,15,160 | Rs. 2,04,624 |     2/3 |      8d
+    12115091 | SHREE SAWARIYA SETH KRISHI SEVA KENDR  | Madhya Prade  | Rs. 4,24,000 | Rs. 4,66,858 | Rs. 2,03,434 |     3/4 |     29d
+     2758451 | M/S PATEL KHAD BHANDAR . .             | Uttar Prades  | Rs. 2,99,000 | Rs. 1,97,230 | Rs. 1,97,230 |     3/3 |      5d
+    10185772 | AMOL KRUSHI SEWA KENDRA KRUSHI SEWA K  | Maharashtra   | Rs. 7,02,000 | Rs. 1,97,147 | Rs. 1,97,147 |     1/1 |      1d
+     9273822 | GAJANAN KRUSHI SEVA KENDRA . .         | Maharashtra   | Rs. 9,74,000 | Rs. 1,96,018 | Rs. 1,96,018 |     2/2 |      0d
+     6189393 | Shree Ram Agro Sales .                 | Rajasthan     | Rs. 1,96,000 | Rs. 5,55,556 | Rs. 1,94,663 |   10/17 |     29d
+    11209844 | NEW SAPTASHRUNGI AGRO SERVICES         | Maharashtra   | Rs. 1,96,000 | Rs. 1,92,450 | Rs. 1,92,450 |     3/3 |      8d
+     4555332 | M/s Gupta Khad Beej Kitnashak Bhandar  | Uttar Prades  | Rs. 1,93,000 | Rs. 1,91,407 | Rs. 1,91,407 |   13/13 |     32d
+     2204073 | M/S AABAN BEEJ BHANDAR .               | Uttar Prades  | Rs.10,00,000 | Rs. 1,91,357 | Rs. 1,91,357 |     1/1 |     10d
+    12236817 | JYOTIRLING KRISHI SEVA KENDRA          | Maharashtra   | Rs. 4,93,000 | Rs. 1,88,305 | Rs. 1,88,305 |     1/1 |     14d
+    10344941 | AGARWAL KHAD BEEJ BHANDAR              | Rajasthan     | Rs.10,00,000 | Rs. 1,83,947 | Rs. 1,83,947 |     2/2 |     10d
+     8104763 | M/S NIYAZI FERTILIZER . .              | Uttar Prades  | Rs. 5,00,000 | Rs. 1,83,782 | Rs. 1,83,782 |     3/3 |      8d
+    11561977 | Ashapuri Krushi Kendra                 | Maharashtra   | Rs. 1,86,000 | Rs. 4,05,858 | Rs. 1,82,923 |   10/15 |     33d
+    11081298 | Patel Agrijunction Kendra . .          | Uttar Prades  | Rs. 5,00,000 | Rs. 1,79,103 | Rs. 1,79,103 |     7/7 |     23d
+    11017653 | MA AGRIJUNCTION KENDRA (ONE STOP SHOP  | Uttar Prades  | Rs. 3,28,000 | Rs. 3,53,305 | Rs. 1,76,905 |     4/5 |     24d
+    11584716 | CHAUHAN KHAD BEEJ BHANDAR . .          | Uttar Prades  | Rs. 2,28,000 | Rs. 1,76,273 | Rs. 1,76,273 |     9/9 |     42d
+    11203130 | MAA GAYTRI BEEJ BHANDAR                | Madhya Prade  | Rs. 2,05,000 | Rs. 6,11,196 | Rs. 1,70,550 |     1/3 |      8d
+     8634693 | M/S CHOUDHARY KRISHI SEVA KENDRA       | Madhya Prade  | Rs. 1,99,000 | Rs. 4,87,494 | Rs. 1,69,705 |     2/3 |      8d
+    10307649 | Lawaniya khad Beej Bhandar .           | Uttar Prades  | Rs. 7,90,000 | Rs. 1,69,050 | Rs. 1,69,050 |     1/1 |      0d
+    11989196 | SHETKARI AGRO AGENCY .                 | Maharashtra   | Rs. 2,10,000 | Rs. 1,68,367 | Rs. 1,68,367 |     8/8 |      7d
+     2202676 | PAWAN AGROTECH .                       | Madhya Prade  | Rs. 3,43,000 | Rs. 1,61,476 | Rs. 1,61,476 |     2/2 |      2d
+    11972761 | SHYAM KHAD BEEJ BHANDAR .              | Rajasthan     | Rs. 5,00,000 | Rs. 1,60,995 | Rs. 1,60,995 |     7/7 |     28d
+    11051139 | M/S GUPTA KHAAD BHANDAR                | Uttar Prades  | Rs. 1,52,000 | Rs. 4,30,861 | Rs. 1,51,062 |    5/18 |     43d
+    12088770 | KANAK KRISHI SEVA KENDRA               | Madhya Prade  | Rs. 4,46,000 | Rs. 1,50,641 | Rs. 1,50,641 |     5/5 |     26d
+    12173989 | M/s ADISHAKTI KRUSHI KENDRA .          | Maharashtra   | Rs. 1,58,000 | Rs. 2,31,225 | Rs. 1,50,135 |    8/11 |     30d
+      963762 | RASAL KRUSHI SEVA KENDRA kendra .      | Maharashtra   | Rs. 3,17,000 | Rs. 1,49,836 | Rs. 1,49,836 |     4/4 |     29d
+    11881437 | HARI OM KHAD BEEJ BANDAR               | Rajasthan     | Rs. 3,30,000 | Rs. 1,49,361 | Rs. 1,49,361 |     2/2 |      7d
+    12035422 | Shree Ganesh krushi seva kendra        | Maharashtra   | Rs. 1,56,000 | Rs. 1,77,689 | Rs. 1,49,209 |     8/9 |     43d
+     9203852 | VISHWAKARMA KRISHI SEVA KENDRA . .     | Madhya Prade  | Rs. 2,53,000 | Rs. 1,45,648 | Rs. 1,45,648 |     5/5 |      4d
+    10350138 | EKTA BEEJ BHANDAR                      | Madhya Prade  | Rs. 3,38,000 | Rs. 1,45,280 | Rs. 1,45,280 |     1/1 |      9d
+     9928380 | Gajanan krushi Seva Kendra khetri .    | Maharashtra   | Rs. 4,19,000 | Rs. 1,45,256 | Rs. 1,45,256 |     1/1 |      0d
+     5175775 | Patidar Krashi seva Kendra Pipleyaman  | Madhya Prade  | Rs. 2,00,000 | Rs. 1,45,204 | Rs. 1,45,204 |     6/6 |     44d
+    11353037 | SPARSH KRISHI SEWA KENDRA .            | Uttar Prades  | Rs. 1,85,000 | Rs. 1,43,545 | Rs. 1,43,545 |   11/11 |     43d
+     6528424 | AGRI JUNCTION KENDRA                   | Uttar Prades  | Rs. 3,08,000 | Rs. 1,42,811 | Rs. 1,42,811 |     9/9 |     43d
+     9413866 | SHRI JANSEWA KRISHI KENDRA             | Maharashtra   | Rs. 2,46,000 | Rs. 1,42,188 | Rs. 1,42,188 |     1/1 |      0d
+    11610197 | SHREE DEV BEEJ BHANDAR                 | Rajasthan     | Rs. 3,37,000 | Rs. 1,41,622 | Rs. 1,41,622 |     3/3 |     29d
+     9340260 | JADAUN AGRI CLINIC AND AGRI BUSINESS   | Uttar Prades  | Rs. 1,72,000 | Rs. 6,55,968 | Rs. 1,41,500 |    9/11 |     44d
+     6606761 | Agrijunction One Stop Shop             | Uttar Prades  | Rs. 3,30,000 | Rs. 1,40,101 | Rs. 1,40,101 |     4/4 |     31d
+     4213156 | SHREE KRISHNA TRADERS                  | Madhya Prade  | Rs. 3,19,000 | Rs. 1,39,417 | Rs. 1,39,417 |     3/3 |      5d
+     7386197 | M/s.Chanchal Krashi Sewa Kendra . .    | Madhya Prade  | Rs. 3,33,000 | Rs. 1,38,387 | Rs. 1,38,387 |     4/4 |     45d
+     8247798 | LAXMI FERTILIZERS AND CEMENT AGENCIES  | Uttar Prades  | Rs. 1,47,000 | Rs. 1,38,053 | Rs. 1,38,053 |     5/5 |     30d
+    12092613 | ROYAL FEED AGENCY .                    | Rajasthan     | Rs. 5,00,000 | Rs. 1,37,719 | Rs. 1,37,719 |     1/1 |      8d
+    11422315 | HARIYALI KRUSHI UDYOG                  | Maharashtra   | Rs. 1,37,000 | Rs. 6,87,162 | Rs. 1,36,475 |   11/28 |     45d
+     7909347 | SHRI RAJ MOMAI AGRO CENTER             | Gujarat       | Rs. 3,30,000 | Rs. 1,34,693 | Rs. 1,34,693 |     9/9 |     38d
+     6015118 | Gauri krushi seva kendra .             | Maharashtra   | Rs. 2,53,000 | Rs. 3,48,758 | Rs. 1,34,208 |     2/3 |      9d
+    11869070 | SHREE MAHAKAL KRISHI SEVA KENDRA B     | Madhya Prade  | Rs. 1,44,000 | Rs. 1,32,575 | Rs. 1,32,575 |     2/2 |      8d
+     8598944 | Shri Ganesh Krushi Sewa Kendra         | Maharashtra   | Rs. 3,09,000 | Rs. 1,31,419 | Rs. 1,31,419 |     3/3 |      8d
+     3692097 | CHOUHAN TRADING COMPANY .              | Madhya Prade  | Rs. 1,76,000 | Rs. 1,30,008 | Rs. 1,30,008 |     3/3 |      8d
+    11500908 | Sri Lakshmi Ganapathi fertilizers      | Andhra Prade  | Rs. 4,55,000 | Rs. 1,29,376 | Rs. 1,29,376 |     1/1 |      8d
+    12099003 | ROYAL AGRO AGENCY KRUSHI SEVA KENDRA   | Maharashtra   | Rs. 3,89,000 | Rs. 1,28,824 | Rs. 1,28,824 |     1/1 |      9d
+     8038743 | BAPU AGRO AGENCY KOLSA                 | Maharashtra   | Rs. 3,85,000 | Rs. 5,93,634 | Rs. 1,28,634 |   10/11 |      9d
+    11836485 | JAYBHARAT AGRO TRADERS                 | Maharashtra   | Rs. 1,40,000 | Rs. 9,91,827 | Rs. 1,27,331 |    9/11 |     23d
+    11561351 | SWARAJ AGRO AGENCY                     | Maharashtra   | Rs. 1,44,000 | Rs. 2,82,724 | Rs. 1,27,223 |    7/11 |     26d
+     6387709 | ROHAN AGRO AGENCIES .                  | Maharashtra   | Rs. 7,44,000 | Rs. 1,26,961 | Rs. 1,26,961 |     3/3 |     23d
+    11030388 | Rathi krushi Seva kendra               | Maharashtra   | Rs. 1,74,000 | Rs. 2,20,970 | Rs. 1,26,105 |    9/10 |     31d
+     5398378 | TURANKAR KRUSHI KENDRA                 | Maharashtra   | Rs. 1,32,000 | Rs. 5,11,915 | Rs. 1,25,780 |    4/10 |      8d
+    11208621 | Jagdmamb krushi Kendra                 | Maharashtra   | Rs. 3,40,000 | Rs. 1,23,970 | Rs. 1,23,970 |     3/3 |      7d
+    11572426 | Saibaba krishi kendra  Gowari          | Maharashtra   | Rs. 1,42,000 | Rs. 1,22,996 | Rs. 1,22,996 |     3/3 |      5d
+    11584365 | Pratik Fertilizers                     | Uttar Prades  | Rs. 4,17,000 | Rs. 1,22,789 | Rs. 1,22,789 |     4/4 |     15d
+    10275723 | KHANDESHWAR KRUSHI SEVA KENDRA .       | Maharashtra   | Rs. 4,05,000 | Rs. 1,22,351 | Rs. 1,22,351 |     3/3 |      5d
+    12116971 | NEW PUNJAB BEEJ COMPANY .              | Uttar Prades  | Rs. 1,80,000 | Rs. 2,34,879 | Rs. 1,22,316 |     4/5 |     12d
+    11650232 | RAGHAV TRADERS .                       | Madhya Prade  | Rs. 1,39,000 | Rs. 1,20,210 | Rs. 1,20,210 |     9/9 |     40d
+    10977295 | OM KRUSHI SEVA KENDRA .                | Maharashtra   | Rs. 2,97,000 | Rs. 1,18,527 | Rs. 1,18,527 |     1/1 |      5d
+    11922435 | CHOURASIYA BEEJ BHANDAR                | Madhya Prade  | Rs. 5,00,000 | Rs. 1,16,224 | Rs. 1,16,224 |     1/1 |      1d
+     6471534 | M/S ISHWARI KRISHI SEVA KENDRA         | Maharashtra   | Rs. 2,46,000 | Rs. 1,14,963 | Rs. 1,14,963 |     2/2 |     28d
+      577163 | JANARDAN AGRO CENTER                   | Maharashtra   | Rs. 4,00,000 | Rs. 1,14,877 | Rs. 1,14,877 |     3/3 |     33d
+     8280179 | OMKAR HITECH AGRO SERVICES PALASTIKA   | Maharashtra   | Rs. 1,14,000 | Rs. 1,13,284 | Rs. 1,13,284 |     3/3 |     18d
+    11863983 | Mesars Verma Khad beej bhandar         | Uttar Prades  | Rs. 2,23,000 | Rs. 1,11,230 | Rs. 1,11,230 |     2/2 |      1d
+    11174477 | MORDEN AGRO AND SEEDS                  | Gujarat       | Rs. 1,88,000 | Rs. 1,11,206 | Rs. 1,11,206 |     6/6 |     38d
+    12162661 | DEV KRISHI SEVA KENDRA                 | Madhya Prade  | Rs. 3,30,000 | Rs. 1,10,500 | Rs. 1,10,500 |     2/2 |      0d
+    10235613 | Shree Agro Sales                       | Maharashtra   | Rs.10,00,000 | Rs. 1,10,220 | Rs. 1,10,220 |   12/12 |     42d
+     2071335 | KUSHWAHA KRISHI KENDRA                 | Madhya Prade  | Rs. 3,00,000 | Rs. 1,08,120 | Rs. 1,08,120 |     1/1 |      2d
+    11413706 | M/s. SRI RAJA RAJESHWARA FERTILIZERS,  | Telangana     | Rs. 1,86,000 | Rs. 1,07,958 | Rs. 1,07,958 |     2/2 |      0d
+     6909565 | M/S KUMAR AGRICULTURE STORE . . .      | Uttar Prades  | Rs. 2,55,000 | Rs. 1,07,738 | Rs. 1,07,738 |   10/10 |     39d
+    10272614 | MAA SARASWATI KRISHI SEWA KENDRA . .   | Uttar Prades  | Rs. 6,91,000 | Rs. 1,05,320 | Rs. 1,05,320 |     6/6 |     32d
+     3762046 | Kisan krushi seva kendra               | Maharashtra   | Rs. 5,78,000 | Rs. 1,03,861 | Rs. 1,03,861 |     2/2 |     39d
+    11083068 | M/S PRATIGYA KRISHI SEWA KENDRA        | Uttar Prades  | Rs. 1,04,000 | Rs. 2,18,059 | Rs. 1,03,457 |   11/19 |     42d
+    11775364 | DHARTIDHAN KRISHI KENDRA               | Maharashtra   | Rs. 3,00,000 | Rs. 1,02,802 | Rs. 1,02,802 |     1/1 |     29d
+    11454251 | BALIRAJA KRUSHI BHANDAR .              | Maharashtra   | Rs. 1,74,000 | Rs. 1,01,500 | Rs. 1,01,500 |     2/2 |      5d
+    10262519 | M/S Abhay Traders .                    | Madhya Prade  | Rs. 4,30,000 | Rs. 1,00,939 | Rs. 1,00,939 |     2/2 |      4d
+     1371470 | SHREE MAHAKALI AGRO CENTER MAYAPUR     | Gujarat       | Rs. 1,07,000 | Rs. 2,43,716 | Rs. 1,00,906 |    4/10 |     35d
+     8012753 | Mahalaxmi Traders .                    | Uttar Prades  | Rs. 1,38,000 | Rs. 1,44,217 | Rs.   99,753 |     3/4 |     29d
+    11299210 | ANNAPURNA KRUSHI SEVA KENDRA .         | Rajasthan     | Rs. 3,00,000 | Rs.   99,439 | Rs.   99,439 |     6/6 |     33d
+     6180975 | GANESH KRISHI KENDRA lakhandur         | Maharashtra   | Rs. 1,12,000 | Rs. 2,60,369 | Rs.   99,207 |     3/4 |     25d
+     9749032 | Shri Radha Krishna Traders .           | Madhya Prade  | Rs. 4,51,000 | Rs.   98,990 | Rs.   98,990 |     2/2 |      1d
+     8532241 | KISAN AGRO CHEMICALS Jesar             | Gujarat       | Rs. 1,01,000 | Rs.   98,841 | Rs.   98,841 |   10/10 |     31d
+     3443850 | KALYANI KRUSHI SEVA KENDRA PATHARI     | Maharashtra   | Rs. 1,78,000 | Rs.   98,543 | Rs.   98,543 |     1/1 |      8d
+    11803296 | M/S SAUMYA GRAMIN AGRIJUCTION KISAN S  | Uttar Prades  | Rs. 1,64,000 | Rs.   98,423 | Rs.   98,423 |     8/8 |     31d
+    11600254 | VISHNU AGRO AGENCIES                   | Rajasthan     | Rs. 1,68,000 | Rs.   98,109 | Rs.   98,109 |     3/3 |      1d
+    11127549 | RAJPUT KRISHI SEVA KENDRA .            | Madhya Prade  | Rs. 3,70,000 | Rs.   97,906 | Rs.   97,906 |     1/1 |      5d
+    12115019 | Bhairav beej bhandar .                 | Madhya Prade  | Rs. 1,87,000 | Rs. 5,20,519 | Rs.   97,527 |     1/2 |      1d
+    11649745 | SINGH KISHAN GHAR .                    | Uttar Prades  | Rs. 2,18,000 | Rs.   95,888 | Rs.   95,888 |     1/1 |     26d
+     9320857 | KUSUM KRISHI UDYOG                     | Maharashtra   | Rs. 3,64,000 | Rs.   94,655 | Rs.   94,655 |     3/3 |     23d
+    12059510 | SHRI RAM AGRO TRADERS                  | Rajasthan     | Rs. 3,30,000 | Rs.   94,612 | Rs.   94,612 |     3/3 |     11d
+     4174294 | AGRIJUCTION ONE STOP SHOP .            | Uttar Prades  | Rs. 2,17,000 | Rs. 3,76,295 | Rs.   94,055 |     1/2 |     29d
+     5454449 | PATIDAR KRISHI SEWA KENDRA T .         | Madhya Prade  | Rs.   94,000 | Rs. 4,33,912 | Rs.   93,935 |     4/6 |     40d
+     5495231 | Nageshwar Fertilizers . .              | Maharashtra   | Rs. 1,78,000 | Rs.   93,886 | Rs.   93,886 |     3/3 |     10d
+    10960598 | KUNJ BIHARI TREDERS .                  | Uttar Prades  | Rs. 3,30,000 | Rs. 4,05,675 | Rs.   89,451 |     8/9 |     29d
+     9865285 | SARVESH KISHAN SEWA KENDRA .           | Uttar Prades  | Rs. 3,00,000 | Rs.   89,230 | Rs.   89,230 |     5/5 |     44d
+    11884376 | SALASAR KHAAD BEEJ BHANDAR             | Rajasthan     | Rs. 3,30,000 | Rs.   89,054 | Rs.   89,054 |     3/3 |      5d
+    11863806 | R D AGRO MART NASIRDA                  | Rajasthan     | Rs. 1,65,000 | Rs.   88,948 | Rs.   88,948 |     3/3 |      3d
+     8169321 | VERMA KRISHI SEWA KENDRA               | Uttar Prades  | Rs. 2,62,000 | Rs.   87,738 | Rs.   87,738 |     2/2 |     36d
+     3093809 | AMBIKA AGRO CHEMICALS AND FERTILIZERS  | Gujarat       | Rs. 1,12,000 | Rs. 1,67,160 | Rs.   86,070 |     4/5 |     35d
+    11448602 | SIDDHNATH KRUSHI SEVA KENDRA           | Maharashtra   | Rs. 1,54,000 | Rs.   85,590 | Rs.   85,590 |     6/6 |     23d
+    12232714 | Flora krushi seva kendra  .            | Maharashtra   | Rs. 1,94,000 | Rs. 3,55,489 | Rs.   85,489 |     3/4 |     39d
+    11974969 | PATIL AGRO CENTER SHAHAPUR .           | Maharashtra   | Rs. 2,34,000 | Rs.   85,457 | Rs.   85,457 |     5/5 |     33d
+    11870949 | DEVARADDI AGRO ENTERPRISES             | Karnataka     | Rs. 1,56,000 | Rs.   84,928 | Rs.   84,928 |     1/1 |      1d
+     8834631 | DEEPAK KRUSHI SEWA KENDRA TAKARWAN MA  | Maharashtra   | Rs. 4,29,000 | Rs.   83,940 | Rs.   83,940 |     3/3 |      4d
+     8367027 | CHAMUNDA AGROTECH                      | Gujarat       | Rs. 1,06,000 | Rs.   83,717 | Rs.   83,717 |     5/5 |     36d
+    11441139 | Devansh Agro Services                  | Maharashtra   | Rs. 3,50,000 | Rs.   81,732 | Rs.   81,732 |     2/2 |     21d
+     9067387 | Ajay Agro Center .                     | Rajasthan     | Rs. 3,44,000 | Rs.   81,476 | Rs.   81,476 |     3/3 |      3d
+    11960471 | Kisan Mitra khad beej bhandar          | Uttar Prades  | Rs.   85,000 | Rs. 1,40,910 | Rs.   80,438 |     4/6 |     40d
+     1166922 | Pandurang krushi seva kendra purna     | Maharashtra   | Rs. 1,39,000 | Rs.   80,355 | Rs.   80,355 |     1/1 |      1d
+    12121334 | SAINI AGENCIES                         | Rajasthan     | Rs. 3,30,000 | Rs.   78,000 | Rs.   78,000 |     2/2 |      7d
+    12162681 | ARAYAN KHAD BEEJ BHANDAR .             | Rajasthan     | Rs. 4,32,000 | Rs.   77,821 | Rs.   77,821 |     1/1 |      7d
+     2728096 | SHREE RAM KHAD BEEJ BHANDAR .          | Rajasthan     | Rs. 3,07,000 | Rs.   77,700 | Rs.   77,700 |     1/1 |      7d
+     6253773 | Gourav Kumar                           | Uttar Prades  | Rs. 1,90,000 | Rs.   77,024 | Rs.   77,024 |     4/4 |     24d
+     7703936 | Patidar krishi Sewa kendra Sunthi      | Madhya Prade  | Rs.   84,000 | Rs. 1,33,871 | Rs.   76,987 |     1/3 |      8d
+    11497967 | KISAN AGRO MART .                      | Rajasthan     | Rs. 3,30,000 | Rs.   76,358 | Rs.   76,358 |     4/4 |     15d
+    10164934 | RENUKA MATA KRUSHI SEVA KENDRA         | Maharashtra   | Rs. 3,30,000 | Rs.   76,106 | Rs.   76,106 |   10/10 |     44d
+     9139259 | Anuj Yadav                             | Uttar Prades  | Rs. 2,99,000 | Rs.   76,085 | Rs.   76,085 |     4/4 |     44d
+    10125812 | BALIRAJA AGRO AGENCIES ATNOOR          | Maharashtra   | Rs. 6,80,000 | Rs.   76,050 | Rs.   76,050 |     1/1 |      8d
+    12292873 | Shri Balaji Traders                    | Uttar Prades  | Rs. 2,46,000 | Rs.   74,972 | Rs.   74,972 |     1/1 |      8d
+    11534831 | Singh Fertilizer  . .                  | Uttar Prades  | Rs. 1,44,000 | Rs.   74,815 | Rs.   74,815 |     6/6 |     39d
+    11433940 | KISAN KHAD BHANDAR .                   | Uttar Prades  | Rs. 4,71,000 | Rs.   74,729 | Rs.   74,729 |     5/5 |     28d
+     6490200 | PARAS TRADERS                          | Madhya Prade  | Rs. 2,80,000 | Rs. 4,13,529 | Rs.   74,349 |     4/5 |     40d
+     1478712 | NANDAN AGRO MART MITIYAJ               | Gujarat       | Rs.   90,000 | Rs. 1,05,865 | Rs.   74,233 |     8/9 |     45d
+     2276911 | M/S JABBAR BEEJ BHANDAR . .            | Uttar Prades  | Rs. 6,80,000 | Rs. 8,66,706 | Rs.   73,184 |     5/6 |     19d
+    10166220 | SAHYADRI AGRO AGENCIES                 | Maharashtra   | Rs. 2,00,000 | Rs.   72,087 | Rs.   72,087 |     2/2 |      8d
+     8470281 | SALONI KRUSHI SEVA KENDRA              | Maharashtra   | Rs.   93,000 | Rs.   70,087 | Rs.   70,087 |     4/4 |      1d
+    11285195 | RUDRA KRISHI SEWA KENDRA . .           | Madhya Prade  | Rs.   72,000 | Rs. 3,64,872 | Rs.   69,016 |     4/6 |     28d
+      708753 | YASH KRISHI KENDRA                     | Maharashtra   | Rs. 1,01,000 | Rs.   68,862 | Rs.   68,862 |     2/2 |      4d
+    12182308 | Omkareshwar Agro Agencies Zirofata     | Maharashtra   | Rs. 3,40,000 | Rs. 4,11,982 | Rs.   68,220 |     1/2 |      0d
+    11324614 | VINAYAK KRUSHI KENDRA  .               | Maharashtra   | Rs. 2,54,000 | Rs.   67,860 | Rs.   67,860 |     3/3 |      7d
+    10252588 | Om Agri Mart .                         | Maharashtra   | Rs. 1,14,000 | Rs.   64,926 | Rs.   64,926 |     2/2 |      0d
+    11159927 | M/S JAI AMBAY FERTILIZER . .           | Uttar Prades  | Rs. 1,00,000 | Rs. 2,89,603 | Rs.   64,703 |     7/9 |     18d
+    12142637 | SURESHKUMAR BABULAL VED .              | Madhya Prade  | Rs. 3,30,000 | Rs.   62,947 | Rs.   62,947 |     1/1 |      2d
+    11448224 | CHANDRA FERTILISERS                    | Andhra Prade  | Rs. 1,37,000 | Rs.   62,897 | Rs.   62,897 |     1/1 |      0d
+    11454266 | RUTURAJ AGRO CENTER .                  | Gujarat       | Rs. 1,66,000 | Rs.   62,410 | Rs.   62,410 |     2/2 |     15d
+     9130204 | GURUKRUPA AGRO AGENCIES Thugaon Pimpr  | Maharashtra   | Rs.   73,000 | Rs.   62,280 | Rs.   62,280 |     3/3 |      1d
+    11479162 | SHREE SAWARIYA KRISHI SEVA KENDRA . .  | Madhya Prade  | Rs. 1,76,000 | Rs.   61,509 | Rs.   61,509 |     2/2 |     15d
+    11260742 | YUVARAJ KRUSHI KENDRA SAWARGAON DUKAR  | Maharashtra   | Rs. 5,00,000 | Rs.   60,033 | Rs.   60,033 |     6/6 |     36d
+    11786399 | AADVIK TRADERS                         | Uttar Prades  | Rs.   61,000 | Rs.   99,531 | Rs.   59,132 |    8/12 |     44d
+    12133473 | SAINATH KRUSHI SEWA KENDRA .           | Maharashtra   | Rs. 2,50,000 | Rs. 9,92,681 | Rs.   58,673 |     3/4 |      5d
+    12020538 | SHRI VEER TEJAJI KHAD BEEJ BHANDAR .   | Rajasthan     | Rs. 3,30,000 | Rs.   58,535 | Rs.   58,535 |     3/3 |     18d
+      819824 | SHRI RAJESHWAR KRISHI SEVA KENDRA      | Maharashtra   | Rs. 1,28,000 | Rs.   57,742 | Rs.   57,742 |     2/2 |     35d
+    11209396 | ASHISH KHAD BHANDAR .                  | Uttar Prades  | Rs.   80,000 | Rs.   84,161 | Rs.   57,361 |     2/3 |     29d
+     4287118 | SHREE ANAND MANGAL CASH COUNTER        | Madhya Prade  | Rs. 3,00,000 | Rs.   57,202 | Rs.   57,202 |     5/5 |     29d
+     5604191 | SAMRUDHI KRUSHI KENDRA                 | Maharashtra   | Rs. 6,83,000 | Rs.   57,026 | Rs.   57,026 |     1/1 |      1d
+    11420836 | shri durga fertilizer .                | Karnataka     | Rs. 1,35,000 | Rs.   56,584 | Rs.   56,584 |     2/2 |     23d
+    11669117 | NEW BALAJI BEEJ BHANDAR                | Uttar Prades  | Rs.   82,000 | Rs.   86,267 | Rs.   55,522 |     1/2 |     23d
+     7026785 | DONGA FARM INPUTS                      | Gujarat       | Rs. 1,63,000 | Rs.   55,500 | Rs.   55,500 |     2/2 |      3d
+    11144158 | Chhaya traders                         | Uttar Prades  | Rs.   56,000 | Rs. 1,57,295 | Rs.   55,306 |    6/10 |     45d
+     8641080 | M/S VIJAY BEEJ BHANDAR . . .           | Uttar Prades  | Rs. 1,80,000 | Rs.   55,269 | Rs.   55,269 |     2/2 |     12d
+    11812058 | MAA SAMOTI KRISHI SEVA KENDRA          | Madhya Prade  | Rs. 1,73,000 | Rs.   55,200 | Rs.   55,200 |     1/1 |      9d
+    11968817 | KHEDUT AGRO CENTER                     | Gujarat       | Rs. 4,88,000 | Rs.   54,401 | Rs.   54,401 |     3/3 |      1d
+    11938550 | M/S SARWADHNYA KRUSHI SEVA KENDRA AMB  | Maharashtra   | Rs. 3,26,000 | Rs.   54,060 | Rs.   54,060 |     1/1 |      3d
+     5420290 | Adinath Krushi Seva Kendra Sawargaon   | Maharashtra   | Rs. 3,69,000 | Rs.   54,000 | Rs.   54,000 |     1/1 |      2d
+     4167601 | M/S Kanaujia Krishi Raksha Kendra      | Uttar Prades  | Rs. 6,99,000 | Rs.   53,362 | Rs.   53,362 |     6/6 |     36d
+    11451783 | Sharma Krishi Raksha Kendra .          | Uttar Prades  | Rs.   62,000 | Rs.   52,977 | Rs.   52,977 |     2/2 |      8d
+    12331103 | SHRIJI KRISHI SEVA KENDRA              | Uttar Prades  | Rs.   99,000 | Rs.   50,096 | Rs.   50,096 |     3/3 |     24d
+     5672540 | Vinay Khad Bhandar .                   | Uttar Prades  | Rs. 1,11,000 | Rs.   49,853 | Rs.   49,853 |     3/3 |      7d
+     9017039 | BALAJI KRUSHI KENDRA BHAM RAJA         | Maharashtra   | Rs. 1,23,000 | Rs.   49,606 | Rs.   49,606 |     2/2 |      3d
+     5393379 | MADHAV AGRO CENTER                     | Gujarat       | Rs. 5,00,000 | Rs.   48,546 | Rs.   48,546 |     2/2 |      0d
+    10026451 | AGRI JUCTION .                         | Uttar Prades  | Rs. 2,29,000 | Rs.   48,300 | Rs.   48,300 |     2/2 |     19d
+    11947642 | SHREE SHYAM KRISHI SEWA KENDRA .       | Rajasthan     | Rs. 2,28,000 | Rs.   48,068 | Rs.   48,068 |     3/3 |      5d
+    12099739 | Agri junction nagra                    | Uttar Prades  | Rs. 1,08,000 | Rs.   47,336 | Rs.   47,336 |     3/3 |     15d
+    10300803 | PATIL KRISHI SEVA KENDRA               | Maharashtra   | Rs.   58,000 | Rs.   46,224 | Rs.   46,224 |     3/3 |      0d
+    11392380 | BALAJI KRUSHI KENDRA . .               | Maharashtra   | Rs.   50,000 | Rs. 7,99,418 | Rs.   45,834 |     3/8 |     40d
+     9223369 | MAA AGRO AGENCY                        | Gujarat       | Rs.   49,000 | Rs. 1,72,692 | Rs.   45,325 |    5/12 |     37d
+     6871667 | K.G.N. KRUSHI SEVA KENDRA              | Maharashtra   | Rs. 1,19,000 | Rs.   45,127 | Rs.   45,127 |     1/1 |      8d
+    10098971 | Piyush Krushi Sewa Kendra . .          | Maharashtra   | Rs. 2,51,000 | Rs.   45,081 | Rs.   45,081 |     2/2 |      8d
+      658082 | LAXYA AGRO AGENCY                      | Gujarat       | Rs. 3,00,000 | Rs.   44,769 | Rs.   44,769 |     3/3 |      8d
+    11025452 | DHANSHRI TRADERS .                     | Maharashtra   | Rs.   78,000 | Rs. 1,06,468 | Rs.   44,462 |     3/4 |      1d
+    10761519 | SHRIHARI KRUSHI SEVA KENDRA            | Maharashtra   | Rs. 6,92,000 | Rs.   43,984 | Rs.   43,984 |     1/1 |      3d
+    11329083 | Dhanwalkar Agro center  .              | Maharashtra   | Rs.   65,000 | Rs.   42,885 | Rs.   42,885 |     2/2 |      8d
+     3032054 | M/s. Nagveli Agro Agency Shendurni     | Maharashtra   | Rs. 4,30,000 | Rs.   42,720 | Rs.   42,720 |     1/1 |      2d
+     1474480 | BAJARANG KRUSHI KENDRA                 | Maharashtra   | Rs. 2,20,000 | Rs.   42,655 | Rs.   42,655 |     2/2 |      8d
+    11927881 | PATIDAR KRASHI SEWA KENDRA             | Madhya Prade  | Rs. 8,00,000 | Rs.   42,254 | Rs.   42,254 |     1/1 |      9d
+    12102894 | Agrigacton one stop shop               | Uttar Prades  | Rs. 1,02,000 | Rs.   41,535 | Rs.   41,535 |     1/1 |      4d
+    12262228 | Shetkari krushi seva kendra hingoli    | Maharashtra   | Rs.   88,000 | Rs.   41,454 | Rs.   41,454 |     2/2 |      8d
+    11254661 | ANJANEYA AGROS                         | Andhra Prade  | Rs. 6,36,000 | Rs.   40,991 | Rs.   40,991 |     1/1 |      0d
+     8118233 | SHRI DURGA AGRO AGENCIES               | Rajasthan     | Rs. 2,94,000 | Rs.   40,494 | Rs.   40,494 |     1/1 |      5d
+    10538739 | VIRKRUPA FARTILIZERS .                 | Gujarat       | Rs. 3,00,000 | Rs.   40,341 | Rs.   40,341 |     4/4 |      8d
+     7506057 | SAHYADRI KRUSHI SEVA KENDRA .          | Maharashtra   | Rs. 1,14,000 | Rs.   40,272 | Rs.   40,272 |     2/2 |     24d
+    11208556 | RAJ BEEJ BHANDAR  .                    | Uttar Prades  | Rs. 1,00,000 | Rs.   39,721 | Rs.   39,721 |     2/2 |     10d
+    11664692 | Prince Khad Beej Bhandar .             | Uttar Prades  | Rs.   83,000 | Rs.   39,521 | Rs.   39,521 |     3/3 |      7d
+    11617403 | Kisan khad bhandar .                   | Uttar Prades  | Rs. 3,30,000 | Rs.   39,168 | Rs.   39,168 |     1/1 |      1d
+    10146762 | Aniket krushi seva kendra .            | Maharashtra   | Rs. 2,04,000 | Rs.   38,793 | Rs.   38,793 |     5/5 |     33d
+      912938 | Matra krapa krashi seva kendra         | Madhya Prade  | Rs. 3,00,000 | Rs. 6,01,989 | Rs.   38,079 |     3/4 |     19d
+    11422682 | Sarwan khad bhandar . .                | Uttar Prades  | Rs.   89,000 | Rs.   37,535 | Rs.   37,535 |     1/1 |     29d
+     4794366 | MAHAK AGRO AGENCY                      | Madhya Prade  | Rs. 4,89,000 | Rs.   37,387 | Rs.   37,387 |     4/4 |     43d
+    11799691 | MAHADEV KHAAD BEEJ BHANDAR BILOO BILO  | Rajasthan     | Rs. 3,30,000 | Rs.   37,150 | Rs.   37,150 |     1/1 |      0d
+    11423672 | KRUSHI SANKALP AGRO SERVICES           | Maharashtra   | Rs. 1,39,000 | Rs.   36,760 | Rs.   36,760 |     1/1 |      8d
+     5638158 | ANKIT ENTERPRISES & BEEJ BHANDAR .     | Madhya Prade  | Rs. 3,16,000 | Rs.   36,746 | Rs.   36,746 |     1/1 |      1d
+    11811870 | Agri junction Kendra                   | Uttar Prades  | Rs. 2,36,000 | Rs.   36,151 | Rs.   36,151 |     1/1 |      1d
+    11847830 | SAI MALHAR AGRO AGENCY                 | Maharashtra   | Rs.   40,000 | Rs. 1,19,289 | Rs.   36,000 |     2/4 |      8d
+      582531 | ADIRAJ KRUSHI SEVA KENDRA              | Maharashtra   | Rs. 3,18,000 | Rs.   35,904 | Rs.   35,904 |     1/1 |     23d
+    11523071 | SHREE HINGLAJ KISAN SEWA KENDRA .      | Rajasthan     | Rs.   54,000 | Rs. 2,28,984 | Rs.   35,488 |     3/5 |     11d
+    12087488 | M/S SINGH KHAD BHANDAR .               | Uttar Prades  | Rs. 3,58,000 | Rs.   34,355 | Rs.   34,355 |     1/1 |     15d
+    12116758 | SAMRUDDHI AGRO SCIENCESS               | Maharashtra   | Rs. 2,78,000 | Rs.   33,641 | Rs.   33,641 |     3/3 |      0d
+     3915425 | M/s. Shree swami samarth ksk walkheda  | Maharashtra   | Rs. 1,38,000 | Rs.   33,302 | Rs.   33,302 |     1/1 |     35d
+    11817295 | AGRO RYTHU SEVA KENDRAM RAGHAVAPUR     | Telangana     | Rs. 3,30,000 | Rs.   33,264 | Rs.   33,264 |     1/1 |      5d
+    11819773 | MAHADEV KHAD BEEJ BHANDAR .            | Rajasthan     | Rs. 3,30,000 | Rs.   32,601 | Rs.   32,601 |     2/2 |      0d
+     6565032 | Kissan Agrijunction One Stop shop .    | Uttar Prades  | Rs. 3,25,000 | Rs.   32,588 | Rs.   32,588 |     2/2 |      3d
+      664316 | KRUSHISPARSHA SEVA KENDRA              | Maharashtra   | Rs. 1,83,000 | Rs.   32,250 | Rs.   32,250 |     1/1 |      7d
+     9199659 | GAJRAJ AGRO AGENCIES HARAL .           | Maharashtra   | Rs. 1,33,000 | Rs.   31,671 | Rs.   31,671 |     1/1 |      1d
+    11304789 | JINMATA KRUSHI SEVA KENDRA             | Maharashtra   | Rs. 8,75,000 | Rs.   30,188 | Rs.   30,188 |     2/2 |      4d
+     8963335 | M/S KHETI KISHANI KRISHI SEWA KENDRA   | Uttar Prades  | Rs. 1,05,000 | Rs.   29,825 | Rs.   29,825 |     2/2 |     12d
+     8465217 | SHIVAM AGRO TRADERS . . . .            | Gujarat       | Rs. 1,40,000 | Rs.   29,625 | Rs.   29,625 |     1/1 |      1d
+    12084132 | KAMAL AGRO TRADERS .                   | Maharashtra   | Rs.   30,000 | Rs. 1,07,153 | Rs.   29,569 |     6/7 |     29d
+     8036707 | BANDEWAR KRUSHI SEVA KENDRA Latur      | Maharashtra   | Rs. 5,31,000 | Rs.   29,552 | Rs.   29,552 |     1/1 |      9d
+    11073595 | Bharti trading company . . .           | Madhya Prade  | Rs. 4,32,000 | Rs.   29,020 | Rs.   29,020 |     2/2 |      3d
+     9549666 | MAA BHAWANI KRUSHI BHANDAR             | Maharashtra   | Rs.   59,000 | Rs.   28,124 | Rs.   28,124 |     1/1 |      2d
+     8649461 | PARTH KRUSHI SEVA KENDRA .             | Maharashtra   | Rs. 4,64,000 | Rs.   27,681 | Rs.   27,681 |     1/1 |      8d
+     1268471 | TRIMURTI KRUSHI KENDRA                 | Maharashtra   | Rs.   92,000 | Rs. 3,04,940 | Rs.   27,030 |     1/2 |      8d
+     2135183 | krushiratna haitech center             | Maharashtra   | Rs. 1,36,000 | Rs.   27,030 | Rs.   27,030 |     1/1 |      5d
+     3351723 | NIRJLA KRISHI SEWA KENDRA              | Madhya Prade  | Rs. 2,83,000 | Rs.   27,013 | Rs.   27,013 |     3/3 |     44d
+    12159380 | SARTHAK KRUSHI SEVA KENDRA             | Maharashtra   | Rs.   30,000 | Rs. 1,35,000 | Rs.   27,000 |     1/3 |      5d
+     8815206 | SHRIKANT KRUSHI KENDRA                 | Maharashtra   | Rs. 1,87,000 | Rs.   27,000 | Rs.   27,000 |     1/1 |      8d
+     8174888 | DATTA AGRO CENTER                      | Maharashtra   | Rs.   35,000 | Rs.   27,000 | Rs.   27,000 |     1/1 |      5d
+     1654084 | GAYATRI TRADERS .                      | Gujarat       | Rs. 1,37,000 | Rs.   27,000 | Rs.   27,000 |     1/1 |     30d
+    11937652 | GARIMA KRISHI SEVA KENDRA .            | Madhya Prade  | Rs. 2,50,000 | Rs.   27,000 | Rs.   27,000 |     1/1 |     10d
+    11551238 | Shree dhakad krishi sewa kendra        | Madhya Prade  | Rs.   30,000 | Rs.   51,384 | Rs.   26,388 |     1/2 |     11d
+     8387913 | SAMIL AGRO CENTER                      | Gujarat       | Rs. 3,52,000 | Rs.   26,195 | Rs.   26,195 |     2/2 |      1d
+    10348293 | Krushak Krushi Seva Kendra Krushi Sev  | Maharashtra   | Rs. 5,62,000 | Rs.   26,030 | Rs.   26,030 |     1/1 |     44d
+    12090302 | Dwarkadish krushi seva kenrda          | Maharashtra   | Rs. 1,40,000 | Rs.   25,970 | Rs.   25,970 |     1/1 |      1d
+    12333184 | Shivam khad Bhandar .                  | Uttar Prades  | Rs.   52,000 | Rs.   25,251 | Rs.   25,251 |     2/2 |     43d
+     3887450 | PATEL AGRO CENTER .                    | Madhya Prade  | Rs. 1,28,000 | Rs.   25,243 | Rs.   25,243 |     4/4 |     31d
+     9404128 | M/S TULSIRAM CHHOTEYLAL .              | Uttar Prades  | Rs. 5,97,000 | Rs.   25,095 | Rs.   25,095 |     2/2 |      9d
+    11542783 | RAJESHWAR AGRO CENTRE                  | Gujarat       | Rs. 1,85,000 | Rs.   24,908 | Rs.   24,908 |     2/2 |     36d
+     6362595 | TAJ PESTICIDES                         | Uttar Prades  | Rs. 1,00,000 | Rs.   24,871 | Rs.   24,871 |     3/3 |     30d
+    12258758 | SRI ARUNACHALA TRADERS                 | Telangana     | Rs.   31,000 | Rs.   24,851 | Rs.   24,851 |     1/1 |     18d
+     1772448 | Viraj Agrotech Budh                    | Maharashtra   | Rs. 1,83,000 | Rs.   24,702 | Rs.   24,702 |     2/2 |     37d
+    12277795 | Kesharwani khad beej dava .            | Uttar Prades  | Rs. 2,40,000 | Rs.   24,445 | Rs.   24,445 |     1/1 |      1d
+     7711598 | SHIV AGRO (VIRAMGAM)                   | Gujarat       | Rs.   38,000 | Rs. 2,38,536 | Rs.   24,276 |     2/4 |     23d
+    12262758 | Agri junction one stop shop  .         | Uttar Prades  | Rs. 3,31,000 | Rs.   24,093 | Rs.   24,093 |     2/2 |     31d
+    12010577 | Durga beej bhandar .                   | Uttar Prades  | Rs.   32,000 | Rs.   33,185 | Rs.   23,987 |     1/2 |     23d
+    11679239 | PRASHANT AGRO CHEMICALS .              | Maharashtra   | Rs.   41,000 | Rs.   23,676 | Rs.   23,676 |     3/3 |     23d
+     2694287 | SHREE VIHAT AGRO CENTER .              | Gujarat       | Rs. 7,37,000 | Rs.   23,601 | Rs.   23,601 |     1/1 |      3d
+    10846076 | MS DEEP MALA KHAD BHANDAR .            | Uttar Prades  | Rs. 1,51,000 | Rs. 2,49,266 | Rs.   23,520 |     1/2 |     31d
+    10253227 | RADHA KRISHNA HARDWARE                 | Madhya Prade  | Rs. 3,53,000 | Rs.   23,464 | Rs.   23,464 |     1/1 |      1d
+    12251513 | Devnarayan Krishi Kendra kahani        | Madhya Prade  | Rs. 1,88,000 | Rs.   23,346 | Rs.   23,346 |     1/1 |      4d
+    11550904 | Muktai Krushi Seva Kendra  .           | Maharashtra   | Rs. 1,16,000 | Rs.   23,335 | Rs.   23,335 |     1/1 |      0d
+    11772020 | Goldy krishi Kendra . .                | Madhya Prade  | Rs. 1,27,000 | Rs. 1,63,433 | Rs.   23,310 |     1/2 |      7d
+    11968681 | Shivlesh krishi Kendra                 | Madhya Prade  | Rs.   64,000 | Rs. 2,07,960 | Rs.   22,500 |     1/2 |      8d
+    12139688 | Harsh krushi kendra                    | Maharashtra   | Rs.   83,000 | Rs.   90,902 | Rs.   22,149 |     2/3 |     17d
+    11610171 | CHOUDHRY KRISHI SEWA KENDRA BH         | Madhya Prade  | Rs. 2,56,000 | Rs.   21,669 | Rs.   21,669 |     1/1 |      1d
+     8681062 | GANESH FERTILIZERS                     | Maharashtra   | Rs. 1,03,000 | Rs.   20,943 | Rs.   20,943 |     4/4 |     44d
+    10984313 | ASHAPURA AGRO CENTER                   | Gujarat       | Rs. 1,25,000 | Rs.   20,732 | Rs.   20,732 |     2/2 |      0d
+    11598576 | SHETAKARI KRISHI SEWA KENDRA  .        | Maharashtra   | Rs.   30,000 | Rs. 1,92,931 | Rs.   20,440 |     3/6 |     35d
+      176474 | shree Mauli krushi seva kendra  Dhama  | Maharashtra   | Rs. 4,26,000 | Rs.   19,888 | Rs.   19,888 |     2/2 |     29d
+     7955161 | VIHAT AGRO CENTER . .                  | Gujarat       | Rs.10,00,000 | Rs.   19,855 | Rs.   19,855 |     2/2 |      0d
+    11413523 | OM PESTICIDE AND SEED STORE .          | Uttar Prades  | Rs. 2,72,000 | Rs.   19,824 | Rs.   19,824 |     3/3 |      9d
+     7804733 | GAJANAND AGRO CENTRE                   | Gujarat       | Rs. 5,01,000 | Rs.   19,691 | Rs.   19,691 |     1/1 |      2d
+    12332815 | Ovi krushi kendra                      | Maharashtra   | Rs. 1,23,000 | Rs. 1,29,285 | Rs.   19,660 |     2/3 |     15d
+    12162326 | SAMBHAJI KRUSHI KENDRA                 | Maharashtra   | Rs.   30,000 | Rs. 1,50,501 | Rs.   19,536 |     1/3 |      1d
+    11563825 | MAHAVEER AGRO AGENCIES MAJALGAON       | Maharashtra   | Rs. 3,17,000 | Rs.   18,000 | Rs.   18,000 |     1/1 |      0d
+     5294422 | SHRI YOGESHVAR FERTILIZER              | Gujarat       | Rs.10,00,000 | Rs.   17,775 | Rs.   17,775 |     1/1 |      1d
+    12326642 | Shristi Agri Junction Sewa Kendra      | Uttar Prades  | Rs.   76,000 | Rs.   17,475 | Rs.   17,475 |     2/2 |     28d
+    11424473 | BALAJI KRUSHI SEVA KENDRA .            | Maharashtra   | Rs. 2,71,000 | Rs.   17,077 | Rs.   17,077 |     1/1 |      3d
+    11602998 | Balaji Krishi Seva Kendra .            | Madhya Prade  | Rs. 2,74,000 | Rs.   16,925 | Rs.   16,925 |     1/1 |      5d
+      540742 | BIBHA AGRO                             | Maharashtra   | Rs.   63,000 | Rs.   16,656 | Rs.   16,656 |     2/2 |     24d
+    11834471 | SHIVNERI KRISHI SEWA KENDRA DEOSARRA   | Maharashtra   | Rs. 4,00,000 | Rs.   16,642 | Rs.   16,642 |     3/3 |     44d
+    11708283 | Shiv shakti bhandar                    | Uttar Prades  | Rs.   51,000 | Rs.   16,579 | Rs.   16,579 |     1/1 |      5d
+     5596696 | SATYAM KRISHI SEWA KENDRA . .          | Madhya Prade  | Rs. 4,63,000 | Rs.   15,794 | Rs.   15,794 |     1/1 |      1d
+    11560280 | KHUSHBU KHAD BEEJ BHANDAR              | Rajasthan     | Rs. 2,97,000 | Rs.   15,723 | Rs.   15,723 |     1/1 |      1d
+     8042909 | WADHAI KRISHI SEVA KENDRA              | Maharashtra   | Rs. 2,99,000 | Rs.   15,514 | Rs.   15,514 |     3/3 |      4d
+    11845173 | RADHE AGRO CENTER                      | Gujarat       | Rs. 5,00,000 | Rs.   15,195 | Rs.   15,195 |     2/2 |     33d
+    12092944 | Rachana khad beej Bhandar pavta        | Rajasthan     | Rs. 1,44,000 | Rs.   14,875 | Rs.   14,875 |     1/1 |      5d
+     4321186 | M/S.SIDDHIVINAYAK KRUSHI SEVA KENDRA   | Maharashtra   | Rs. 8,99,000 | Rs.   14,847 | Rs.   14,847 |     1/1 |      0d
+    11584887 | YADAV KRISHI SEWA KENDRA MALAWAR       | Madhya Prade  | Rs.   30,000 | Rs. 2,44,101 | Rs.   14,556 |     3/4 |     33d
+    12252946 | Shiv shakti krashi kendra              | Madhya Prade  | Rs. 1,35,000 | Rs.   14,462 | Rs.   14,462 |     4/4 |     39d
+    11515635 | AGRI JUNCTION                          | Uttar Prades  | Rs.   88,000 | Rs.   14,357 | Rs.   14,357 |     2/2 |     16d
+    11918060 | Divyansh Krishi Sewa Kendra            | Madhya Prade  | Rs. 1,68,000 | Rs.   14,008 | Rs.   14,008 |     1/1 |     12d
+     8802785 | SHRI DATTA KRISHI SEVA KENDRA yetala   | Maharashtra   | Rs. 4,23,000 | Rs.   13,932 | Rs.   13,932 |     1/1 |      3d
+    12335472 | SHRI RAM KISAAN BEEJ BHANDAR           | Uttar Prades  | Rs.   40,000 | Rs.   47,088 | Rs.   13,927 |     1/2 |      8d
+     1889298 | SHIVAY AGRO SERVICES                   | Maharashtra   | Rs. 2,86,000 | Rs.   13,431 | Rs.   13,431 |     2/2 |      1d
+      945842 | JYOTIRLING KRUSHI SEVA KENDRA          | Karnataka     | Rs. 1,25,000 | Rs.   13,021 | Rs.   13,021 |     1/1 |      4d
+     6591940 | SHREE VITTHAL AGRO AGENCIES ( Clinic   | Maharashtra   | Rs. 2,48,000 | Rs.   12,900 | Rs.   12,900 |     1/1 |      0d
+    11340617 | M/S OM PRAKASH BEEJ BHANDAR .          | Madhya Prade  | Rs. 5,00,000 | Rs.   12,838 | Rs.   12,838 |     2/2 |      1d
+     5378904 | M/S JAY SHREE BALA JI AGRI JUNCTION K  | Uttar Prades  | Rs. 1,45,000 | Rs.   12,563 | Rs.   12,563 |     1/1 |     14d
+    12162195 | Shri Shyam Krishi Kendra .             | Rajasthan     | Rs. 1,45,000 | Rs.   12,065 | Rs.   12,065 |     1/1 |      8d
+    11875018 | SHRI GANESH TRADERS . .                | Madhya Prade  | Rs. 1,59,000 | Rs.   11,905 | Rs.   11,905 |     2/2 |      7d
+    10277193 | M/S VAISNO BEEZ AGENCY AND PESTICIDES  | Uttar Prades  | Rs. 3,30,000 | Rs.   11,850 | Rs.   11,850 |     1/1 |      1d
+     8059217 | Ravi krishi beej bhandar               | Uttar Prades  | Rs. 2,03,000 | Rs.   11,710 | Rs.   11,710 |     2/2 |     29d
+     1699448 | KANCHAN KRISHI SEWA KENDRA .           | Madhya Prade  | Rs.10,00,000 | Rs.   10,222 | Rs.   10,222 |     3/3 |      8d
+      803581 | VIRAJ KRUSHI SEVA KENDRA               | Maharashtra   | Rs. 3,13,000 | Rs.   10,144 | Rs.   10,144 |     1/1 |      4d
+    10436313 | DHARMVEER SINGH KHAD BEEJ BHANDAR      | Uttar Prades  | Rs. 3,00,000 | Rs.    9,950 | Rs.    9,950 |     1/1 |      1d
+    10171254 | M/S, Aditya Beej Bhandar               | Uttar Prades  | Rs. 1,30,000 | Rs.    9,564 | Rs.    9,564 |     2/2 |     14d
+    12239629 | Majumdar krishi Farm                   | Madhya Prade  | Rs. 1,78,000 | Rs.    9,555 | Rs.    9,555 |     2/2 |      4d
+      472661 | SHIVKRIPA KRISHI SEVA KENDRA .         | Maharashtra   | Rs. 1,44,000 | Rs.    9,540 | Rs.    9,540 |     2/2 |     35d
+     9597310 | SATAV AGROTECH SANGRAMPUR              | Maharashtra   | Rs. 2,77,000 | Rs.    9,205 | Rs.    9,205 |     1/1 |      1d
+     7366981 | HANUMAN TRADERS                        | Gujarat       | Rs. 9,18,000 | Rs.    9,043 | Rs.    9,043 |     2/2 |     33d
+     9123728 | Shri Ram Krishi Seva Kendra Machalpur  | Madhya Prade  | Rs. 3,17,000 | Rs.    7,590 | Rs.    7,590 |     1/1 |     11d
+     8102541 | Baliraja Krushi Seva Kendra Pisorekha  | Maharashtra   | Rs. 1,74,000 | Rs.    7,409 | Rs.    7,409 |     1/1 |     25d
+    11809866 | ABHINAV KRISHI SEWA KENDRA .           | Uttar Prades  | Rs. 1,13,000 | Rs.    7,001 | Rs.    7,001 |     1/1 |     14d
+     8440377 | SHRIRAM KRUSHI VIKAS KENDRA DIGHORI M  | Maharashtra   | Rs. 2,30,000 | Rs.    6,980 | Rs.    6,980 |     1/1 |     32d
+    11385359 | Jay Maa Krishi Kendra                  | Madhya Prade  | Rs. 3,91,000 | Rs.    6,930 | Rs.    6,930 |     1/1 |     14d
+     7730785 | SUKVIRA KRISHI KENDRA . .              | Maharashtra   | Rs.   91,000 | Rs.    6,450 | Rs.    6,450 |     1/1 |      7d
+    11736143 | AGRIJUNCTION ONE STOP SHOP             | Uttar Prades  | Rs. 1,15,000 | Rs. 2,53,232 | Rs.    6,272 |     1/2 |     12d
+    10857738 | RAXIT AGRO AGENCY                      | Rajasthan     | Rs. 2,14,000 | Rs.    5,846 | Rs.    5,846 |     1/1 |     38d
+    12315917 | Sanvi beej Bhandar                     | Uttar Prades  | Rs. 1,53,000 | Rs.    5,746 | Rs.    5,746 |     1/1 |      8d
+    10140618 | Shri Hari Agro Dahigaon                | Maharashtra   | Rs. 5,23,000 | Rs.    5,581 | Rs.    5,581 |     2/2 |     32d
+     4193019 | GOVIND TRADING CO. .                   | Maharashtra   | Rs. 4,36,000 | Rs.    5,253 | Rs.    5,253 |     2/2 |     35d
+     5966868 | MATESHWARI KRISHI KENDRA . .           | Uttar Prades  | Rs. 5,59,000 | Rs.    5,122 | Rs.    5,122 |     1/1 |      8d
+      317907 | GURUKRUPA AGRO                         | Gujarat       | Rs. 8,45,000 | Rs.    4,385 | Rs.    4,385 |     1/1 |     30d
+    11323386 | SHIVAM SEEDS AND AGRO MART             | Karnataka     | Rs.   57,000 | Rs.    3,618 | Rs.    3,618 |     1/1 |      2d
+    10257242 | Bhagyashri krishi kendra Vasantpur     | Maharashtra   | Rs. 2,94,000 | Rs.    3,440 | Rs.    3,440 |     1/1 |     31d
+     8438648 | SHIV TRADERS                           | Gujarat       | Rs.10,00,000 | Rs.    3,327 | Rs.    3,327 |     1/1 |     33d
+      411348 | SAMBHAJI KRUSHI SEVA KENDRA RAMEGAON   | Maharashtra   | Rs.   97,000 | Rs.    3,225 | Rs.    3,225 |     1/1 |      0d
+    11935905 | VIKAS KRASHI SEVA KENDRA               | Madhya Prade  | Rs. 2,50,000 | Rs.    2,873 | Rs.    2,873 |     1/1 |     33d
+    11633058 | AGRI CLINIC AND AGRI BUSINESS CENTER   | Uttar Prades  | Rs. 4,99,000 | Rs.    2,873 | Rs.    2,873 |     1/1 |      8d
+     7273893 | Shivraaj Kisan seva kendra             | Uttar Prades  | Rs. 2,48,000 | Rs.    2,678 | Rs.    2,678 |     1/1 |      5d
+    12153860 | JAY HANUMAN AGRO AGENCY .              | Maharashtra   | Rs.   43,000 | Rs.    2,328 | Rs.    2,328 |     1/1 |      0d
+    12111678 | ALOK AGRI CLINIC AND AGRI BUSINESS CE  | Uttar Prades  | Rs. 4,38,000 | Rs.    2,312 | Rs.    2,312 |     1/1 |      3d
+     8609030 | BAJARANG KHETI VIKAS KENDRA            | Gujarat       | Rs. 5,03,000 | Rs.    2,160 | Rs.    2,160 |     1/1 |      5d
+     3822354 | Shiv Krupa Krushi Sewa Kendra Wardha   | Maharashtra   | Rs. 4,22,000 | Rs.    2,057 | Rs.    2,057 |     1/1 |     31d
+     4318793 | SOMNATH AGRO CHEMICALS SANVAV          | Gujarat       | Rs. 1,53,000 | Rs.    2,040 | Rs.    2,040 |     1/1 |     30d
+    11562452 | MAHANKAL KRASHI SEWA KENDRA            | Madhya Prade  | Rs.   78,000 | Rs.    2,030 | Rs.    2,030 |     1/1 |     32d
+    11006414 | VERAI AGRO CENTRE                      | Gujarat       | Rs. 2,99,000 | Rs.    1,767 | Rs.    1,767 |     1/1 |      1d
+     2654811 | BRIJ KHAD BEEJ BHANDAR NADBAI .        | Rajasthan     | Rs. 3,30,000 | Rs.    1,615 | Rs.    1,615 |     1/1 |     32d
+    11663864 | JAY MAHAKAL AGRO STORE .               | Madhya Prade  | Rs. 4,50,000 | Rs.    1,536 | Rs.    1,536 |     1/1 |      1d
+    11796620 | MAA REVA KRISHI SEWA KENDRA            | Madhya Prade  | Rs. 3,00,000 | Rs. 6,56,288 | Rs.        0 |     0/2 |      0d
+    12210582 | Shivkrupa Agri Clinic Latur            | Maharashtra   | Rs. 1,19,000 | Rs. 7,40,275 | Rs.        0 |     0/1 |      0d
+    11995639 | SRUSHTI AGRO SERVICES                  | Maharashtra   | Rs. 3,30,000 | Rs. 3,94,733 | Rs.        0 |     0/1 |      0d
+    11385411 | SHUBHANGI KRUSHI KENDRA .              | Maharashtra   | Rs.   69,000 | Rs. 4,10,161 | Rs.        0 |     0/3 |      0d
+    12173929 | Jay Malhar Krushi Seva Kendra          | Maharashtra   | Rs. 3,30,000 | Rs. 5,41,802 | Rs.        0 |     0/1 |      0d
+     8725243 | KAMAKSHA AGRO MALL KAMARGAON           | Maharashtra   | Rs. 3,43,000 | Rs. 5,91,625 | Rs.        0 |     0/1 |      0d
+    12104459 | banjari ksk .                          | Madhya Prade  | Rs. 1,74,000 | Rs. 5,15,328 | Rs.        0 |     0/2 |      0d
+    12100650 | SAI KRUSHI SEVA KENDRA                 | Maharashtra   | Rs.   67,000 | Rs. 6,45,000 | Rs.        0 |     0/1 |      0d
+    10439755 | M/S VERMA KHAD BHANDAR .               | Uttar Prades  | Rs.   53,000 | Rs. 1,18,500 | Rs.        0 |     0/1 |      0d
+    11300255 | JAY AMBAY KRUSHI SEWA KENDRA           | Maharashtra   | Rs. 2,04,000 | Rs. 3,79,855 | Rs.        0 |     0/1 |      0d
+    11183694 | KRUSHNA KRUSHI SEVA KENDRA             | Maharashtra   | Rs.   72,000 | Rs. 1,35,822 | Rs.        0 |     0/1 |      0d
+    11341721 | AMIT KRASHI KENDRA .                   | Madhya Prade  | Rs. 5,00,000 | Rs. 5,68,833 | Rs.        0 |     0/1 |      0d
+    10119163 | New Chatrapati Krushi seva Kendra      | Maharashtra   | Rs.   79,000 | Rs. 1,28,197 | Rs.        0 |     0/1 |      0d
+--------------------------------------------------------------------------------------------------------------------------------------
+  TOTAL actionable BT: Rs.4,73,59,567   (415 partners, 1317 orders)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 3 — ELIGIBLE BUT NO BALANCE (2 partners) — blocked by limit
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  partner_id | store_name                             | state         |   total_elig_amt | orders
+-------------------------------------------------------------------------------------------------
+     2724775 | VIRANI AGRO CHEMICALS .                | Gujarat       | Rs.       22,041 |      1
+     7886035 | SHREE MAHAKALI TRADING COMPANY         | Gujarat       | Rs.       10,243 |      2
+  Locked eligible amount: Rs.32,284   (2 partners)
