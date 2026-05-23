@@ -5448,20 +5448,37 @@ function renderRestockTab() {
       </div>
 
       <!-- Row 1: Overview -->
-      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;align-items:stretch">
+
         ${card('#dc2626','Orders ON_HOLD',s.orders,'#0f172a',`
           <div style="font-size:13px;color:#64748b;font-weight:500">across <strong style="color:#0f172a">${fmt(s.stores)}</strong> stores</div>`)}
+
         ${card('#16a34a','Restock Tomorrow',s.restock_tomorrow,'#16a34a',`
           <div style="font-size:12px;color:#64748b;line-height:1.5">marked ON_HOLD after 3:30 PM today<br>
           <span style="color:#94a3b8;font-size:11px">auto-restock fires tomorrow · no action needed</span></div>`)}
+
         ${card('#2563eb','B2B In Transit',s.b2b_in_transit,'#2563eb',`
           <div style="font-size:12px;color:#64748b;line-height:1.5">active B2B for all UNFULFILLABLE SKUs<br>
           <span style="color:#94a3b8;font-size:11px">no action needed</span></div>`)}
+
+        <!-- Needs Attention bridge card -->
+        <div style="display:flex;flex-direction:column;background:#fff7ed;border-radius:16px;
+                    box-shadow:0 2px 16px rgba(0,0,0,.09);border-top:5px solid #f59e0b;
+                    padding:24px 32px;gap:6px;min-width:240px;flex:1;position:relative">
+          <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.8px">Needs Attention</div>
+          <div style="font-size:48px;font-weight:900;color:#b45309;line-height:1;letter-spacing:-1px">${fmt(s.orders - s.restock_tomorrow - s.b2b_in_transit)}</div>
+          <div style="font-size:12px;color:#92400e;line-height:1.6">
+            ${fmt(s.system_tried_failed + s.never_triggered + s.partial_coverage + s.truly_stuck)} restock issues<br>
+            ${fmt(s.ground_ops + s.cc_team)} partner / CC actions
+          </div>
+          <div style="font-size:11px;color:#d97706;margin-top:4px;font-weight:600">↓ breakdown below</div>
+        </div>
+
       </div>
 
-      <!-- Row 2: Actionable -->
-      <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">
-        Needs Action
+      <!-- Row 2: Actionable breakdown -->
+      <div style="font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;padding-left:2px">
+        ↳ Needs Attention — breakdown
       </div>
       <div style="display:flex;gap:14px;flex-wrap:wrap">
 
