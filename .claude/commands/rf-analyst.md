@@ -67,13 +67,15 @@ Determined by `galaxy_views.institution.lendingProvider`:
 
 | lendingProvider | Meaning |
 |---|---|
-| `Agrostar` | Credit on AgroStar's own books — NOT in RF program (or not yet migrated) |
-| `Rupifi` | Partner is on Rupifi NBFC |
-| `Tyger Capital` | Partner is on Tyger Capital NBFC |
-| `BlackSoil` | Partner is on BlackSoil NBFC |
+| `AGROSTAR` | Credit on AgroStar's own books — NOT in RF program (or not yet migrated) |
+| `RUPIFI` | Partner is on Rupifi NBFC |
+| `TYGER_CAPITAL` | Partner is on Tyger Capital NBFC |
+| `BLACKSOIL` | Partner is on BlackSoil NBFC (not yet live as of May 2026) |
 
-**RF partners filter:** `lendingProvider IN ('Rupifi', 'Tyger Capital', 'BlackSoil')`
-**Non-RF partners (Anchor books):** `lendingProvider = 'Agrostar'` OR `lendingProvider IS NULL`
+**RF partners filter:** `lendingProvider IN ('RUPIFI', 'TYGER_CAPITAL', 'BLACKSOIL')`
+**Non-RF partners (Anchor books):** `lendingProvider = 'AGROSTAR'` OR `lendingProvider IS NULL`
+
+**Validated counts (May 2026):** Rupifi = 1,361 partners (1,301 active) | Tyger Capital = 49 (48 active) | BlackSoil = 0
 
 ---
 
