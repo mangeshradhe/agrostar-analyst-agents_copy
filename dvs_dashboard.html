@@ -1554,6 +1554,7 @@ const STATIC_DATA = {
   // ── RESTOCK HEALTH TAB DATA (snapshot: 2026-05-23) ──
   restockSummary: {
     stores: 494, orders: 1665,
+    revenue_inr: 10634674,  // total ON_HOLD order GMV from BQ (May 23 2026)
     restock_tomorrow: 253,
     b2b_in_transit: 335,
     system_tried_failed: 189, stf_reroute: 100, stf_finance: 50, stf_supply: 18,
@@ -5441,7 +5442,13 @@ function renderPipelinePlan(sf) {
 function renderRestockTab() {
   const s = STATIC_DATA.restockSummary;
   const a = STATIC_DATA.restockAging;
-  const fmt = n => n.toLocaleString('en-IN');
+  const fmt    = n => n.toLocaleString('en-IN');
+  const fmtInr = v => '₹' + Math.round(v).toLocaleString('en-IN');
+  const tmrwRev = Math.round(s.revenue_inr * s.restock_tomorrow / s.orders);
+  const b2bRev  = Math.round(s.revenue_inr * s.b2b_in_transit  / s.orders);
+  const attnRev = s.revenue_inr - tmrwRev - b2bRev;
+  const stfRev  = a.stf_reroute[7] + a.stf_finance[7] + a.stf_supply[7];
+  const ccRev   = a.cc_confirm[7]  + a.cc_rerouting[7];
 
   const card = (borderColor, label, count, countColor, sub) => `
     <div style="display:flex;flex-direction:column;background:#fff;border-radius:16px;
@@ -5465,21 +5472,16 @@ function renderRestockTab() {
   const colBg = ['#d1fae5','#fef9c3','#fde68a','#ffedd5','#fee2e2','#fca5a5'];
   const colFg = ['#065f46','#854d0e','#92400e','#c2410c','#991b1b','#7f1d1d'];
 
-  const fmtInr = v => '₹' + Math.round(v).toLocaleString('en-IN');
-
   const heatRow = (dot, label, data, note) => {
     const [d1,d2,d3,d4,d5,d6,oldest,revenue] = data;
     const total = d1+d2+d3+d4+d5+d6;
     return `<tr style="border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-      <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap">
-        <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${dot};margin-right:7px"></span>${label}${note ? `<span style="font-size:10px;color:#94a3b8;font-weight:400;margin-left:5px">${note}</span>` : ''}
+      <td style="padding:6px 14px;font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap">
+        <div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dot};margin-right:6px"></span>${label}${note ? `<span style="font-size:10px;color:#94a3b8;font-weight:400;margin-left:5px">${note}</span>` : ''}</div>
+        <div style="font-size:10px;color:#64748b;font-weight:500;margin-top:2px;padding-left:14px">${fmtInr(revenue)} <span style="color:#dc2626;font-weight:600">· ↑${oldest}d</span></div>
       </td>
-      ${[d1,d2,d3,d4,d5,d6].map((v,i) => `<td style="padding:8px 14px;text-align:center;background:${v>0?colBg[i]:'#f8fafc'};font-size:13px;font-weight:${v>0?'700':'400'};color:${v>0?colFg[i]:'#cbd5e1'}">${v>0?v:'—'}</td>`).join('')}
-      <td style="padding:8px 14px;text-align:center;font-size:12px;font-weight:700;color:#475569">${fmt(total)}</td>
-      <td style="padding:8px 14px;text-align:right;font-size:12px;font-weight:700;color:#0f172a;white-space:nowrap">${fmtInr(revenue)}</td>
-      <td style="padding:6px 10px;white-space:nowrap">
-        <span style="background:#fee2e2;color:#dc2626;font-weight:700;padding:2px 7px;border-radius:5px;font-size:11px">↑${oldest}d</span>
-      </td>
+      ${[d1,d2,d3,d4,d5,d6].map((v,i) => `<td style="padding:5px 10px;text-align:center;background:${v>0?colBg[i]:'#f8fafc'};font-size:12px;font-weight:${v>0?'700':'400'};color:${v>0?colFg[i]:'#cbd5e1'}">${v>0?v:'—'}</td>`).join('')}
+      <td style="padding:5px 10px;text-align:center;font-size:12px;font-weight:700;color:#475569">${fmt(total)}</td>
     </tr>`;
   };
 
@@ -5489,13 +5491,12 @@ function renderRestockTab() {
   const gtOldest = Math.max(...allHeatRows.map(r => r[6]));
   const gtRevenue = allHeatRows.reduce((s,r) => s+r[7], 0);
   const heatGrandTotal = `<tr style="background:#1e293b;border-top:2px solid #334155">
-    <td style="padding:10px 16px;font-size:12px;font-weight:800;color:#f1f5f9;white-space:nowrap;letter-spacing:.3px">Grand Total</td>
-    ${gtCols.map((v,i) => `<td style="padding:8px 14px;text-align:center;background:${colBg[i]};font-size:13px;font-weight:800;color:${colFg[i]}">${fmt(v)}</td>`).join('')}
-    <td style="padding:8px 14px;text-align:center;font-size:13px;font-weight:900;color:#f1f5f9">${fmt(gtTotal)}</td>
-    <td style="padding:8px 14px;text-align:right;font-size:12px;font-weight:900;color:#f1f5f9;white-space:nowrap">${fmtInr(gtRevenue)}</td>
-    <td style="padding:6px 10px;white-space:nowrap">
-      <span style="background:#7f1d1d;color:#fecaca;font-weight:800;padding:2px 7px;border-radius:5px;font-size:11px">↑${gtOldest}d</span>
+    <td style="padding:6px 14px;white-space:nowrap">
+      <div style="font-size:12px;font-weight:800;color:#f1f5f9;letter-spacing:.3px">Grand Total <span style="font-size:10px;font-weight:400;color:#94a3b8">(heat table scope — see note)</span></div>
+      <div style="font-size:10px;color:#94a3b8;font-weight:500;margin-top:2px">${fmtInr(gtRevenue)} · ↑${gtOldest}d oldest</div>
     </td>
+    ${gtCols.map((v,i) => `<td style="padding:5px 10px;text-align:center;background:${colBg[i]};font-size:13px;font-weight:800;color:${colFg[i]}">${fmt(v)}</td>`).join('')}
+    <td style="padding:5px 10px;text-align:center;font-size:13px;font-weight:900;color:#f1f5f9">${fmt(gtTotal)}</td>
   </tr>`;
 
   const stfOldest = Math.max(a.stf_reroute[6], a.stf_finance[6], a.stf_supply[6]);
@@ -5513,15 +5514,18 @@ function renderRestockTab() {
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;align-items:stretch">
 
         ${card('#dc2626','Orders ON_HOLD',s.orders,'#0f172a',`
-          <div style="font-size:13px;color:#64748b;font-weight:500">across <strong style="color:#0f172a">${fmt(s.stores)}</strong> stores</div>`)}
+          <div style="font-size:13px;color:#64748b;font-weight:500">across <strong style="color:#0f172a">${fmt(s.stores)}</strong> stores</div>
+          <div style="font-size:13px;color:#dc2626;font-weight:700;margin-top:2px">${fmtInr(s.revenue_inr)}</div>`)}
 
         ${card('#16a34a','Restock Tomorrow',s.restock_tomorrow,'#16a34a',`
           <div style="font-size:12px;color:#64748b;line-height:1.5">marked ON_HOLD after 3:30 PM today<br>
-          <span style="color:#94a3b8;font-size:11px">auto-restock fires tomorrow · no action needed</span></div>`)}
+          <span style="color:#94a3b8;font-size:11px">auto-restock fires tomorrow · no action needed</span></div>
+          <div style="font-size:12px;color:#16a34a;font-weight:700;margin-top:2px">${fmtInr(tmrwRev)}</div>`)}
 
         ${card('#2563eb','B2B In Transit',s.b2b_in_transit,'#2563eb',`
           <div style="font-size:12px;color:#64748b;line-height:1.5">active B2B for all UNFULFILLABLE SKUs<br>
-          <span style="color:#94a3b8;font-size:11px">no action needed</span></div>`)}
+          <span style="color:#94a3b8;font-size:11px">no action needed</span></div>
+          <div style="font-size:12px;color:#2563eb;font-weight:700;margin-top:2px">${fmtInr(b2bRev)}</div>`)}
 
         <!-- Needs Attention bridge card -->
         <div style="display:flex;flex-direction:column;background:#fff7ed;border-radius:16px;
@@ -5529,6 +5533,7 @@ function renderRestockTab() {
                     padding:24px 32px;gap:6px;min-width:240px;flex:1;position:relative">
           <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.8px">Needs Attention</div>
           <div style="font-size:48px;font-weight:900;color:#b45309;line-height:1;letter-spacing:-1px">${fmt(s.orders - s.restock_tomorrow - s.b2b_in_transit)}</div>
+          <div style="font-size:14px;color:#b45309;font-weight:700;margin-top:2px">${fmtInr(attnRev)}</div>
           <div style="font-size:12px;color:#92400e;line-height:1.6">
             ${fmt(s.system_tried_failed + s.never_triggered + s.partial_coverage + s.truly_stuck)} restock issues<br>
             ${fmt(s.ground_ops + s.cc_team)} partner / CC actions
@@ -5550,6 +5555,7 @@ function renderRestockTab() {
                     padding:24px 32px;gap:6px;min-width:320px;flex:2">
           <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">System Tried &amp; Failed</div>
           <div style="font-size:48px;font-weight:900;color:#d97706;line-height:1;letter-spacing:-1px">${fmt(s.system_tried_failed)}</div>
+          <div style="font-size:13px;color:#d97706;font-weight:700">${fmtInr(stfRev)}</div>
           <div style="font-size:12px;color:#92400e;margin-bottom:2px">restock attempted on window date but blocked</div>
           ${ageBadge(stfOldest)}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
@@ -5596,6 +5602,7 @@ function renderRestockTab() {
                     padding:24px 32px;gap:6px;min-width:320px;flex:2">
           <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px">Partner / CC Actions</div>
           <div style="font-size:48px;font-weight:900;color:#475569;line-height:1;letter-spacing:-1px">${fmt(s.ground_ops + s.cc_team)}</div>
+          <div style="font-size:13px;color:#475569;font-weight:700">${fmtInr(a.ground_ops[7] + ccRev)}</div>
           <div style="font-size:12px;color:#64748b;margin-bottom:2px">no UNFULFILLABLE restock issue — different action streams</div>
           ${ageBadge(Math.max(a.ground_ops[6], ccOldest))}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
@@ -5632,15 +5639,13 @@ function renderRestockTab() {
             <thead>
               <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
                 <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.6px">Team / Queue</th>
-                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#065f46;text-align:center;background:#d1fae5">1d</th>
-                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#854d0e;text-align:center;background:#fef9c3">2d</th>
-                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#92400e;text-align:center;background:#fde68a">3d</th>
-                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#c2410c;text-align:center;background:#ffedd5">4d</th>
-                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#991b1b;text-align:center;background:#fee2e2">5d</th>
-                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#7f1d1d;text-align:center;background:#fca5a5">&gt;5d</th>
-                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#64748b;text-align:center">Total</th>
-                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#64748b;text-align:right;white-space:nowrap">Revenue (₹)</th>
-                <th style="padding:10px 14px;font-size:11px;font-weight:700;color:#64748b;text-align:center;min-width:100px">Oldest</th>
+                <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#065f46;text-align:center;background:#d1fae5">1d</th>
+                <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#854d0e;text-align:center;background:#fef9c3">2d</th>
+                <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#92400e;text-align:center;background:#fde68a">3d</th>
+                <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#c2410c;text-align:center;background:#ffedd5">4d</th>
+                <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#991b1b;text-align:center;background:#fee2e2">5d</th>
+                <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#7f1d1d;text-align:center;background:#fca5a5">&gt;5d</th>
+                <th style="padding:8px 10px;font-size:11px;font-weight:700;color:#64748b;text-align:center">Total</th>
               </tr>
             </thead>
             <tbody>
