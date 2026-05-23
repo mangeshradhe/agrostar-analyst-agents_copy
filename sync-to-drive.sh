@@ -9,7 +9,9 @@ set -e
 GDRIVE_ACCOUNT="Darpan.pathar@agrostar.in"
 
 POSSIBLE_PATHS=(
+  "$HOME/Library/CloudStorage/GoogleDrive-${GDRIVE_ACCOUNT}/My Drive/agrostar-analyst-agents"
   "$HOME/Library/CloudStorage/GoogleDrive-${GDRIVE_ACCOUNT}/My Drive/Agrostar Analyst Agents"
+  "$HOME/Google Drive/My Drive/agrostar-analyst-agents"
   "$HOME/Google Drive/My Drive/Agrostar Analyst Agents"
   "$HOME/Google Drive/Agrostar Analyst Agents"
 )

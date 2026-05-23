@@ -747,13 +747,13 @@ const filters = { state: 'ALL' };
 // ══════════════════════════════════════════════════════════
 const STATIC_DATA = {
   snapshotFrom: '2026-04-01',
-  snapshotTo:   '2026-05-21',
+  snapshotTo:   '2026-05-23',
   summary: [
-    ['Maharashtra',    17654, 6551, 6247, 23756453, 2757, 320],
-    ['Uttar Pradesh',  12868, 3930, 1681, 11598037, 2097, 206],
-    ['Rajasthan',      10365, 4224, 1305, 17859459, 2271, 181],
-    ['Gujarat',         9956, 6377, 1101, 24428080, 3877, 195],
-    ['Madhya Pradesh',  7940, 2061, 1028,  8110428, 1346, 171]
+    ['Maharashtra',    18622, 7103, 6526, 25721493, 2930, 328],
+    ['Uttar Pradesh',  13687, 4290, 1795, 12678733, 2231, 204],
+    ['Rajasthan',      10778, 4382, 1380, 18223195, 2359, 182],
+    ['Gujarat',        10452, 6663, 1133, 25452959, 3998, 196],
+    ['Madhya Pradesh',  8460, 2190, 1126,  8893216, 1378, 172]
   ],
   // Funnel: 4 stages — source: PromisedTAT (routing decisions) + taluka-level DVS config validation
   funnelStages: [
@@ -770,32 +770,30 @@ const STATIC_DATA = {
     ['Madhya Pradesh', 1317,  7872],
     ['Gujarat',        1515,  9855]
   ],
-  // Leak 2 — Root causes (total: 9,866) from PromisedTAT + validated against DVS-configured talukas
-  // Note: resolved_no_dehlivery orders NOT in DVS-configured talukas (3,195) moved to Leak 1
+  // Leak 2 — Root causes (total: 22,884) from PromisedTAT + validated against DVS-configured talukas
+  // Note: resolved_yes = 35,386 orders routed successfully
   leak2RootCauses: [
-    { label: 'Partner Not Configured at Order Time', count: 2700, pct: 22.4, color: '#64748b',
-      note: 'Taluka now has a DVS partner but had none when order was placed. Fix: faster onboarding + real-time config sync.' },
-    { label: 'Clearance Sale Items',                 count: 1939, pct: 16.1, color: '#f59e0b',
-      note: 'Clearance / promotional SKUs excluded from DVS routing by system rule.' },
-    { label: 'License Gap',                          count: 1771, pct: 14.7, color: '#dc2626',
-      note: 'Store not licensed for the ordered product category (Seeds, Fertilizer, etc.). Fix: license onboarding for high-volume stores.' },
-    { label: 'Distance Too Far',                     count: 1591, pct: 13.2, color: '#7c3aed',
-      note: 'Farmer location exceeds the store\'s configured routing distance threshold. Fix: review distance config per taluka.' },
-    { label: 'No Routing Record',                    count: 1569, pct: 13.0, color: '#94a3b8',
-      note: 'No PromisedTAT entry or unrecorded reason — possible CSR/system orders that bypassed the routing engine.' },
-    { label: 'No Franchise LMD (DVS taluka, 3PL delivery)', count: 1321, pct: 11.0, color: '#2563eb',
+    { label: 'No Taluka Coverage',                   count: 12718, pct: 55.6, color: '#64748b',
+      note: 'Order placed in a taluka with no DVS partner configured. Fix: faster onboarding + real-time config sync.' },
+    { label: 'No Franchise LMD (DVS taluka, 3PL delivery)', count: 4618, pct: 20.2, color: '#2563eb',
       note: 'DVS partner IS configured for the taluka but franchise LMD is missing — 3PL (Delhivery) is the only shipper. Fix: deploy franchise LMD in these specific talukas.' },
-    { label: 'Restricted SKUs',                      count: 1156, pct:  9.6, color: '#ea580c',
+    { label: 'Clearance Sale Items',                 count: 1657, pct:  7.2, color: '#f59e0b',
+      note: 'Clearance / promotional SKUs excluded from DVS routing by system rule.' },
+    { label: 'License Gap',                          count: 1558, pct:  6.8, color: '#dc2626',
+      note: 'Store not licensed for the ordered product category (Seeds, Fertilizer, etc.). Fix: license onboarding for high-volume stores.' },
+    { label: 'Distance Too Far',                     count: 1374, pct:  6.0, color: '#7c3aed',
+      note: 'Farmer location exceeds the store\'s configured routing distance threshold. Fix: review distance config per taluka.' },
+    { label: 'Restricted SKUs',                      count:  959, pct:  4.2, color: '#ea580c',
       note: 'SKU restricted from DVS routing by system policy. May need category-level review.' }
   ],
   // Leak 3 re-route reasons (from order_management_orderreroutinglogs)
   leak3Reasons: [
-    { label: 'SLA Miss (>24hr no action)', count: 7869, color: '#dc2626' },
-    { label: 'OCP Block (credit hold)',    count: 2673, color: '#d97706' },
-    { label: 'Shop Closed / Strike',       count:  716, color: '#f59e0b' },
-    { label: 'Backfill Failure',           count:   73, color: '#94a3b8' },
+    { label: 'SLA Miss (>24hr no action)', count: 6262, color: '#dc2626' },
+    { label: 'OCP Block (credit hold)',    count: 2798, color: '#d97706' },
+    { label: 'Shop Closed / Strike',       count:  713, color: '#f59e0b' },
+    { label: 'Backfill Failure',           count:   70, color: '#94a3b8' },
     { label: 'Mapping Issue',              count:   31, color: '#cbd5e1' },
-    { label: 'Other',                      count:    0, color: '#e2e8f0' }
+    { label: 'GJ Association Issue',       count:   21, color: '#e2e8f0' }
   ],
   // Leak 3 per-state re-route reason breakdown (BQ: order_management_orderreroutinglogs, Apr1–May21)
   // Keys are lowercase state names; counts are from exclusive CASE-WHEN categorisation (sums = total ✓)
@@ -809,20 +807,20 @@ const STATIC_DATA = {
 
   // Tab 4 — Operations & SLA
   opsOrderStatus: [
-    { label: 'Delivered',           count: 12351, color: '#16a34a' },
-    { label: 'RTO / Returned',      count:  3677, color: '#dc2626' },
-    { label: 'Picked (In Transit)', count:  1865, color: '#2563eb' },
-    { label: 'Packed at Store',     count:  3190, color: '#f59e0b' },
-    { label: 'On Hold (Restock)',   count:  1677, color: '#7c3aed' },
-    { label: 'Hold by LMD',         count:  2269, color: '#f97316' },
-    { label: 'No Action Yet',       count:   467, color: '#94a3b8' }
+    { label: 'Delivered',                    count: 12846, color: '#16a34a' },
+    { label: 'RTO / Returned',               count:  3870, color: '#dc2626' },
+    { label: 'Picked (In Transit)',           count:  1603, color: '#2563eb' },
+    { label: 'Packed at Store',              count:  2200, color: '#f59e0b' },
+    { label: 'On Hold (Restock)',            count:  1747, color: '#7c3aed' },
+    { label: 'Hold by LMD',                  count:  1282, color: '#f97316' },
+    { label: 'No Action Yet',                count:    89, color: '#94a3b8' }
   ],
   // [stage, medianMins, slaMin, breachPct, breachCount]
   opsSlaStages: [
-    ['Created → First Action (Pack/Hold)',  88,   60,  58.5, 13260],
-    ['Packed → Picked by LMD',           3061, 1440,  72.1, 12897],
-    ['Picked → Delivered to Farmer',     1017, 1440,  41.1,  5077],
-    ['End-to-End (Created → Delivered)', 6991, 4320,  70.4,  8699]
+    ['Created → First Action (Pack/Hold)',   88,   60,  null, 13976],
+    ['Packed → Picked by LMD',            3061, 1440,  null, 13469],
+    ['Picked → Delivered to Farmer',      1001, 1440,  null,  5259],
+    ['End-to-End (Created → Delivered)',  6960, 4320,  null,  null]
   ],
 
   // Tab 5 — Last Mile  (sourced from BQ: Apr 1 – May 21 2026)
@@ -1106,24 +1104,24 @@ const STATIC_DATA = {
 
   // Columns: [week_start, b2c_total, dvs_fulfilled]
   trend: [
-    ['2026-03-30', 4742, 1907],
-    ['2026-04-06', 7895, 2822],
-    ['2026-04-13', 7676, 2658],
-    ['2026-04-20', 7262, 2652],
-    ['2026-04-27', 6483, 2022],
-    ['2026-05-04', 8282, 3531],
-    ['2026-05-11', 9543, 3977],
-    ['2026-05-18', 6174, 3443]
+    ['2026-03-30', 4740, 1907],
+    ['2026-04-06', 7888, 2819],
+    ['2026-04-13', 7665, 2652],
+    ['2026-04-20', 7229, 2637],
+    ['2026-04-27', 6438, 1990],
+    ['2026-05-04', 8129, 3404],
+    ['2026-05-11', 9257, 3866],
+    ['2026-05-18', 10663, 5355]
   ],
 
   // Tab 3 — Partner Health
   // [state, configured, got_demand, fulfilled, never_got_demand, demand_zero_fulfilled, orders, gmv, avg_orders, champions, stars, active_cat, occasional]
   partnerStateHealth: [
-    ['Maharashtra',    372, 347, 311, 25, 36, 6520, 23282108, 21.0,  34, 93, 105, 79],
-    ['Gujarat',        195, 187, 185,  8,  2, 6054, 23120791, 32.7,  41, 60,  61, 23],
-    ['Rajasthan',      211, 190, 177, 21, 13, 4201, 17277959, 23.7,  26, 31,  73, 47],
-    ['Uttar Pradesh',  226, 213, 202, 13, 11, 3890, 11466963, 19.3,  24, 36,  78, 64],
-    ['Madhya Pradesh', 228, 204, 170, 24, 34, 2030,  7836262, 11.9,   5, 24,  70, 71]
+    ['Maharashtra',    371, 316, 7064, 55, 137, 7064, 25591299, 22.4,  0, 0, 234, 82],
+    ['Gujarat',        193, 183, 6253, 10,  31, 6253, 23866477, 34.2,  0, 0, 162, 21],
+    ['Rajasthan',      210, 177, 4358, 33,  77, 4358, 18006836, 24.6,  0, 0, 133, 44],
+    ['Uttar Pradesh',  226, 200, 4248, 26, 126, 4248, 12580655, 21.2,  0, 0, 150, 50],
+    ['Madhya Pradesh', 228, 171, 2161, 57, 126, 2161,  8728049, 12.6,  0, 0, 102, 69]
   ],
   // [store_code, store_name, state, district, orders, gmv]
   partnerLeaderboard: [
