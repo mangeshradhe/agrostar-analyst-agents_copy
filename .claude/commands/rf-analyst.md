@@ -541,19 +541,44 @@ ORDER BY pw.farmer_id, eo.invoice_age_days DESC
 
 **Python greedy allocation (run after BQ):**
 ```python
-# Load BQ rows + sheet CSV (Partner Id, BALANCE)
+# Step 0 — Identify partners in BQ but missing from sheet
+#   missing_from_sheet = {partner_id} in BQ results but NOT in sheet CSV
+#   These are ACTIVE AgroStar partners mapped to Rupifi in BQ but no LIMIT/BALANCE record
+#   → Flag as Bucket 0: show their eligible orders, alert PM to update sheet
+#   → Do NOT attempt greedy (balance unknown)
+#   → Print: "⚠ X partners have eligible BT orders but no Rupifi sheet record — update sheet"
+
+# Step 1 — Load BQ rows + sheet CSV (Partner Id, STATUS, BALANCE, LIMIT)
 # Group rows by partner_id
-# For each partner:
+# For each partner in sheet:
+#   rupifi_status = sheet STATUS (ACTIVE/INACTIVE)
 #   Sort orders by invoice_age_days DESC  (oldest = most urgent, first)
+
+# Bucket classification:
+#   Bucket 0 — In BQ, ACTIVE AgroStar, NOT in sheet → flag, show all eligible orders
+#   Bucket 1 — ACTIVE Rupifi + balance > 0 → greedy pick → actionable today
+#   Bucket 2 — B2_WAITING orders (credit term gate, from BQ classification)
+#   Bucket 3 — ACTIVE Rupifi + greedy skipped (balance ran out) OR balance = 0
+#   Bucket 4 — INACTIVE Rupifi + balance > 0 → push Rupifi to activate
+
 #   remaining = sheet BALANCE
 #   For each order:
-#     if order_bt_amount <= remaining: select it, remaining -= order_bt_amount
-#     else: skip (can't partially raise)
+#     if order_bt_amount <= remaining: select → Bucket 1, remaining -= order_bt_amount
+#     else: skip → Bucket 3
 #   actionable_bt_amount = sum of selected orders
 ```
 
 **Output columns to produce:**
 `partner_id | store_name | state | available_balance | total_bt_eligible_amount | actionable_bt_amount | actionable_orders / total_eligible_orders | oldest_invoice_age_days | selected_order_ids`
+
+**Bucket 0 flag output (missing sheet partners):**
+Print a dedicated section at the top of the scan output:
+```
+⚠ MISSING SHEET DATA — X partners active in AgroStar + Rupifi BQ but not in local CSV
+  Add these to the Rupifi onboarding sheet to enable balance-capped BT allocation.
+  Showing all eligible orders (no balance cap applied):
+  partner_id | store_name | state | order_id | bt_net_amount | invoice_age_days
+```
 
 ### 7. CXO — Disbursement Rate (Disbursed ÷ Total B2B Billed)
 ```sql

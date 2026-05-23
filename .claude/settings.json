@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(python3 *)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(jq *)",
+      "Bash(head *)",
+      "Bash(wc *)",
+      "Bash(ls *)",
+      "Bash(grep *)",
+      "Bash(find *)"
     ]
   },
   "hooks": {
