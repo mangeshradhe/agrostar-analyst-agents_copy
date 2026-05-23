@@ -490,6 +490,12 @@ invoice_dates AS (
     ON CAST(o.unicommerce_id AS STRING) = inv.DisplayOrderCode
   WHERE inv.line_status != 'CANCELLED'
     AND inv.is_return = 0
+    AND o.status NOT IN (
+      'CREATED', 'FUTURE ORDER', 'READY_TO_SHIP', 'PACKED',
+      'WAITING_FOR_PARTNER_APPROVAL', 'BILTY_UPLOAD_PENDING',
+      'ON_HOLD_FULFILLABLE', 'WAITING_FOR_APPROVAL',
+      'WAITING_FOR_OFFER_QUALIFICATION', 'MOB_APP_UNVERIFIED'
+    )
   GROUP BY 1
 ),
 -- Apply all BT eligibility conditions
