@@ -1551,19 +1551,19 @@ const STATIC_DATA = {
     ['2026-05-18','Uttar Pradesh',816,85.0,28.7,39.3,10.2,11.4]
   ],
 
-  // ── RESTOCK HEALTH TAB DATA (snapshot: 2026-05-23) ──
+  // ── RESTOCK HEALTH TAB DATA (snapshot: 2026-05-25) ──
   restockSummary: {
-    stores: 494, orders: 1665,
-    revenue_inr: 10634674,  // total ON_HOLD order GMV from BQ (May 23 2026)
-    restock_tomorrow: 253,
-    b2b_in_transit: 335,
-    system_tried_failed: 189, stf_reroute: 100, stf_finance: 50, stf_supply: 18,
-    never_triggered: 298,
-    partial_coverage: 78,
-    truly_stuck: 19,
-    // 493 split by team
-    ground_ops: 316,   // ON_HOLD_FULFILLABLE (173) + FULFILLABLE updated (143) — partner has stock, not packing
-    cc_team: 177,      // CONFIRM_ON_HOLD (82) confirm farmer + REROUTING_FAILED (95) edit order / category escalation
+    stores: 475, orders: 1577,
+    revenue_inr: 9638985,  // total ON_HOLD order GMV from BQ (May 25 2026)
+    restock_tomorrow: 78,
+    b2b_in_transit: 423,
+    system_tried_failed: 211, stf_reroute: 8, stf_finance: 73, stf_supply: 130,  // refreshed May 25 2026
+    never_triggered: 299,
+    partial_coverage: 0,   // absorbed into NOT_TRIGGERED in new methodology
+    truly_stuck: 42,       // B2B placed but cancelled/RTO — refreshed May 25 2026
+    // team split
+    ground_ops: 137,   // ON_HOLD_FULFILLABLE — partner has stock, not packing
+    cc_team: 187,      // CONFIRM_ON_HOLD (99) + REROUTING_FAILED (88)
   },
 
   // Aging per bucket — [1d, 2d, 3d, 4d, 5d, gt5d, oldest_days, revenue_inr]
@@ -5507,7 +5507,7 @@ function renderRestockTab() {
 
       <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:24px">
         <span style="font-size:18px;font-weight:800;color:#0f172a">Restock Health</span>
-        <span style="font-size:12px;color:#94a3b8;font-weight:500">FY27 · Apr 1 – May 23, 2026 · orders currently ON_HOLD</span>
+        <span style="font-size:12px;color:#94a3b8;font-weight:500">FY27 · Apr 1 – May 25, 2026 · orders currently ON_HOLD</span>
       </div>
 
       <!-- Row 1: Overview -->

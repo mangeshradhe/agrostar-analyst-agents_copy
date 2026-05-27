@@ -115,6 +115,398 @@ ORDER BY 1
 """
 
 
+FIELD_PARTNER_SQL = """
+WITH
+partners AS (
+  SELECT
+    farmer_id,
+    COALESCE(name, 'Unknown') AS name,
+    COALESCE(territory, 'Unknown') AS territory,
+    COALESCE(cluster, 'Unknown') AS cluster,
+    COALESCE(revised_state, 'Unknown') AS state,
+    COALESCE(sm, '') AS sm,
+    COALESCE(tm, '') AS tm,
+    status,
+    first_order_date
+  FROM `agrostar-data.offline_team.okr_data_live`
+),
+visits_period_raw AS (
+  SELECT
+    LOWER(TRIM(email)) AS email,
+    date AS visit_date,
+    date_time AS visit_ts,
+    CAST(store_id AS STRING) AS store_id
+  FROM `agrostar-data.offline_team.store_visits_v2`
+  WHERE date BETWEEN '{from_date}' AND '{to_date}'
+  UNION ALL
+  SELECT
+    LOWER(TRIM(email)) AS email,
+    DATE(date) AS visit_date,
+    updatedOn AS visit_ts,
+    storeId AS store_id
+  FROM `agrostar-data.prod_db_views.visit`
+  WHERE DATE(date) BETWEEN '{from_date}' AND '{to_date}'
+),
+visits_period AS (
+  SELECT * EXCEPT(rn)
+  FROM (
+    SELECT *, ROW_NUMBER() OVER (
+      PARTITION BY email, store_id, visit_date ORDER BY visit_ts DESC
+    ) AS rn FROM visits_period_raw
+  ) WHERE rn = 1
+),
+partner_visits AS (
+  SELECT
+    SAFE_CAST(store_id AS INT64) AS partner_id,
+    COUNT(*) AS visits_period,
+    COUNTIF(visit_date = CURRENT_DATE()) AS visits_today
+  FROM visits_period
+  GROUP BY 1
+),
+visits_hist_raw AS (
+  SELECT CAST(store_id AS STRING) AS store_id, date AS visit_date, date_time AS visit_ts
+  FROM `agrostar-data.offline_team.store_visits_v2`
+  WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 365 DAY)
+  UNION ALL
+  SELECT storeId AS store_id, DATE(date) AS visit_date, updatedOn AS visit_ts
+  FROM `agrostar-data.prod_db_views.visit`
+  WHERE DATE(date) >= DATE_SUB(CURRENT_DATE(), INTERVAL 365 DAY)
+),
+visits_hist AS (
+  SELECT * EXCEPT(rn)
+  FROM (
+    SELECT *, ROW_NUMBER() OVER (
+      PARTITION BY store_id, visit_date ORDER BY visit_ts DESC
+    ) AS rn FROM visits_hist_raw
+  ) WHERE rn = 1
+),
+partner_last_visit AS (
+  SELECT
+    SAFE_CAST(store_id AS INT64) AS partner_id,
+    MAX(visit_date) AS last_visit_date
+  FROM visits_hist
+  GROUP BY 1
+),
+revenue AS (
+  SELECT
+    o.owner_id AS partner_id,
+    ROUND(SUM(inv.TotalPrice), 0) AS revenue_period
+  FROM `agrostar-data.pristine_wms_views.invoiced_report` inv
+  JOIN `agrostar-data.prod_db_views.order_management_order` o
+    ON CAST(o.unicommerce_id AS STRING) = inv.DisplayOrderCode
+  WHERE DATE(inv.CreatedOn) BETWEEN '{from_date}' AND '{to_date}'
+    AND inv.line_status != 'CANCELLED'
+    AND inv.is_return = 0
+    AND o.initiating_source LIKE 'B2B%'
+    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.status, '')), r'cancelled|mob_app_unverified|error|payment_pending|edited')
+    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.unicommerce_status, '')), r'cancelled|mob_app_unverified|error|payment_pending|edited')
+  GROUP BY 1
+),
+partner_credit AS (
+  SELECT
+    cf.farmer_id AS partner_id,
+    ROUND(
+      SUM(CASE WHEN cwt.transaction_type = 0 THEN cwt.amount ELSE 0 END) -
+      SUM(CASE WHEN cwt.transaction_type = 1 THEN cwt.amount ELSE 0 END), 0
+    ) AS total_outstanding,
+    ROUND(GREATEST(LEAST(
+      SUM(CASE WHEN cwt.transaction_type = 0 AND DATE(cwt.due_date) < CURRENT_DATE() THEN cwt.amount ELSE 0 END) -
+      SUM(CASE WHEN cwt.transaction_type = 1 THEN cwt.amount ELSE 0 END),
+      SUM(CASE WHEN cwt.transaction_type = 0 THEN cwt.amount ELSE 0 END) -
+      SUM(CASE WHEN cwt.transaction_type = 1 THEN cwt.amount ELSE 0 END)
+    ), 0), 0) AS ocp_raw,
+    CASE WHEN GREATEST(LEAST(
+      SUM(CASE WHEN cwt.transaction_type = 0 AND DATE(cwt.due_date) < CURRENT_DATE() THEN cwt.amount ELSE 0 END) -
+      SUM(CASE WHEN cwt.transaction_type = 1 THEN cwt.amount ELSE 0 END),
+      SUM(CASE WHEN cwt.transaction_type = 0 THEN cwt.amount ELSE 0 END) -
+      SUM(CASE WHEN cwt.transaction_type = 1 THEN cwt.amount ELSE 0 END)
+    ), 0) > 0
+    THEN MAX(CASE WHEN cwt.transaction_type = 0 AND DATE(cwt.due_date) < CURRENT_DATE()
+      THEN DATE_DIFF(CURRENT_DATE(), DATE(cwt.due_date), DAY) ELSE NULL END)
+    ELSE 0 END AS max_dpd
+  FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` cwt
+  JOIN `agrostar-data.prod_db_views.csr_farmer` cf ON cf.user_id = cwt.wallet_user_id
+  WHERE cwt.cancelled = 0
+    AND cwt.reason_id != 2
+  GROUP BY 1
+),
+collections AS (
+  SELECT
+    cf.farmer_id AS partner_id,
+    ROUND(SUM(cwt.amount), 0) AS collections_period
+  FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` cwt
+  JOIN `agrostar-data.prod_db_views.csr_farmer` cf ON cf.user_id = cwt.wallet_user_id
+  WHERE DATE(cwt.created_on) BETWEEN '{from_date}' AND '{to_date}'
+    AND cwt.transaction_type = 1
+    AND cwt.reason_id = 4
+    AND cwt.cancelled = 0
+  GROUP BY 1
+)
+
+SELECT
+  CAST(p.farmer_id AS STRING)                                          AS farmer_id,
+  p.name,
+  p.territory,
+  p.cluster,
+  p.state,
+  p.sm,
+  p.tm,
+  p.status,
+  COALESCE(FORMAT_DATE('%Y-%m-%d', plv.last_visit_date), '')           AS last_visit_date,
+  COALESCE(DATE_DIFF(CURRENT_DATE(), plv.last_visit_date, DAY), 9999)  AS days_since_visit,
+  COALESCE(pv.visits_period, 0)                                        AS visits_period,
+  COALESCE(pv.visits_today, 0)                                         AS visits_today,
+  COALESCE(rev.revenue_period, 0)                                      AS revenue_period,
+  COALESCE(pc.total_outstanding, 0)                                     AS total_outstanding,
+  GREATEST(COALESCE(pc.ocp_raw, 0), 0)                                 AS ocp,
+  COALESCE(pc.max_dpd, 0)                                              AS dpd,
+  CASE
+    WHEN GREATEST(COALESCE(pc.ocp_raw, 0), 0) > 5000 THEN 'HARD_BLOCK'
+    WHEN GREATEST(COALESCE(pc.ocp_raw, 0), 0) > 1000 AND COALESCE(pc.max_dpd, 0) > 30 THEN 'HARD_BLOCK'
+    ELSE 'CLEAR'
+  END                                                                   AS block_status,
+  COALESCE(col.collections_period, 0)                                  AS collections_period,
+  COALESCE(FORMAT_DATE('%Y-%m-%d', p.first_order_date), '')            AS first_order_date
+FROM partners p
+LEFT JOIN partner_last_visit plv ON plv.partner_id = p.farmer_id
+LEFT JOIN partner_visits pv ON pv.partner_id = p.farmer_id
+LEFT JOIN revenue rev ON rev.partner_id = p.farmer_id
+LEFT JOIN partner_credit pc ON pc.partner_id = p.farmer_id
+LEFT JOIN collections col ON col.partner_id = p.farmer_id
+ORDER BY GREATEST(COALESCE(pc.ocp_raw, 0), 0) DESC
+"""
+
+FIELD_DASHBOARD_PATH = os.path.join(os.path.dirname(__file__), 'field_dashboard.html')
+UNDERWRITING_DASHBOARD_PATH = os.path.join(os.path.dirname(__file__), 'underwriting_dashboard.html')
+
+# ── Visit Analysis queries ──────────────────────────────────────────────────
+
+VISIT_VOLUME_SQL = """
+WITH
+visits_raw AS (
+  SELECT LOWER(TRIM(email)) AS email, date AS visit_date, date_time AS visit_ts,
+    CAST(store_id AS STRING) AS store_id,
+    LOWER(TRIM(COALESCE(sm,''))) AS sm, LOWER(TRIM(COALESCE(tm,''))) AS tm,
+    LOWER(TRIM(COALESCE(cm,''))) AS cm, LOWER(TRIM(COALESCE(sh,''))) AS sh,
+    'fieldstar' AS source
+  FROM `agrostar-data.offline_team.store_visits_v2`
+  WHERE date BETWEEN '{from_date}' AND '{to_date}'
+  UNION ALL
+  SELECT LOWER(TRIM(v.email)), DATE(v.date), v.updatedOn, v.storeId,
+    LOWER(TRIM(COALESCE(okr.sm,''))), LOWER(TRIM(COALESCE(okr.tm,''))),
+    LOWER(TRIM(COALESCE(okr.cm,''))), LOWER(TRIM(COALESCE(okr.sh,''))),
+    'saathiapp'
+  FROM `agrostar-data.prod_db_views.visit` v
+  LEFT JOIN `agrostar-data.offline_team.okr_data_live` okr
+    ON SAFE_CAST(v.storeId AS INT64) = okr.farmer_id
+  WHERE DATE(v.date) BETWEEN '{from_date}' AND '{to_date}'
+),
+visits_dedup AS (
+  SELECT * EXCEPT(rn)
+  FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY email, store_id, visit_date ORDER BY visit_ts DESC) AS rn FROM visits_raw)
+  WHERE rn = 1
+),
+tagged AS (
+  SELECT email, visit_date, store_id, source,
+    FORMAT_DATE('%Y-%m', visit_date) AS month,
+    CASE
+      WHEN email != '' AND email = sm THEN 'SM'
+      WHEN email != '' AND email = tm THEN 'TM'
+      WHEN email != '' AND email = cm THEN 'CM'
+      WHEN email != '' AND email = sh THEN 'SH'
+      ELSE 'Other'
+    END AS visitor_role
+  FROM visits_dedup
+)
+SELECT
+  month, source,
+  COUNT(*) AS total_visits,
+  COUNT(DISTINCT email) AS active_reps,
+  COUNT(DISTINCT store_id) AS unique_stores,
+  COUNTIF(visitor_role='SM') AS sm_visits,
+  COUNTIF(visitor_role='TM') AS tm_visits,
+  COUNTIF(visitor_role='CM') AS cm_visits,
+  COUNTIF(visitor_role='SH') AS sh_visits,
+  COUNTIF(visitor_role='Other') AS other_visits
+FROM tagged
+GROUP BY 1, 2
+ORDER BY 1, 2
+"""
+
+VISIT_COVERAGE_SQL = """
+WITH
+visits_raw AS (
+  SELECT LOWER(TRIM(email)) AS email, date AS visit_date, date_time AS visit_ts, CAST(store_id AS STRING) AS store_id
+  FROM `agrostar-data.offline_team.store_visits_v2`
+  WHERE date BETWEEN '{from_date}' AND '{to_date}'
+  UNION ALL
+  SELECT LOWER(TRIM(v.email)), DATE(v.date), v.updatedOn, v.storeId
+  FROM `agrostar-data.prod_db_views.visit` v
+  WHERE DATE(v.date) BETWEEN '{from_date}' AND '{to_date}'
+),
+visits_dedup AS (
+  SELECT * EXCEPT(rn)
+  FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY email, store_id, visit_date ORDER BY visit_ts DESC) AS rn FROM visits_raw)
+  WHERE rn = 1
+),
+store_visits AS (
+  SELECT DISTINCT SAFE_CAST(store_id AS INT64) AS partner_id, visit_date
+  FROM visits_dedup WHERE store_id IS NOT NULL AND store_id != ''
+),
+active_partners AS (
+  SELECT farmer_id,
+    INITCAP(LOWER(TRIM(revised_state))) AS state,
+    TRIM(cluster) AS cluster,
+    TRIM(COALESCE(sm,'')) AS sm,
+    TRIM(COALESCE(tm,'')) AS tm,
+    TRIM(COALESCE(cm,'')) AS cm
+  FROM `agrostar-data.offline_team.okr_data_live`
+  WHERE status = 'ACTIVE'
+),
+partner_cov AS (
+  SELECT ap.farmer_id, ap.state, ap.cluster,
+    STARTS_WITH(UPPER(ap.sm), 'VACANT') AS sm_vacant,
+    STARTS_WITH(UPPER(ap.tm), 'VACANT') AS tm_vacant,
+    STARTS_WITH(UPPER(ap.cm), 'VACANT') AS cm_vacant,
+    COUNT(sv.visit_date) AS total_visits,
+    MAX(sv.visit_date) AS last_visit_date
+  FROM active_partners ap
+  LEFT JOIN store_visits sv ON sv.partner_id = ap.farmer_id
+  GROUP BY 1, 2, 3, 4, 5, 6
+)
+SELECT
+  COALESCE(state,'Unknown') AS state,
+  COALESCE(cluster,'Unknown') AS cluster,
+  COUNT(*) AS total_partners,
+  COUNTIF(sm_vacant) AS sm_vacant_count,
+  COUNTIF(tm_vacant) AS tm_vacant_count,
+  COUNTIF(cm_vacant) AS cm_vacant_count,
+  COUNTIF(total_visits > 0) AS visited,
+  ROUND(COUNTIF(total_visits > 0) * 100.0 / COUNT(*), 1) AS coverage_pct,
+  COUNTIF(total_visits = 0) AS not_visited,
+  COUNTIF(last_visit_date IS NOT NULL AND last_visit_date < DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)) AS stale_30d,
+  ROUND(AVG(CASE WHEN total_visits > 0 THEN total_visits END), 1) AS avg_visits_covered
+FROM partner_cov
+GROUP BY 1, 2
+ORDER BY 1, 2
+"""
+
+VISIT_OUTCOMES_SQL = """
+WITH
+visits_raw AS (
+  SELECT LOWER(TRIM(email)) AS email, date AS visit_date, date_time AS visit_ts, CAST(store_id AS STRING) AS store_id
+  FROM `agrostar-data.offline_team.store_visits_v2`
+  WHERE date BETWEEN '{from_date}' AND '{to_date}'
+  UNION ALL
+  SELECT LOWER(TRIM(v.email)), DATE(v.date), v.updatedOn, v.storeId
+  FROM `agrostar-data.prod_db_views.visit` v
+  WHERE DATE(v.date) BETWEEN '{from_date}' AND '{to_date}'
+),
+visits_dedup AS (
+  SELECT * EXCEPT(rn)
+  FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY email, store_id, visit_date ORDER BY visit_ts DESC) AS rn FROM visits_raw)
+  WHERE rn = 1
+),
+store_visits AS (
+  SELECT DISTINCT SAFE_CAST(store_id AS INT64) AS partner_id
+  FROM visits_dedup WHERE store_id IS NOT NULL AND store_id != ''
+),
+active_partners AS (
+  SELECT farmer_id, INITCAP(LOWER(TRIM(revised_state))) AS state, TRIM(cluster) AS cluster
+  FROM `agrostar-data.offline_team.okr_data_live` WHERE status = 'ACTIVE'
+),
+rev AS (
+  SELECT o.owner_id AS partner_id, ROUND(SUM(inv.TotalPrice), 0) AS revenue
+  FROM `agrostar-data.pristine_wms_views.invoiced_report` inv
+  JOIN `agrostar-data.prod_db_views.order_management_order` o ON CAST(o.unicommerce_id AS STRING) = inv.DisplayOrderCode
+  WHERE DATE(inv.CreatedOn) BETWEEN '{from_date}' AND '{to_date}'
+    AND inv.line_status != 'CANCELLED' AND inv.is_return = 0 AND o.initiating_source LIKE 'B2B%'
+    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.status,'')), r'cancelled|mob_app_unverified|error|payment_pending|edited')
+    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.unicommerce_status,'')), r'cancelled|mob_app_unverified|error|payment_pending|edited')
+  GROUP BY 1
+),
+coll AS (
+  SELECT cf.farmer_id AS partner_id, ROUND(SUM(cwt.amount), 0) AS collections
+  FROM `agrostar-data.prod_db_views.csr_farmer` cf
+  JOIN `agrostar-data.prod_db_views.wallet_creditwallettransaction` cwt ON cwt.wallet_user_id = cf.user_id
+  WHERE DATE(cwt.created_on) BETWEEN '{from_date}' AND '{to_date}'
+    AND cwt.transaction_type = 1 AND cwt.reason_id = 4 AND cwt.cancelled = 0
+  GROUP BY 1
+)
+SELECT
+  ap.state, ap.cluster,
+  CASE WHEN sv.partner_id IS NOT NULL THEN 1 ELSE 0 END AS was_visited,
+  COUNT(*) AS partner_count,
+  COUNTIF(COALESCE(r.revenue,0) > 0) AS with_revenue,
+  ROUND(SUM(COALESCE(r.revenue,0))) AS total_revenue,
+  ROUND(AVG(CASE WHEN COALESCE(r.revenue,0) > 0 THEN r.revenue END)) AS avg_rev_with_revenue,
+  ROUND(SUM(COALESCE(c.collections,0))) AS total_collections
+FROM active_partners ap
+LEFT JOIN store_visits sv ON sv.partner_id = ap.farmer_id
+LEFT JOIN rev r ON r.partner_id = ap.farmer_id
+LEFT JOIN coll c ON c.partner_id = ap.farmer_id
+GROUP BY 1, 2, 3
+ORDER BY 1, 2, 3
+"""
+
+VISIT_ANOMALY_SQL = """
+WITH
+visits_raw AS (
+  SELECT LOWER(TRIM(email)) AS email, date AS visit_date, date_time AS visit_ts,
+    CAST(store_id AS STRING) AS store_id,
+    LOWER(TRIM(COALESCE(sm,''))) AS sm, LOWER(TRIM(COALESCE(tm,''))) AS tm,
+    LOWER(TRIM(COALESCE(cm,''))) AS cm, LOWER(TRIM(COALESCE(sh,''))) AS sh
+  FROM `agrostar-data.offline_team.store_visits_v2`
+  WHERE date BETWEEN '{from_date}' AND '{to_date}'
+  UNION ALL
+  SELECT LOWER(TRIM(v.email)), DATE(v.date), v.updatedOn, v.storeId,
+    LOWER(TRIM(COALESCE(okr.sm,''))), LOWER(TRIM(COALESCE(okr.tm,''))),
+    LOWER(TRIM(COALESCE(okr.cm,''))), LOWER(TRIM(COALESCE(okr.sh,'')))
+  FROM `agrostar-data.prod_db_views.visit` v
+  LEFT JOIN `agrostar-data.offline_team.okr_data_live` okr ON SAFE_CAST(v.storeId AS INT64) = okr.farmer_id
+  WHERE DATE(v.date) BETWEEN '{from_date}' AND '{to_date}'
+),
+visits_dedup AS (
+  SELECT * EXCEPT(rn)
+  FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY email, store_id, visit_date ORDER BY visit_ts DESC) AS rn FROM visits_raw)
+  WHERE rn = 1
+),
+tagged AS (
+  SELECT email, visit_date, store_id,
+    DATE_TRUNC(visit_date, WEEK(MONDAY)) AS week_start,
+    CASE WHEN email != '' AND email = sm THEN 'SM'
+         WHEN email != '' AND email = tm THEN 'TM'
+         WHEN email != '' AND email = cm THEN 'CM'
+         WHEN email != '' AND email = sh THEN 'SH'
+         ELSE 'Other' END AS visitor_role
+  FROM visits_dedup
+),
+rep_stats AS (
+  SELECT email, COUNT(*) AS total_visits, COUNT(DISTINCT store_id) AS unique_stores,
+    ROUND(COUNT(*)*1.0/NULLIF(COUNT(DISTINCT store_id),0),1) AS visits_per_store
+  FROM tagged GROUP BY 1
+),
+repeat_store_week AS (
+  SELECT email, store_id, week_start, COUNT(*) AS cnt
+  FROM tagged WHERE store_id IS NOT NULL AND store_id != ''
+  GROUP BY 1, 2, 3 HAVING COUNT(*) >= 3
+),
+okr_sms AS (SELECT DISTINCT LOWER(TRIM(sm)) AS rep_email FROM `agrostar-data.offline_team.okr_data_live`
+  WHERE status='ACTIVE' AND sm IS NOT NULL AND sm!='' AND NOT STARTS_WITH(UPPER(sm),'VACANT')),
+okr_tms AS (SELECT DISTINCT LOWER(TRIM(tm)) AS rep_email FROM `agrostar-data.offline_team.okr_data_live`
+  WHERE status='ACTIVE' AND tm IS NOT NULL AND tm!='' AND NOT STARTS_WITH(UPPER(tm),'VACANT')),
+logging_reps AS (SELECT DISTINCT email FROM tagged)
+SELECT 'ghost_sms'           AS metric, COUNT(*) AS value FROM okr_sms o LEFT JOIN logging_reps l ON l.email=o.rep_email WHERE l.email IS NULL
+UNION ALL SELECT 'ghost_tms',           COUNT(*) FROM okr_tms o LEFT JOIN logging_reps l ON l.email=o.rep_email WHERE l.email IS NULL
+UNION ALL SELECT 'total_sms_in_okr',    COUNT(*) FROM okr_sms
+UNION ALL SELECT 'total_tms_in_okr',    COUNT(*) FROM okr_tms
+UNION ALL SELECT 'repeat_store_reps',   COUNT(DISTINCT email) FROM repeat_store_week
+UNION ALL SELECT 'repeat_store_combos', COUNT(*) FROM repeat_store_week
+UNION ALL SELECT 'high_conc_reps',      COUNT(*) FROM rep_stats WHERE visits_per_store >= 5 AND total_visits >= 10
+UNION ALL SELECT 'total_active_reps',   COUNT(DISTINCT email) FROM tagged
+"""
+
+
 def run_query(sql):
     rows = get_client().query(sql).result()
     return [[str(v) if v is not None else None for v in row] for row in rows]
@@ -124,6 +516,17 @@ def run_query(sql):
 @app.route('/dvs_dashboard')
 def dashboard():
     return send_file(DASHBOARD_PATH)
+
+
+@app.route('/field_dashboard')
+def field_dashboard():
+    return send_file(FIELD_DASHBOARD_PATH)
+
+
+@app.route('/underwriting_dashboard')
+@app.route('/underwriting_dashboard.html')
+def underwriting_dashboard():
+    return send_file(UNDERWRITING_DASHBOARD_PATH)
 
 
 @app.route('/health')
@@ -143,6 +546,36 @@ def refresh():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+@app.route('/api/field/partners')
+def field_partners():
+    today     = datetime.date.today()
+    from_date = request.args.get('from', today.replace(day=1).isoformat())
+    to_date   = request.args.get('to',   today.isoformat())
+    try:
+        rows = run_query(FIELD_PARTNER_SQL.format(from_date=from_date, to_date=to_date))
+        return jsonify({'ok': True, 'rows': rows, 'from_date': from_date, 'to_date': to_date})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/field/visit-analysis')
+def visit_analysis():
+    today     = datetime.date.today()
+    from_date = request.args.get('from', today.replace(day=1).isoformat())
+    to_date   = request.args.get('to',   today.isoformat())
+    try:
+        volume    = run_query(VISIT_VOLUME_SQL.format(from_date=from_date, to_date=to_date))
+        coverage  = run_query(VISIT_COVERAGE_SQL.format(from_date=from_date, to_date=to_date))
+        outcomes  = run_query(VISIT_OUTCOMES_SQL.format(from_date=from_date, to_date=to_date))
+        anomalies = run_query(VISIT_ANOMALY_SQL.format(from_date=from_date, to_date=to_date))
+        return jsonify({'ok': True, 'volume': volume, 'coverage': coverage,
+                        'outcomes': outcomes, 'anomalies': anomalies,
+                        'from_date': from_date, 'to_date': to_date})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
-    print('DVS proxy → http://localhost:7891/dvs_dashboard  (Ctrl-C to stop)')
+    print('DVS proxy    → http://localhost:7891/dvs_dashboard')
+    print('Field proxy  → http://localhost:7891/field_dashboard')
     app.run(host='127.0.0.1', port=7891)

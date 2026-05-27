@@ -57,15 +57,15 @@ BT is a **daily Portfolio Manager job** — scan every RF partner every day for 
 | 3 | Total order amount > ₹200 | `SUM(amount)` across ALL debits for the order must exceed ₹200 |
 | 4 | Invoice age ≤ 45 days | Measured from `invoiced_report.CreatedOn` — NOT ledger `created_on` or `due_date` |
 
-**Additional gate — long credit term (>150 days):**
+**Additional gate — long credit term (>120 days):**
 - Compute `credit_term = DATE_DIFF(MAX(due_date), invoice_created_date, DAY)` per order
-- If `credit_term > 150` → wait 30 days from invoice date before BT is allowed
-- Filter: `NOT (credit_term > 150 AND invoice_age_days < 30)`
+- If `credit_term > 120` → wait 34 days from invoice date before BT is allowed
+- Filter: `NOT (credit_term > 120 AND invoice_age_days <= 33)`
 
 **A debit entry is BT-able if:** `cancelled = 0` AND `finbox_transaction_id IS NULL` AND `is_reconciled = 0`
 **An order is BT-eligible if:** at least one BT-able debit + total_order_amount > ₹200 + invoice age + credit term rules pass
 
-**BT is capped by BALANCE from the Google Sheet** — never push more than available balance.
+**BT is capped by `account_balance_value` from `galaxy_views.b2blandingdetails`** — never push more than available balance. Note: this value has a lag vs Rupifi's live system; some pushes may still fail with insufficient balance.
 
 **Greedy allocation (order-level):** When a partner has multiple eligible orders and limited balance:
 - Sort orders by `invoice_age_days DESC` (oldest first — most urgent, closest to 45-day expiry)
@@ -516,9 +516,9 @@ eligible_orders AS (
     os.bt_eligible_debits > 0                   -- C1+C2: unpushed + unreconciled debit exists
     AND os.total_order_amount > 200              -- C3: total order > ₹200
     AND DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) BETWEEN 0 AND 45  -- C4: ≤45 days
-    AND NOT (                                    -- Long credit term gate: wait 30 days
-      DATE_DIFF(DATE(os.max_due_date), id.invoice_created_date, DAY) > 150
-      AND DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) < 30
+    AND NOT (                                    -- Long credit term gate: wait 34 days
+      DATE_DIFF(DATE(os.max_due_date), id.invoice_created_date, DAY) > 120
+      AND DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) <= 33
     )
 )
 -- Final: one row per eligible order
@@ -660,11 +660,10 @@ ORDER BY total_partners DESC
 | `is_reconciled = 1` means already paid back | If `is_reconciled = 1`, the partner has repaid that specific debit to AgroStar. These entries must be excluded from BT — there is nothing to push to the lender. Only `is_reconciled = 0` debits are BT-able. |
 | BT requires BOTH `finbox IS NULL` AND `is_reconciled = 0` | An entry being unpushed (`finbox IS NULL`) is not enough — it also must be unreconciled. An order is BT-eligible only if it has at least one debit that is BOTH conditions simultaneously. |
 | Total order amount > ₹200 for BT | `SUM(amount)` across ALL debits of the order must exceed ₹200. Orders below this threshold are not raised to lender regardless of other conditions. |
-| Long credit term gate (>150 days) | If `DATE_DIFF(MAX(due_date), invoice_created_date, DAY) > 150`, the order is only BT-eligible after the invoice is 30+ days old. Filter: `NOT (credit_term > 150 AND invoice_age_days < 30)`. |
+| Long credit term gate (>120 days) | If `DATE_DIFF(MAX(due_date), invoice_created_date, DAY) > 120`, the order is only BT-eligible after the invoice is 34+ days old. Filter: `NOT (credit_term > 120 AND invoice_age_days <= 33)`. |
 | BT greedy allocation: oldest-first, full orders only | When a partner has multiple eligible orders exceeding their balance, pick orders oldest-first (highest invoice_age_days first). Only include orders that fit entirely within remaining balance — no partial order raises. |
-| Lender LIMIT & BALANCE not in BigQuery | `LIMIT` and `BALANCE` per partner live only in the Google Sheet tracker. For BT opportunity analysis, fetch the sheet first and cross-reference by `Partner Id`. BQ queries alone cannot enforce the BALANCE cap. |
-| `BUSINESS ID` ≠ `Partner Id` in Sheet | Rupifi's `BUSINESS ID` is their internal reference. Always use `Partner Id` column (= AgroStar `farmer_id`) to join sheet data with BigQuery. |
-| Sheet data is as-of today only | The sheet is updated daily — it reflects the current day's BALANCE. There is no historical BALANCE series in the sheet. |
+| Lender LIMIT & BALANCE source | `account_limit_value` and `account_balance_value` come from `galaxy_views.b2blandingdetails`. Join: `institution.user_id = SAFE_CAST(b2blanding.merchantCustomerRefId AS INT64)`. Tyger Capital partners have no rows here — balance unknown for them. |
+| `b2blandingdetails` balance has lag | `account_balance_value` is cached and not real-time from Rupifi. Some B1 orders will fail with "insufficient balance" at push time even though BQ shows balance available. |
 
 ---
 

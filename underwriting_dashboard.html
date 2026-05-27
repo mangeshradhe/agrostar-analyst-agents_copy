@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Underwriting Analytics — Agrostar</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; font-size: 13px; min-height: 100vh; padding: 28px; }
+
+.page-header { margin-bottom: 28px; }
+.page-header h1 { font-size: 20px; font-weight: 800; color: #f8fafc; letter-spacing: -.4px; }
+.page-header .sub { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+.section { margin-bottom: 32px; }
+
+.section-title {
+  font-size: 15px; font-weight: 700; color: #f8fafc;
+  margin-bottom: 4px; display: flex; align-items: center; gap: 8px;
+}
+.section-subtitle { font-size: 11.5px; color: #64748b; margin-bottom: 14px; font-style: italic; }
+
+.card {
+  background: #1e2235;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #2a2f45;
+}
+
+table { width: 100%; border-collapse: collapse; }
+
+thead th {
+  font-size: 11px; font-weight: 700; color: #94a3b8;
+  text-transform: uppercase; letter-spacing: .5px;
+  padding: 11px 16px; text-align: right;
+  border-bottom: 1px solid #2a2f45;
+  background: #1a1d2e;
+}
+thead th:first-child { text-align: left; }
+
+tbody td {
+  padding: 10px 16px; text-align: right;
+  color: #e2e8f0; border-bottom: 1px solid #252a3a;
+  font-size: 12.5px;
+}
+tbody td:first-child { text-align: left; font-weight: 500; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: #252a3a; }
+
+.dip { font-size: 10.5px; color: #f59e0b; font-weight: 700; margin-left: 6px; }
+.stp-pct { font-weight: 700; color: #4ade80; }
+.stp-pct.low { color: #f59e0b; }
+
+.acc { font-weight: 600; }
+.acc-high  { color: #4ade80; }
+.acc-mid   { color: #e2e8f0; }
+.acc-low   { color: #f59e0b; }
+.acc-vlow  { color: #f87171; }
+
+.sub-section { margin-bottom: 20px; }
+.sub-header {
+  font-size: 12px; font-weight: 700; color: #94a3b8;
+  padding: 10px 16px; border-bottom: 1px solid #2a2f45;
+  background: #1a1d2e; text-transform: uppercase; letter-spacing: .4px;
+}
+
+.note {
+  font-size: 11px; color: #64748b; margin-top: 10px;
+  padding: 8px 12px; background: #1a1d2e; border-radius: 6px;
+  border-left: 3px solid #2a2f45;
+}
+.note strong { color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>🔍 Saathi Partner Underwriting — AIDR Analytics</h1>
+  <div class="sub">Activated leads | Jan–May 2026 | Corrected methodology — v2 (27 May 2026)</div>
+</div>
+
+<!-- ───────────── INVESTIGATION 1 ───────────── -->
+<div class="section">
+  <div class="section-title">🚀 Straight-Through Processing (STP)</div>
+  <div class="section-subtitle">Leads activated without any finance correction</div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Leads</th>
+          <th>Finance Edited</th>
+          <th>AIDR Auto</th>
+          <th>STP%</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Jan 2026</td>
+          <td>312</td>
+          <td>86</td>
+          <td>226</td>
+          <td><span class="stp-pct">72.4%</span></td>
+        </tr>
+        <tr>
+          <td>Feb 2026</td>
+          <td>195</td>
+          <td>110</td>
+          <td>85</td>
+          <td><span class="stp-pct low">43.6%</span></td>
+        </tr>
+        <tr>
+          <td>Mar 2026</td>
+          <td>129</td>
+          <td>83</td>
+          <td>46</td>
+          <td><span class="stp-pct low">35.7%</span><span class="dip">← dip</span></td>
+        </tr>
+        <tr>
+          <td>Apr 2026</td>
+          <td>306</td>
+          <td>112</td>
+          <td>194</td>
+          <td><span class="stp-pct">63.4%</span></td>
+        </tr>
+        <tr>
+          <td>May 2026</td>
+          <td>316</td>
+          <td>101</td>
+          <td>215</td>
+          <td><span class="stp-pct">68.0%</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <strong>Note:</strong> Feb–Mar 2026 STP dropped to 36–44% vs 63–72% in other months.
+    Finance was significantly more active in those cohorts — likely a batch of complex or non-standard documents.
+  </div>
+</div>
+
+<!-- ───────────── INVESTIGATION 2 ───────────── -->
+<div class="section">
+  <div class="section-title">📋 AIDR Field-Level Accuracy %</div>
+  <div class="section-subtitle">% of leads where AIDR extracted a correct, non-blank value · Corrected for STP blank inflation & SAFE_CAST NULL bug</div>
+
+  <div class="card">
+
+    <!-- Bank Statement -->
+    <div class="sub-section">
+      <div class="sub-header">🏦 Bank Statement Accuracy %</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Jan</th>
+            <th>Feb</th>
+            <th>Mar</th>
+            <th>Apr</th>
+            <th>May</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>OpeningBalance</td>
+            <td><span class="acc acc-high">93.9%</span></td>
+            <td><span class="acc acc-high">96.9%</span></td>
+            <td><span class="acc acc-high">94.5%</span></td>
+            <td><span class="acc acc-high">96.0%</span></td>
+            <td><span class="acc acc-high">91.7%</span></td>
+          </tr>
+          <tr>
+            <td>StatementMonths</td>
+            <td><span class="acc acc-mid">90.7%</span></td>
+            <td><span class="acc acc-high">94.8%</span></td>
+            <td><span class="acc acc-low">87.5%</span></td>
+            <td><span class="acc acc-mid">90.4%</span></td>
+            <td><span class="acc acc-low">88.2%</span></td>
+          </tr>
+          <tr>
+            <td>Last6MonthsCredits</td>
+            <td><span class="acc acc-high">92.6%</span></td>
+            <td><span class="acc acc-mid">90.8%</span></td>
+            <td><span class="acc acc-vlow">79.8%</span></td>
+            <td><span class="acc acc-mid">90.2%</span></td>
+            <td><span class="acc acc-low">85.8%</span></td>
+          </tr>
+          <tr>
+            <td>Last12MonthsCredits</td>
+            <td><span class="acc acc-mid">91.6%</span></td>
+            <td><span class="acc acc-high">95.3%</span></td>
+            <td><span class="acc acc-high">93.3%</span></td>
+            <td><span class="acc acc-high">95.6%</span></td>
+            <td><span class="acc acc-mid">90.4%</span></td>
+          </tr>
+          <tr>
+            <td>ChequeBounceCount</td>
+            <td><span class="acc acc-high">94.2%</span></td>
+            <td><span class="acc acc-high">96.4%</span></td>
+            <td><span class="acc acc-high">97.6%</span></td>
+            <td><span class="acc acc-high">95.4%</span></td>
+            <td><span class="acc acc-mid">91.4%</span></td>
+          </tr>
+          <tr>
+            <td>EnachBounceCount</td>
+            <td><span class="acc acc-high">94.6%</span></td>
+            <td><span class="acc acc-high">96.4%</span></td>
+            <td><span class="acc acc-high">97.6%</span></td>
+            <td><span class="acc acc-high">95.4%</span></td>
+            <td><span class="acc acc-mid">91.1%</span></td>
+          </tr>
+          <tr>
+            <td>ReportGenerationDate</td>
+            <td><span class="acc acc-vlow">71.3%</span></td>
+            <td><span class="acc acc-low">83.9%</span></td>
+            <td><span class="acc acc-low">86.4%</span></td>
+            <td><span class="acc acc-vlow">78.8%</span></td>
+            <td><span class="acc acc-vlow">76.0%</span></td>
+          </tr>
+          <tr>
+            <td>StatementFrom</td>
+            <td><span class="acc acc-high">93.3%</span></td>
+            <td><span class="acc acc-high">95.9%</span></td>
+            <td><span class="acc acc-high">92.2%</span></td>
+            <td><span class="acc acc-high">93.4%</span></td>
+            <td><span class="acc acc-mid">89.8%</span></td>
+          </tr>
+          <tr>
+            <td>StatementTo</td>
+            <td><span class="acc acc-mid">92.0%</span></td>
+            <td><span class="acc acc-high">95.4%</span></td>
+            <td><span class="acc acc-mid">90.6%</span></td>
+            <td><span class="acc acc-mid">91.4%</span></td>
+            <td><span class="acc acc-low">87.6%</span></td>
+          </tr>
+          <tr>
+            <td>AgencyName</td>
+            <td><span class="acc acc-high">93.2%</span></td>
+            <td><span class="acc acc-high">96.8%</span></td>
+            <td><span class="acc acc-high">95.3%</span></td>
+            <td><span class="acc acc-high">95.7%</span></td>
+            <td><span class="acc acc-mid">91.0%</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- CIBIL -->
+    <div class="sub-section" style="margin-bottom:0">
+      <div class="sub-header">🏛 CIBIL Accuracy %</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Jan</th>
+            <th>Feb</th>
+            <th>Mar</th>
+            <th>Apr</th>
+            <th>May</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CIBILScore</td>
+            <td><span class="acc acc-vlow">70.6%</span></td>
+            <td><span class="acc acc-vlow">67.2%</span></td>
+            <td><span class="acc acc-vlow">65.2%</span></td>
+            <td><span class="acc acc-vlow">71.5%</span></td>
+            <td><span class="acc acc-vlow">71.2%</span></td>
+          </tr>
+          <tr>
+            <td>CibilAgencyName</td>
+            <td><span class="acc acc-vlow">77.0%</span></td>
+            <td><span class="acc acc-vlow">71.6%</span></td>
+            <td><span class="acc acc-vlow">71.1%</span></td>
+            <td><span class="acc acc-vlow">74.8%</span></td>
+            <td><span class="acc acc-vlow">75.2%</span></td>
+          </tr>
+          <tr>
+            <td>CibilReportGenDate</td>
+            <td><span class="acc acc-vlow">75.2%</span></td>
+            <td><span class="acc acc-vlow">70.7%</span></td>
+            <td><span class="acc acc-vlow">72.0%</span></td>
+            <td><span class="acc acc-vlow">75.3%</span></td>
+            <td><span class="acc acc-low">78.0%</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="note">
+    <strong>Color key:</strong>
+    <span style="color:#4ade80">■</span> ≥92% &nbsp;
+    <span style="color:#e2e8f0">■</span> 88–91% &nbsp;
+    <span style="color:#f59e0b">■</span> 80–87% &nbsp;
+    <span style="color:#f87171">■</span> &lt;80% &nbsp;&nbsp;
+    <strong>Correction note:</strong> Earlier version had two bugs — SAFE_CAST NULL (missed 274 CIBIL score failures) and STP blank inflation (AIDR `*` counted as correct). Both fixed here.
+  </div>
+</div>
+
+</body>
+</html>

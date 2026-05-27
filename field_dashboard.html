@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Field Team Dashboard — Agrostar</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; color: #1a1a2e; font-size: 13px; min-height: 100vh; }
+
+.header { background: #0f172a; color: #fff; padding: 14px 28px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; }
+.header h1 { font-size: 16px; font-weight: 700; letter-spacing: -.3px; }
+.header h1 span { color: #4ade80; }
+.header-sub { font-size: 11px; color: #64748b; margin-top: 3px; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.header-meta { font-size: 11px; color: #64748b; text-align: right; line-height: 1.8; }
+
+/* Tab nav */
+.tab-nav { background: #fff; border-bottom: 2px solid #e2e8f0; padding: 0 28px; display: flex; gap: 0; }
+.tab-btn { padding: 11px 20px; font-size: 12.5px; font-weight: 700; color: #64748b; background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.tab-btn:hover { color: #1a1a2e; }
+.tab-btn.active { color: #16a34a; border-bottom-color: #16a34a; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.filter-bar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 28px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.filter-label { font-size: 10.5px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+.pill { padding: 4px 12px; border-radius: 20px; border: 1.5px solid #e2e8f0; background: #fff; cursor: pointer; font-size: 11.5px; font-weight: 600; color: #475569; transition: all .12s; user-select: none; }
+.pill:hover { border-color: #94a3b8; color: #1a1a2e; }
+.pill.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+.date-input { padding: 5px 10px; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: 11.5px; color: #1a1a2e; background: #fff; font-family: inherit; }
+.date-input:focus { outline: none; border-color: #16a34a; }
+.divider { width: 1px; height: 22px; background: #e2e8f0; flex-shrink: 0; }
+.load-btn { padding: 6px 18px; background: #16a34a; color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.load-btn:hover { background: #15803d; }
+.load-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+.load-btn.secondary { background: #2563eb; }
+.load-btn.secondary:hover { background: #1d4ed8; }
+.export-btn { padding: 6px 14px; background: #fff; color: #475569; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all .12s; white-space: nowrap; }
+.export-btn:hover { border-color: #94a3b8; color: #1a1a2e; }
+#query-status { font-size: 11px; color: #94a3b8; }
+select.filter-select { padding: 5px 10px; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: 11.5px; color: #1a1a2e; background: #fff; font-family: inherit; cursor: pointer; }
+select.filter-select:focus { outline: none; border-color: #16a34a; }
+.search-input { padding: 5px 12px; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: 11.5px; color: #1a1a2e; background: #fff; font-family: inherit; width: 180px; }
+.search-input:focus { outline: none; border-color: #16a34a; }
+
+.overlay { display: none; position: fixed; inset: 0; background: rgba(255,255,255,.75); z-index: 200; align-items: center; justify-content: center; }
+.overlay.show { display: flex; }
+.spinner-box { background: #fff; border-radius: 10px; padding: 20px 32px; box-shadow: 0 8px 32px rgba(0,0,0,.12); text-align: center; }
+.spinner-box p { font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
+.spinner-box small { color: #64748b; font-size: 11px; }
+.spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #16a34a; border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 10px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.kpi-grid { display: grid; gap: 12px; padding: 16px 28px 0; }
+.kpi-grid-8 { grid-template-columns: repeat(8, 1fr); }
+.kpi-grid-6 { grid-template-columns: repeat(6, 1fr); }
+.kpi { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,.06); border-top: 3px solid #e2e8f0; }
+.kpi.green  { border-top-color: #16a34a; }
+.kpi.blue   { border-top-color: #2563eb; }
+.kpi.amber  { border-top-color: #d97706; }
+.kpi.red    { border-top-color: #dc2626; }
+.kpi.purple { border-top-color: #7c3aed; }
+.kpi.gray   { border-top-color: #64748b; }
+.kpi.teal   { border-top-color: #0891b2; }
+.kpi-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+.kpi-value { font-size: 22px; font-weight: 800; color: #0f172a; line-height: 1.1; }
+.kpi-sub   { font-size: 11px; color: #64748b; margin-top: 4px; }
+
+.table-wrap { margin: 14px 28px 0; background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; }
+.table-wrap.last { margin-bottom: 28px; }
+.table-header { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.table-title { font-size: 13px; font-weight: 700; color: #0f172a; }
+.table-subtitle { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.table-scroll { overflow-x: auto; overflow-y: auto; }
+.table-scroll.h-sm  { max-height: 260px; }
+.table-scroll.h-med { max-height: 380px; }
+.table-scroll.h-lg  { max-height: 460px; }
+.table-scroll.h-main { max-height: calc(100vh - 320px); }
+table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px; }
+thead th { background: #f8fafc; color: #64748b; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; padding: 10px 12px; text-align: right; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; z-index: 10; cursor: pointer; user-select: none; }
+thead th:first-child, thead th.left { text-align: left; }
+thead th:hover { background: #f1f5f9; color: #1a1a2e; }
+thead th.sort-asc::after  { content: ' ↑'; color: #16a34a; }
+thead th.sort-desc::after { content: ' ↓'; color: #16a34a; }
+tbody td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #1a1a2e; vertical-align: middle; }
+tbody td:first-child, tbody td.left { text-align: left; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: #f8fafc; }
+
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.badge-green  { background: #dcfce7; color: #15803d; }
+.badge-red    { background: #fee2e2; color: #991b1b; }
+.badge-amber  { background: #fef3c7; color: #92400e; }
+.badge-orange { background: #ffedd5; color: #c2410c; }
+.badge-gray   { background: #f1f5f9; color: #475569; }
+.badge-blue   { background: #dbeafe; color: #1e40af; }
+
+.partner-name { font-weight: 700; color: #0f172a; font-size: 12px; }
+.partner-id   { font-size: 10px; color: #94a3b8; margin-top: 1px; }
+.two-line-top { font-weight: 600; color: #1a1a2e; font-size: 11.5px; }
+.two-line-bot { font-size: 10.5px; color: #94a3b8; margin-top: 1px; }
+
+.no-data { text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 12px; }
+.footer { text-align: center; padding: 14px; font-size: 10.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; margin-top: 4px; }
+
+/* Visit Analysis specific */
+.va-hint { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 16px; margin: 14px 28px 0; font-size: 11.5px; color: #1e40af; line-height: 1.6; }
+.va-load-area { text-align: center; padding: 60px 20px; }
+.va-load-area .spinner { margin: 0 auto 12px; }
+.multiplier-high { font-weight: 800; color: #15803d; }
+.multiplier-med  { font-weight: 700; color: #92400e; }
+.cov-bar { display: inline-block; height: 6px; border-radius: 3px; background: #16a34a; vertical-align: middle; margin-right: 6px; }
+.cov-bar.low  { background: #dc2626; }
+.cov-bar.med  { background: #d97706; }
+.cov-pct { font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Field Team Dashboard &nbsp;·&nbsp; <span>Agrostar</span></h1>
+    <p class="header-sub">Partner activity · Revenue · Collections · Visit Analysis — live from BigQuery</p>
+  </div>
+  <div class="header-right">
+    <div class="header-meta" id="last-loaded">Not loaded</div>
+  </div>
+</div>
+
+<!-- shared filter bar -->
+<div class="filter-bar">
+  <span class="filter-label">Period</span>
+  <span class="pill active" id="preset-mtd" onclick="setPreset('mtd',this)">MTD</span>
+  <span class="pill" id="preset-30d" onclick="setPreset('30d',this)">Last 30d</span>
+  <span class="pill" id="preset-7d"  onclick="setPreset('7d',this)">Last 7d</span>
+  <input type="date" id="date-from" class="date-input"/>
+  <span class="filter-label">→</span>
+  <input type="date" id="date-to" class="date-input"/>
+  <div class="divider"></div>
+
+  <!-- partner-only filters (hidden on visit tab) -->
+  <span id="partner-filters" style="display:contents">
+    <span class="filter-label">State</span>
+    <select id="sel-state" class="filter-select" onchange="applyFilters()"><option value="">All States</option></select>
+    <span class="filter-label">Territory</span>
+    <select id="sel-territory" class="filter-select" onchange="applyFilters()"><option value="">All</option></select>
+    <span class="filter-label">SM</span>
+    <select id="sel-sm" class="filter-select" onchange="applyFilters()"><option value="">All</option></select>
+    <div class="divider"></div>
+    <span class="filter-label">Block</span>
+    <span class="pill active" id="f-block-all"  onclick="setQuickFilter('block','',this)">All</span>
+    <span class="pill" id="f-block-yes" onclick="setQuickFilter('block','HARD_BLOCK',this)">Hard Block</span>
+    <span class="pill" id="f-block-no"  onclick="setQuickFilter('block','CLEAR',this)">Clear</span>
+    <div class="divider"></div>
+    <span class="filter-label">Visit</span>
+    <span class="pill active" id="f-visit-all" onclick="setQuickFilter('visit','all',this)">All</span>
+    <span class="pill" id="f-visit-yes" onclick="setQuickFilter('visit','visited',this)">Visited</span>
+    <span class="pill" id="f-visit-no"  onclick="setQuickFilter('visit','not',this)">Not Visited</span>
+    <div class="divider"></div>
+    <input type="text" id="search" class="search-input" placeholder="Search partner…" oninput="applyFilters()"/>
+  </span>
+
+  <button class="load-btn" id="load-btn" onclick="loadData()">⟳ Load Data</button>
+  <button class="load-btn secondary" id="va-load-btn" style="display:none" onclick="loadVisitAnalysis()">⟳ Load Analysis</button>
+  <button class="export-btn" id="export-btn" onclick="exportCSV()">↓ CSV</button>
+  <span id="query-status"></span>
+</div>
+
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('partner')">Partner Overview</button>
+  <button class="tab-btn" onclick="switchTab('visit')">Visit Analysis</button>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="spinner-box">
+    <div class="spinner"></div>
+    <p id="overlay-msg">Querying BigQuery…</p>
+    <small id="overlay-sub">Partners · Visits · Revenue · Collections</small>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     TAB 1: Partner Overview
+══════════════════════════════════════════════════════════ -->
+<div id="tab-partner" class="tab-panel active">
+
+  <div class="kpi-grid kpi-grid-8" id="kpi-grid">
+    <div class="kpi gray"><div class="kpi-label">Total Partners</div><div class="kpi-value" id="k-total">—</div><div class="kpi-sub">in okr_data_live</div></div>
+    <div class="kpi green"><div class="kpi-label">Active</div><div class="kpi-value" id="k-active">—</div><div class="kpi-sub" id="k-active-sub">—</div></div>
+    <div class="kpi blue"><div class="kpi-label">Visited (Period)</div><div class="kpi-value" id="k-visited">—</div><div class="kpi-sub" id="k-visited-sub">of active</div></div>
+    <div class="kpi purple"><div class="kpi-label">Revenue (Period)</div><div class="kpi-value" id="k-revenue">—</div><div class="kpi-sub">invoiced B2B</div></div>
+    <div class="kpi amber"><div class="kpi-label">Total OCP</div><div class="kpi-value" id="k-ocp">—</div><div class="kpi-sub">overdue credit</div></div>
+    <div class="kpi red"><div class="kpi-label">Hard Blocked</div><div class="kpi-value" id="k-blocked">—</div><div class="kpi-sub" id="k-blocked-sub">partners</div></div>
+    <div class="kpi green"><div class="kpi-label">Collected (Period)</div><div class="kpi-value" id="k-collected">—</div><div class="kpi-sub">cash received (reason_id=4)</div></div>
+    <div class="kpi blue"><div class="kpi-label">Onboarded MTD</div><div class="kpi-value" id="k-onboarded">—</div><div class="kpi-sub" id="k-onboarded-sub">first order this month</div></div>
+  </div>
+
+  <div class="table-wrap last">
+    <div class="table-header">
+      <div>
+        <div class="table-title" id="tbl-title">Partner Table</div>
+        <div class="table-subtitle" id="tbl-subtitle">Load data to begin</div>
+      </div>
+    </div>
+    <div class="table-scroll h-main">
+      <table id="partner-table">
+        <thead>
+          <tr>
+            <th class="left" style="min-width:200px" onclick="sortBy(1)">Partner</th>
+            <th class="left" style="min-width:130px" onclick="sortBy(2)">Territory · Cluster</th>
+            <th class="left" style="min-width:140px" onclick="sortBy(5)">SM · TM</th>
+            <th style="min-width:75px"  onclick="sortBy(7)">Status</th>
+            <th style="min-width:110px" onclick="sortBy(9)">Last Visit</th>
+            <th style="min-width:70px"  onclick="sortBy(10)">Visits</th>
+            <th style="min-width:110px" onclick="sortBy(12)">Revenue</th>
+            <th style="min-width:110px" onclick="sortBy(17)">Collected</th>
+            <th style="min-width:120px" onclick="sortBy(13)">Outstanding</th>
+            <th style="min-width:110px" onclick="sortBy(14)">OCP</th>
+            <th style="min-width:55px"  onclick="sortBy(15)">DPD</th>
+            <th style="min-width:80px"  onclick="sortBy(16)">Block</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body">
+          <tr><td colspan="12" class="no-data">Click "Load Data" to fetch from BigQuery</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div><!-- /tab-partner -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     TAB 2: Visit Analysis
+══════════════════════════════════════════════════════════ -->
+<div id="tab-visit" class="tab-panel">
+
+  <div class="va-hint">
+    <strong>Visit Analysis</strong> — Two-app dedup applied (agent × store × day). "Other" visits = rep email doesn't match assigned SM/TM/CM/SH for that store (covers vacant territories &amp; cross-territory visits).
+    Revenue = invoiced B2B · Collections = wallet credit (reason_id=4).
+    <strong>~1.1 GB scan per load · takes 30–60 s.</strong>
+  </div>
+
+  <!-- KPI row -->
+  <div class="kpi-grid kpi-grid-6" style="margin-top:14px">
+    <div class="kpi blue"><div class="kpi-label">Total Visits</div><div class="kpi-value" id="va-k-visits">—</div><div class="kpi-sub">agent × store × day, deduped</div></div>
+    <div class="kpi blue"><div class="kpi-label">Active Reps</div><div class="kpi-value" id="va-k-reps">—</div><div class="kpi-sub">logged at least 1 visit</div></div>
+    <div class="kpi green"><div class="kpi-label">Partners Covered</div><div class="kpi-value" id="va-k-stores">—</div><div class="kpi-sub" id="va-k-coverage">of active partners</div></div>
+    <div class="kpi red"><div class="kpi-label">Ghost SMs</div><div class="kpi-value" id="va-k-ghost">—</div><div class="kpi-sub" id="va-k-ghost-sub">zero visits logged</div></div>
+    <div class="kpi amber"><div class="kpi-label">Repeat-Store Reps</div><div class="kpi-value" id="va-k-repeat">—</div><div class="kpi-sub">3+ visits/week same store</div></div>
+    <div class="kpi teal"><div class="kpi-label">SaathiAPP Share</div><div class="kpi-value" id="va-k-appshare">—</div><div class="kpi-sub">% of total visits</div></div>
+  </div>
+
+  <!-- Volume breakdown -->
+  <div class="table-wrap" style="margin-top:14px">
+    <div class="table-header">
+      <div>
+        <div class="table-title">Field Activity by Month &amp; App</div>
+        <div class="table-subtitle">Each row = one month × one app · Roles determined by comparing visitor email to store's assigned SM/TM/CM/SH</div>
+      </div>
+    </div>
+    <div class="table-scroll h-sm">
+      <table id="va-vol-table" style="min-width:700px">
+        <thead><tr>
+          <th class="left">Month</th>
+          <th class="left">App</th>
+          <th>Total Visits</th>
+          <th>Active Reps</th>
+          <th>Unique Stores</th>
+          <th>SM</th><th>TM</th><th>CM</th><th>SH</th><th>Other</th>
+        </tr></thead>
+        <tbody id="va-vol-body"><tr><td colspan="10" class="no-data">Load analysis to view</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Coverage table -->
+  <div class="table-wrap" style="margin-top:14px">
+    <div class="table-header">
+      <div>
+        <div class="table-title">Visit Coverage by State / Cluster</div>
+        <div class="table-subtitle">Active partners only · SM/TM/CM Vacant = hierarchy slot unfilled in OKR · Stale 30d = last visit &gt;30 days ago</div>
+      </div>
+      <input type="text" id="va-cov-search" class="search-input" placeholder="Filter state / cluster…" oninput="filterCovTable()" style="width:180px;flex-shrink:0"/>
+    </div>
+    <div class="table-scroll h-med">
+      <table id="va-cov-table" style="min-width:820px">
+        <thead><tr>
+          <th class="left">State</th>
+          <th class="left">Cluster</th>
+          <th>Partners</th>
+          <th>SM Vacant</th>
+          <th>TM Vacant</th>
+          <th>CM Vacant</th>
+          <th>Visited</th>
+          <th>Coverage %</th>
+          <th>Not Visited</th>
+          <th>Stale 30d</th>
+          <th>Avg Visits</th>
+        </tr></thead>
+        <tbody id="va-cov-body"><tr><td colspan="11" class="no-data">Load analysis to view</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Outcomes table -->
+  <div class="table-wrap last" style="margin-top:14px">
+    <div class="table-header">
+      <div>
+        <div class="table-title">Outcomes: Visited vs Not-Visited Partners</div>
+        <div class="table-subtitle">Multiplier = avg rev (visited active partners) ÷ avg rev (not-visited active partners) · Selection bias applies — high-value partners get more visits</div>
+      </div>
+      <input type="text" id="va-out-search" class="search-input" placeholder="Filter state / cluster…" oninput="filterOutTable()" style="width:180px;flex-shrink:0"/>
+    </div>
+    <div class="table-scroll h-lg">
+      <table id="va-out-table" style="min-width:1100px">
+        <thead><tr>
+          <th class="left">State</th>
+          <th class="left">Cluster</th>
+          <th>Visited</th>
+          <th>w/ Revenue</th>
+          <th>Visited Rev</th>
+          <th>Avg Rev ↑</th>
+          <th>Not Visited</th>
+          <th>w/ Revenue</th>
+          <th>Not Visited Rev</th>
+          <th>Avg Rev ↓</th>
+          <th>Multiplier</th>
+          <th>Visited Coll</th>
+          <th>Not Visited Coll</th>
+        </tr></thead>
+        <tbody id="va-out-body"><tr><td colspan="13" class="no-data">Load analysis to view</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /tab-visit -->
+
+<div class="footer">Field Team Dashboard · Agrostar · Data via BigQuery ADC · <a href="/dvs_dashboard" style="color:#16a34a">DVS Dashboard</a></div>
+
+<script>
+// ── Column indices for partner table ──
+const C = { ID:0, NAME:1, TERR:2, CLUS:3, STATE:4, SM:5, TM:6, STATUS:7,
+            LAST_VISIT:8, DAYS:9, VISITS:10, TODAY:11, REV:12, OUTSTD:13, OCP:14, DPD:15, BLOCK:16,
+            COLL:17, FIRST_ORDER:18 };
+
+let rawData = [], sortCol = C.OCP, sortDir = -1;
+let qf = { block: '', visit: 'all' };
+let vaVolData = [], vaCovData = [], vaOutData = [], vaAnomalies = {};
+
+// ── Tab switching ──
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && tab === 'partner') || (i === 1 && tab === 'visit'));
+  });
+  document.getElementById('tab-partner').classList.toggle('active', tab === 'partner');
+  document.getElementById('tab-visit').classList.toggle('active', tab === 'visit');
+
+  const partnerFilters = document.getElementById('partner-filters');
+  const loadBtn    = document.getElementById('load-btn');
+  const vaLoadBtn  = document.getElementById('va-load-btn');
+  const exportBtn  = document.getElementById('export-btn');
+
+  if (tab === 'partner') {
+    partnerFilters.style.display = 'contents';
+    loadBtn.style.display   = '';
+    vaLoadBtn.style.display = 'none';
+    exportBtn.style.display = '';
+  } else {
+    partnerFilters.style.display = 'none';
+    loadBtn.style.display   = 'none';
+    vaLoadBtn.style.display = '';
+    exportBtn.style.display = 'none';
+  }
+}
+
+// ── Date presets ──
+(function() {
+  const today = new Date();
+  document.getElementById('date-from').value = today.toISOString().slice(0,7) + '-01';
+  document.getElementById('date-to').value   = today.toISOString().slice(0,10);
+})();
+
+function setPreset(p, el) {
+  document.querySelectorAll('#preset-mtd,#preset-30d,#preset-7d').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  const today = new Date(), fmt = d => d.toISOString().slice(0,10);
+  if (p === 'mtd') {
+    document.getElementById('date-from').value = fmt(today).slice(0,7) + '-01';
+  } else {
+    const d = new Date(today); d.setDate(d.getDate() - (p === '30d' ? 30 : 7));
+    document.getElementById('date-from').value = fmt(d);
+  }
+  document.getElementById('date-to').value = fmt(today);
+}
+
+function setQuickFilter(type, val, el) {
+  qf[type] = val;
+  const prefix = type === 'block' ? 'f-block-' : 'f-visit-';
+  document.querySelectorAll(`[id^="${prefix}"]`).forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  applyFilters();
+}
+
+// ── Partner Overview: Load ──
+async function loadData() {
+  const from = document.getElementById('date-from').value;
+  const to   = document.getElementById('date-to').value;
+  if (!from || !to) { alert('Set date range first.'); return; }
+  showOverlay('Querying BigQuery…', 'Partners · Visits · Revenue · Collections');
+  document.getElementById('load-btn').disabled = true;
+  document.getElementById('query-status').textContent = 'Querying…';
+  try {
+    const res  = await fetch(`/api/field/partners?from=${from}&to=${to}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Query failed');
+    rawData = json.rows || [];
+    populateDropdowns(rawData);
+    applyFilters();
+    const now = new Date().toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' });
+    document.getElementById('last-loaded').innerHTML = `Loaded: ${now}<br>${rawData.length.toLocaleString('en-IN')} partners · ${from} → ${to}`;
+    document.getElementById('query-status').textContent = `${rawData.length} rows`;
+  } catch(e) {
+    document.getElementById('query-status').textContent = '❌ ' + e.message;
+    alert('Error: ' + e.message);
+  } finally {
+    hideOverlay();
+    document.getElementById('load-btn').disabled = false;
+  }
+}
+
+// ── Visit Analysis: Load ──
+async function loadVisitAnalysis() {
+  const from = document.getElementById('date-from').value;
+  const to   = document.getElementById('date-to').value;
+  if (!from || !to) { alert('Set date range first.'); return; }
+  showOverlay('Running 4 BigQuery queries…', '~1.1 GB scan · takes 30–60 seconds');
+  document.getElementById('va-load-btn').disabled = true;
+  document.getElementById('query-status').textContent = 'Querying…';
+  try {
+    const res  = await fetch(`/api/field/visit-analysis?from=${from}&to=${to}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Query failed');
+
+    vaVolData   = json.volume   || [];
+    vaCovData   = json.coverage || [];
+    vaOutData   = json.outcomes || [];
+    vaAnomalies = parseAnomalies(json.anomalies || []);
+
+    renderVAKPIs(vaVolData, vaCovData, vaAnomalies);
+    renderVolTable(vaVolData);
+    renderCovTable(vaCovData);
+    renderOutTable(vaOutData);
+
+    const now = new Date().toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' });
+    document.getElementById('last-loaded').innerHTML = `Analysis: ${now}<br>${from} → ${to}`;
+    document.getElementById('query-status').textContent = 'Analysis loaded';
+  } catch(e) {
+    document.getElementById('query-status').textContent = '❌ ' + e.message;
+    alert('Error: ' + e.message);
+  } finally {
+    hideOverlay();
+    document.getElementById('va-load-btn').disabled = false;
+  }
+}
+
+function parseAnomalies(rows) {
+  const m = {};
+  for (const r of rows) m[r[0]] = parseInt(r[1] || 0);
+  return m;
+}
+
+// ── Visit Analysis: KPIs ──
+function renderVAKPIs(vol, cov, ano) {
+  // Totals from volume
+  let totalVisits = 0, totalAppVisits = 0;
+  const repSet = new Set();
+  for (const r of vol) {
+    totalVisits += parseInt(r[2] || 0);
+    if (r[1] === 'saathiapp') totalAppVisits += parseInt(r[2] || 0);
+  }
+  const appShare = totalVisits ? Math.round(totalAppVisits * 100 / totalVisits) : 0;
+
+  // Totals from coverage
+  let totalPartners = 0, totalVisited = 0;
+  for (const r of cov) {
+    totalPartners += parseInt(r[2] || 0);
+    totalVisited  += parseInt(r[6] || 0);
+  }
+  const covPct = totalPartners ? Math.round(totalVisited * 100 / totalPartners) : 0;
+
+  // Reps (distinct across all rows in vol — deduplicate by summing unique reps is not exact, show total logged reps from anomaly query)
+  const totalReps = ano.total_active_reps || 0;
+  const ghostSMs  = ano.ghost_sms || 0;
+  const totalSMs  = ano.total_sms_in_okr || 0;
+  const repeatReps = ano.repeat_store_reps || 0;
+
+  document.getElementById('va-k-visits').textContent   = totalVisits.toLocaleString('en-IN');
+  document.getElementById('va-k-reps').textContent     = totalReps.toLocaleString('en-IN');
+  document.getElementById('va-k-stores').textContent   = totalVisited.toLocaleString('en-IN');
+  document.getElementById('va-k-coverage').textContent = `${covPct}% of ${totalPartners.toLocaleString('en-IN')} active`;
+  document.getElementById('va-k-ghost').textContent    = ghostSMs;
+  document.getElementById('va-k-ghost-sub').textContent = `of ${totalSMs} SMs in OKR`;
+  document.getElementById('va-k-repeat').textContent   = repeatReps.toLocaleString('en-IN');
+  document.getElementById('va-k-appshare').textContent = `${appShare}%`;
+}
+
+// ── Volume table ──
+function renderVolTable(rows) {
+  if (!rows.length) { document.getElementById('va-vol-body').innerHTML = '<tr><td colspan="10" class="no-data">No data</td></tr>'; return; }
+  // compute total per month for % of total
+  const monthTotal = {};
+  for (const r of rows) { monthTotal[r[0]] = (monthTotal[r[0]] || 0) + parseInt(r[2] || 0); }
+
+  let html = '';
+  for (const r of rows) {
+    const total = parseInt(r[2] || 0);
+    const pct   = monthTotal[r[0]] ? Math.round(total * 100 / monthTotal[r[0]]) : 0;
+    const appBadge = r[1] === 'saathiapp'
+      ? `<span class="badge badge-blue">SaathiAPP</span>`
+      : `<span class="badge badge-gray">FieldStar</span>`;
+    html += `<tr>
+      <td class="left"><strong>${r[0]}</strong></td>
+      <td class="left">${appBadge}</td>
+      <td><strong>${fmtN(r[2])}</strong> <small style="color:#94a3b8">(${pct}%)</small></td>
+      <td>${fmtN(r[3])}</td>
+      <td>${fmtN(r[4])}</td>
+      <td>${fmtN(r[5])}</td>
+      <td>${fmtN(r[6])}</td>
+      <td>${fmtN(r[7])}</td>
+      <td>${fmtN(r[8])}</td>
+      <td style="color:#64748b">${fmtN(r[9])}</td>
+    </tr>`;
+  }
+  document.getElementById('va-vol-body').innerHTML = html;
+}
+
+// ── Coverage table ──
+let covDataFull = [];
+function renderCovTable(rows) {
+  covDataFull = rows;
+  filterCovTable();
+}
+function filterCovTable() {
+  const q = (document.getElementById('va-cov-search').value || '').toLowerCase();
+  const filtered = covDataFull.filter(r =>
+    !q || (r[0]||'').toLowerCase().includes(q) || (r[1]||'').toLowerCase().includes(q)
+  );
+  const tbody = document.getElementById('va-cov-body');
+  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">No matching clusters</td></tr>'; return; }
+
+  let html = '';
+  for (const r of filtered) {
+    const pct = parseFloat(r[7] || 0);
+    const barW = Math.round(pct * 0.6); // max 60px
+    const barCls = pct < 60 ? 'low' : pct < 80 ? 'med' : '';
+    const smVac  = parseInt(r[3]||0), tmVac = parseInt(r[4]||0), cmVac = parseInt(r[5]||0);
+    html += `<tr>
+      <td class="left"><strong>${esc(r[0])}</strong></td>
+      <td class="left">${esc(r[1])}</td>
+      <td>${fmtN(r[2])}</td>
+      <td>${smVac > 0 ? `<span class="badge badge-red">${smVac}</span>` : '<span style="color:#cbd5e1">—</span>'}</td>
+      <td>${tmVac > 0 ? `<span class="badge badge-amber">${tmVac}</span>` : '<span style="color:#cbd5e1">—</span>'}</td>
+      <td>${cmVac > 0 ? `<span class="badge badge-gray">${cmVac}</span>` : '<span style="color:#cbd5e1">—</span>'}</td>
+      <td>${fmtN(r[6])}</td>
+      <td><span class="cov-bar ${barCls}" style="width:${barW}px"></span><span class="cov-pct" style="color:${pct<60?'#dc2626':pct<80?'#d97706':'#15803d'}">${pct}%</span></td>
+      <td>${parseInt(r[8]||0) > 0 ? `<strong style="color:#dc2626">${fmtN(r[8])}</strong>` : '—'}</td>
+      <td>${parseInt(r[9]||0) > 0 ? `<span style="color:#d97706">${fmtN(r[9])}</span>` : '—'}</td>
+      <td>${r[10] ? r[10] : '—'}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+// ── Outcomes table ──
+let outDataFull = [];
+function renderOutTable(rows) {
+  // Pivot: each (state,cluster) has was_visited=0 and was_visited=1 rows
+  const map = {};
+  for (const r of rows) {
+    const key = (r[0]||'') + '||' + (r[1]||'');
+    if (!map[key]) map[key] = { state: r[0], cluster: r[1], v: null, nv: null };
+    if (r[2] === '1') map[key].v  = r;
+    else              map[key].nv = r;
+  }
+  outDataFull = Object.values(map).sort((a,b) =>
+    (a.state||'').localeCompare(b.state||'') || (a.cluster||'').localeCompare(b.cluster||'')
+  );
+  filterOutTable();
+}
+function filterOutTable() {
+  const q = (document.getElementById('va-out-search').value || '').toLowerCase();
+  const filtered = outDataFull.filter(row =>
+    !q || (row.state||'').toLowerCase().includes(q) || (row.cluster||'').toLowerCase().includes(q)
+  );
+  const tbody = document.getElementById('va-out-body');
+  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="13" class="no-data">No matching clusters</td></tr>'; return; }
+
+  let html = '';
+  for (const row of filtered) {
+    const v  = row.v  || [null,null,null,0,0,0,null,0]; // state,cluster,visited,count,w_rev,tot_rev,avg_rev,coll
+    const nv = row.nv || [null,null,null,0,0,0,null,0];
+    const vAvg  = parseFloat(v[6]  || 0);
+    const nvAvg = parseFloat(nv[6] || 0);
+    const mult  = nvAvg > 0 ? (vAvg / nvAvg) : null;
+    const multLabel = mult === null ? '—'
+      : mult >= 3 ? `<span class="multiplier-high">${mult.toFixed(1)}×</span>`
+      : mult >= 1.5 ? `<span class="multiplier-med">${mult.toFixed(1)}×</span>`
+      : `${mult.toFixed(1)}×`;
+
+    html += `<tr>
+      <td class="left"><strong>${esc(row.state)}</strong></td>
+      <td class="left">${esc(row.cluster)}</td>
+      <td>${fmtN(v[3])}</td>
+      <td>${fmtN(v[4])}</td>
+      <td>${fmtINR(v[5])}</td>
+      <td><strong>${vAvg > 0 ? fmtINR(vAvg) : '—'}</strong></td>
+      <td>${fmtN(nv[3])}</td>
+      <td>${fmtN(nv[4])}</td>
+      <td>${fmtINR(nv[5])}</td>
+      <td>${nvAvg > 0 ? fmtINR(nvAvg) : '—'}</td>
+      <td>${multLabel}</td>
+      <td>${parseFloat(v[7]||0) > 0 ? `<strong style="color:#16a34a">${fmtINR(v[7])}</strong>` : '—'}</td>
+      <td>${parseFloat(nv[7]||0) > 0 ? fmtINR(nv[7]) : '—'}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+// ── Partner Overview helpers ──
+function populateDropdowns(rows) {
+  const states = [...new Set(rows.map(r => r[C.STATE]).filter(Boolean))].sort();
+  const terrs  = [...new Set(rows.map(r => r[C.TERR]).filter(Boolean))].sort();
+  const sms    = [...new Set(rows.map(r => r[C.SM]).filter(Boolean))].sort();
+  const fill = (id, vals) => {
+    const el = document.getElementById(id);
+    const cur = el.value;
+    el.innerHTML = `<option value="">All</option>` + vals.map(v => `<option value="${v}">${fmtEmail(v)}</option>`).join('');
+    if (vals.includes(cur)) el.value = cur;
+  };
+  fill('sel-state', states);
+  fill('sel-territory', terrs);
+  fill('sel-sm', sms);
+  document.getElementById('sel-state').options[0].text = 'All States';
+}
+
+function applyFilters() {
+  if (!rawData.length) return;
+  const stateF = document.getElementById('sel-state').value;
+  const terrF  = document.getElementById('sel-territory').value;
+  const smF    = document.getElementById('sel-sm').value;
+  const search = document.getElementById('search').value.toLowerCase();
+  let rows = rawData.filter(r => {
+    if (stateF && r[C.STATE] !== stateF) return false;
+    if (terrF  && r[C.TERR]  !== terrF)  return false;
+    if (smF    && r[C.SM]    !== smF)    return false;
+    if (qf.block && r[C.BLOCK] !== qf.block) return false;
+    if (qf.visit === 'visited' && parseInt(r[C.VISITS]||0) === 0) return false;
+    if (qf.visit === 'not'     && parseInt(r[C.VISITS]||0)  >  0) return false;
+    if (search && !r[C.NAME].toLowerCase().includes(search) && !r[C.ID].includes(search)) return false;
+    return true;
+  });
+  rows.sort((a,b) => {
+    let av = a[sortCol], bv = b[sortCol];
+    if ([C.DAYS,C.VISITS,C.TODAY,C.REV,C.OUTSTD,C.OCP,C.DPD].includes(sortCol)) { av = parseFloat(av||0); bv = parseFloat(bv||0); }
+    if (av < bv) return -sortDir; if (av > bv) return sortDir; return 0;
+  });
+  renderKPIs(rows);
+  renderTable(rows);
+  const from = document.getElementById('date-from').value, to = document.getElementById('date-to').value;
+  document.getElementById('tbl-title').textContent    = `Partner Overview (${rows.length.toLocaleString('en-IN')} partners shown)`;
+  document.getElementById('tbl-subtitle').textContent = `Period: ${from} → ${to} · Revenue = invoiced B2B · OCP = overdue credit position`;
+}
+
+function renderKPIs(rows) {
+  const active  = rows.filter(r => r[C.STATUS] === 'ACTIVE');
+  const visited = active.filter(r => parseInt(r[C.VISITS]||0) > 0);
+  const totRev  = rows.reduce((s,r) => s + parseFloat(r[C.REV]||0), 0);
+  const totOCP  = rows.reduce((s,r) => s + parseFloat(r[C.OCP]||0), 0);
+  const totColl = rows.reduce((s,r) => s + parseFloat(r[C.COLL]||0), 0);
+  const blocked = rows.filter(r => r[C.BLOCK] === 'HARD_BLOCK');
+  const covPct  = active.length ? Math.round(visited.length*100/active.length) : 0;
+  const mtdStart = new Date().toISOString().slice(0,7) + '-01';
+  const onboarded = rows.filter(r => r[C.FIRST_ORDER] >= mtdStart && r[C.FIRST_ORDER] !== '');
+  document.getElementById('k-total').textContent     = rows.length.toLocaleString('en-IN');
+  document.getElementById('k-active').textContent    = active.length.toLocaleString('en-IN');
+  document.getElementById('k-active-sub').textContent = `${rows.length - active.length} inactive`;
+  document.getElementById('k-visited').textContent   = visited.length.toLocaleString('en-IN');
+  document.getElementById('k-visited-sub').textContent = `${covPct}% coverage of active`;
+  document.getElementById('k-revenue').textContent   = fmtINR(totRev);
+  document.getElementById('k-ocp').textContent       = fmtINR(totOCP);
+  document.getElementById('k-blocked').textContent   = blocked.length.toLocaleString('en-IN');
+  document.getElementById('k-blocked-sub').textContent = `${blocked.filter(r=>r[C.STATUS]!=='ACTIVE').length} inactive`;
+  document.getElementById('k-collected').textContent  = fmtINR(totColl);
+  document.getElementById('k-onboarded').textContent  = onboarded.length.toLocaleString('en-IN');
+  document.getElementById('k-onboarded-sub').textContent = `first order from ${mtdStart}`;
+}
+
+function renderTable(rows) {
+  if (!rows.length) {
+    document.getElementById('tbl-body').innerHTML = '<tr><td colspan="12" class="no-data">No partners match the current filters</td></tr>';
+    return;
+  }
+  let html = '';
+  for (const r of rows) {
+    const days = parseInt(r[C.DAYS]||9999), visits = parseInt(r[C.VISITS]||0);
+    const ocp = parseFloat(r[C.OCP]||0), outstd = parseFloat(r[C.OUTSTD]||0);
+    const dpd = parseInt(r[C.DPD]||0), rev = parseFloat(r[C.REV]||0), coll = parseFloat(r[C.COLL]||0);
+    html += `<tr>
+      <td class="left"><div class="partner-name">${esc(r[C.NAME])}</div><div class="partner-id">ID ${r[C.ID]}</div></td>
+      <td class="left"><div class="two-line-top">${esc(r[C.TERR])}</div><div class="two-line-bot">${esc(r[C.CLUS])}</div></td>
+      <td class="left"><div class="two-line-top">${fmtEmail(r[C.SM])}</div><div class="two-line-bot">${fmtEmail(r[C.TM])}</div></td>
+      <td><span class="badge ${r[C.STATUS]==='ACTIVE'?'badge-green':'badge-gray'}">${r[C.STATUS]||'—'}</span></td>
+      <td>${visitBadge(days, r[C.LAST_VISIT])}</td>
+      <td><strong>${visits||'—'}</strong></td>
+      <td>${rev > 0 ? fmtINR(rev) : '<span style="color:#cbd5e1">—</span>'}</td>
+      <td>${coll > 0 ? `<strong style="color:#16a34a">${fmtINR(coll)}</strong>` : '<span style="color:#cbd5e1">—</span>'}</td>
+      <td>${outstd > 0 ? fmtINR(outstd) : '<span style="color:#cbd5e1">—</span>'}</td>
+      <td>${ocp > 0 ? `<strong style="color:${ocp>50000?'#dc2626':ocp>5000?'#d97706':'#1a1a2e'}">${fmtINR(ocp)}</strong>` : '<span style="color:#cbd5e1">—</span>'}</td>
+      <td>${dpd > 0 ? `<span style="color:${dpd>90?'#dc2626':dpd>30?'#d97706':'#475569'};font-weight:700">${dpd}</span>` : '<span style="color:#cbd5e1">—</span>'}</td>
+      <td>${r[C.BLOCK]==='HARD_BLOCK' ? '<span class="badge badge-red">Blocked</span>' : '<span class="badge badge-green">Clear</span>'}</td>
+    </tr>`;
+  }
+  document.getElementById('tbl-body').innerHTML = html;
+}
+
+function visitBadge(days, dateStr) {
+  if (days >= 9999 || !dateStr) return '<span class="badge badge-gray">Never</span>';
+  const label = days === 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days}d ago`;
+  const cls = days <= 0 ? 'badge-green' : days <= 7 ? 'badge-green' : days <= 14 ? 'badge-blue' : days <= 30 ? 'badge-amber' : 'badge-red';
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = -1; }
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.getAttribute('onclick') === `sortBy(${col})`) th.classList.add(sortDir===1?'sort-asc':'sort-desc');
+  });
+  applyFilters();
+}
+
+// ── Overlay ──
+function showOverlay(msg, sub) {
+  document.getElementById('overlay-msg').textContent = msg || 'Querying BigQuery…';
+  document.getElementById('overlay-sub').textContent = sub || '';
+  document.getElementById('overlay').classList.add('show');
+}
+function hideOverlay() { document.getElementById('overlay').classList.remove('show'); }
+
+// ── Formatters ──
+function fmtINR(n) {
+  if (!n && n !== 0) return '—';
+  const num = parseFloat(n);
+  if (isNaN(num) || num === 0) return '—';
+  return '₹' + Math.round(num).toLocaleString('en-IN');
+}
+function fmtN(n) {
+  if (n === null || n === undefined || n === '') return '—';
+  const num = parseInt(n);
+  return isNaN(num) ? '—' : num.toLocaleString('en-IN');
+}
+function fmtEmail(e) { return e ? (e.split('@')[0] || e) : '—'; }
+function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '—'; }
+
+// ── Export CSV (Partner Overview) ──
+function exportCSV() {
+  if (!rawData.length) { alert('No data loaded.'); return; }
+  const headers = ['ID','Name','Territory','Cluster','State','SM','TM','Status','Last Visit','Days Since Visit','Visits','Visits Today','Revenue','Outstanding','OCP','DPD','Block','Collections','First Order'];
+  const lines = [headers.join(',')];
+  for (const r of rawData) lines.push(r.map(v => v===null?'':(String(v).includes(',')?`"${v}"`:v)).join(','));
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `field_partners_${document.getElementById('date-from').value}_${document.getElementById('date-to').value}.csv`;
+  a.click();
+}
+</script>
+</body>
+</html>
