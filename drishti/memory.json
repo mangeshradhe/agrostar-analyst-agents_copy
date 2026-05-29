@@ -1,0 +1,88 @@
+{
+  "version": "1.0",
+  "last_run": null,
+  "baselines": {
+    "routing_rate_pct": 48.5,
+    "fulfillment_rate_pct": 43.7,
+    "rto_rate_pct": 24.1,
+    "dvs_3day_sla_pct": 38.4,
+    "fc_5day_sla_pct": 5.7,
+    "packed_to_picked_p50_hrs": 51,
+    "packed_to_delivered_p50_hrs": 96,
+    "dispatch_to_delivered_p50_hrs": 166,
+    "updated_date": "2026-05-30"
+  },
+  "rules": {
+    "dead_persistence_prior": 0.55,
+    "dead_store_seasonal_reactivation": "high_in_may_kharif_season",
+    "declining_mortality_use_rate_not_volume": true,
+    "lmd_selective_threshold_fc_pct": 80,
+    "lmd_selective_threshold_hold_pct": 40,
+    "lmd_overload_threshold_fc_pct": 70,
+    "prediction_accuracy_overall": 60.0,
+    "prediction_accuracy_lmd_hold": 68.5,
+    "prediction_accuracy_gmv_direction": 100.0,
+    "prediction_accuracy_gujarat_onhold": 100.0,
+    "notes": "Dead store persistence lowered from 70% to 55% after May backtesting. Rate-based decline scoring confirmed better than volume-based."
+  },
+  "regime_boundaries": [
+    {
+      "date": "2026-03-01",
+      "event": "PromisedTAT routing engine launched",
+      "impact": "DVS routing now algorithmic. STORE-ORDER type introduced. Fulfillment jumped to 42.8%."
+    },
+    {
+      "date": "2026-04-01",
+      "event": "24-hour auto-reroute rule launched",
+      "impact": "Orders ignored >24hrs auto-rerouted. New reroute reason appeared. April fulfillment dropped to 35.1%."
+    },
+    {
+      "date": "2026-04-01",
+      "event": "Gujarat retailer strike (external)",
+      "impact": "712 orders rerouted. Resolved by May. FC RTO spiked in Gujarat."
+    },
+    {
+      "date": "2026-04-01",
+      "event": "LMD coverage expansion",
+      "impact": "No-LMD blocks: 6715 (Mar) → 163 (Apr) → 0 (May). Major coverage gap closed."
+    }
+  ],
+  "seasonal_calendar": {
+    "oct_dec": "Rabi season prep — peak demand 51-57k orders/month",
+    "jan_feb": "Rabi growing — demand lull 52k → 35k",
+    "feb_apr": "Pre-Kharif trough — lowest demand 32-35k/month",
+    "may_jun": "Kharif prep — demand recovering 38k+ and rising",
+    "note": "Expect dead store reactivation in May-June as Kharif demand pulls dormant stores back. Adjust dead persistence prior DOWN in May-June."
+  },
+  "known_lmd_profiles": {
+    "franchise_3115": {
+      "name": "Ravikaran Singh",
+      "code": "AGROSTARUP139",
+      "state": "UP",
+      "flag": "GENUINE_OVERLOAD",
+      "fc_delivery_pct": 63.7,
+      "dvs_hold_pct": 78.7,
+      "history": "Flagged multiple times. 83.6% HOLD in prior analysis. Consistent underperformer."
+    },
+    "franchise_9070": {
+      "name": "narayan.up",
+      "code": "AGROSTARUP179",
+      "state": "UP",
+      "flag": "SELECTIVE_DEPRIORITIZATION",
+      "fc_delivery_pct": 90.6,
+      "dvs_hold_pct": 54.2,
+      "history": "Best FC performer in UP. Deliberately ignoring DVS stores. Incentive misalignment."
+    },
+    "franchise_1230": {
+      "name": "jignesh.jani",
+      "code": "AGROSTARGJ083",
+      "state": "GJ",
+      "flag": "HEALTHY",
+      "fc_delivery_pct": 97.3,
+      "dvs_hold_pct": 32.1,
+      "history": "Best overall LMD in network. Gujarat. Use as benchmark."
+    }
+  },
+  "predictions": [],
+  "pipeline_snapshots": []
+}
