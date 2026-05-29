@@ -33,10 +33,13 @@ PROJECT = "agrostar-data"
 MEMORY_PATH = os.path.join(os.path.dirname(__file__), "memory.json")
 
 # Slack channels
-SLACK_CHANNEL_SUMMARY  = os.environ.get("DRISHTI_SLACK_SUMMARY",  "#dvs-analytics")
-SLACK_CHANNEL_OPS      = os.environ.get("DRISHTI_SLACK_OPS",      "#dvs-ops")
-SLACK_CHANNEL_FINANCE  = os.environ.get("DRISHTI_SLACK_FINANCE",  "#dvs-finance")
-SLACK_CHANNEL_LMD      = os.environ.get("DRISHTI_SLACK_LMD",      "#dvs-lmd")
+# All output → Darpan Pathar DM during pilot (darpan.pathar@agrostar.in)
+# Slack user ID: U5AR2LLBZ | DM channel: D0B7Y65ENRW
+_DM_DARPAN = "D0B7Y65ENRW"
+SLACK_CHANNEL_SUMMARY  = os.environ.get("DRISHTI_SLACK_SUMMARY",  _DM_DARPAN)
+SLACK_CHANNEL_OPS      = os.environ.get("DRISHTI_SLACK_OPS",      _DM_DARPAN)
+SLACK_CHANNEL_FINANCE  = os.environ.get("DRISHTI_SLACK_FINANCE",  _DM_DARPAN)
+SLACK_CHANNEL_LMD      = os.environ.get("DRISHTI_SLACK_LMD",      _DM_DARPAN)
 
 SLACK_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 

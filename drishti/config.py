@@ -6,13 +6,16 @@ import os
 # BigQuery
 PROJECT = "agrostar-data"
 
-# Slack channel IDs (update these with real channel IDs)
+# Slack — all output goes to Darpan Pathar DM (U5AR2LLBZ) during pilot
+# To route to team channels later, replace D0B7Y65ENRW with real channel IDs
+_DM_DARPAN = "D0B7Y65ENRW"  # Darpan Pathar (darpan.pathar@agrostar.in)
+
 CHANNELS = {
-    "summary":  os.environ.get("DRISHTI_CHANNEL_SUMMARY", "#dvs-drishti"),
-    "ops":      os.environ.get("DRISHTI_CHANNEL_OPS", "#dvs-ops"),
-    "lmd":      os.environ.get("DRISHTI_CHANNEL_LMD", "#dvs-lmd"),
-    "finance":  os.environ.get("DRISHTI_CHANNEL_FINANCE", "#dvs-finance"),
-    "cc":       os.environ.get("DRISHTI_CHANNEL_CC", "#dvs-cc"),
+    "summary": os.environ.get("DRISHTI_CHANNEL_SUMMARY", _DM_DARPAN),
+    "ops":     os.environ.get("DRISHTI_CHANNEL_OPS",     _DM_DARPAN),
+    "lmd":     os.environ.get("DRISHTI_CHANNEL_LMD",     _DM_DARPAN),
+    "finance": os.environ.get("DRISHTI_CHANNEL_FINANCE", _DM_DARPAN),
+    "cc":      os.environ.get("DRISHTI_CHANNEL_CC",      _DM_DARPAN),
 }
 
 # SLA thresholds (hours)
