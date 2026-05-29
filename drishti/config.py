@@ -54,11 +54,22 @@ ALERT_THRESHOLDS = {
 }
 
 # Leaky bucket scoring weights
+# PAT-002 validated 2026-05-30: use decline RATE not volume
+# formula: priority_score = prev_orders × decline_rate × urgency
+#          decline_rate = 1 - (current_orders / prev_orders)
 SCORING = {
-    "avg_order_value": 850,         # ₹ per DVS order (approximate)
+    "avg_order_value": 850,           # ₹ per DVS order (approximate)
     "urgency_truly_dead": 3,
     "urgency_declining": 2,
     "urgency_starved": 1,
+    "use_rate_based_decline": True,   # PAT-002: rate not volume
+}
+
+# PAT-001 validated 2026-05-30: seasonal dead persistence prior
+# Dead stores reactivate in May-Jun due to Kharif demand
+DEAD_PERSISTENCE_BY_MONTH = {
+    "may": 0.35, "jun": 0.35,        # Kharif season — stores come back
+    "default": 0.55,                  # Rest of year
 }
 
 # Prediction settings

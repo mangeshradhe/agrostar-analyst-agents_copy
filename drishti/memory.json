@@ -13,9 +13,18 @@
     "updated_date": "2026-05-30"
   },
   "rules": {
-    "dead_persistence_prior": 0.55,
+    "dead_persistence_prior": 0.35,
+    "dead_persistence_prior_default": 0.55,
+    "dead_persistence_seasonal": {
+      "may": 0.35, "jun": 0.35,
+      "jul": 0.55, "aug": 0.55, "sep": 0.55, "oct": 0.55,
+      "nov": 0.55, "dec": 0.55, "jan": 0.55, "feb": 0.55,
+      "mar": 0.55, "apr": 0.55
+    },
     "dead_store_seasonal_reactivation": "high_in_may_kharif_season",
     "declining_mortality_use_rate_not_volume": true,
+    "declining_scoring_formula": "prev_orders × (1 - curr/prev) × urgency",
+    "declining_scoring_formula_validated": "2026-05-30",
     "lmd_selective_threshold_fc_pct": 80,
     "lmd_selective_threshold_hold_pct": 40,
     "lmd_overload_threshold_fc_pct": 70,
@@ -189,8 +198,8 @@
       "evidence": "1 of 1 SEASONAL_RECOVERY diagnoses shows this pattern (100%). Small sample but high confidence due to known agricultural cycle.",
       "suggested_rule": "Reduce dead_persistence_prior from 0.55 to 0.35 during May-June. Restore to 0.55 in July onwards.",
       "requires_validation": true,
-      "status": "CANDIDATE",
-      "human_note": null
+      "status": "VALIDATED",
+      "human_note": "Validated by Darpan Pathar 2026-05-30. Applied immediately."
     },
     {
       "pattern_id": "PAT-2026-05-31-002",
@@ -200,8 +209,8 @@
       "evidence": "PRED-002 was 100% wrong. Top 50 by volume = 0% mortality. The correct signal is decline RATE, not volume.",
       "suggested_rule": "Replace priority_score = apr_orders × 2 with priority_score = prev_orders × (1 - curr/prev) × urgency. Apply immediately.",
       "requires_validation": true,
-      "status": "CANDIDATE",
-      "human_note": null
+      "status": "VALIDATED",
+      "human_note": "Validated by Darpan Pathar 2026-05-30. Applied immediately."
     }
   ],
   "last_pattern_discovery_date": "2026-05-31"
