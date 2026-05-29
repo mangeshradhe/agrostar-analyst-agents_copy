@@ -773,15 +773,20 @@ ORDER BY doc_type, confidence_pct ASC
 
 ---
 
-## Pilot Benchmarks (Oct–Dec 2025, activated leads)
+## Funnel Health — What Good Looks Like
 
-| Month | Total Leads | BS Readable % | CIBIL Readable % | AIDR All-Confident % | Finance OK % |
-|-------|------------|---------------|------------------|----------------------|-------------|
-| Oct 2025 | 433 | 79% | 62% | 57% | ~26% |
-| Nov 2025 | 641 | 87% | 70% | 66% | ~37% |
-| Dec 2025 | 588 | 82% | 68% | 65% | ~40% |
+The underwriting funnel has four gates. Always compute and compare all four:
 
-CIBIL accuracy (0 finance edits): 81–88%. Bank accuracy: 81–85%.
+| Gate | Definition | What a declining trend means |
+|---|---|---|
+| BS Readable % | Bank statement fields populated (not null/*/NA) | Document quality or upload issues |
+| CIBIL Readable % | CIBIL score extracted (not null/0/*/NA) | Bureau fetch failures or NTC concentration |
+| AIDR All-Confident % | All 13 confidence fields = 'Confident' | AIDR extraction degrading — check model or input quality |
+| Finance OK % | Months ≥ 6 + non-zero CIBIL + non-zero system limit | Credit profile of incoming leads is weakening |
+
+**CIBIL accuracy** = % of CIBIL fields where finance team made 0 edits after AIDR wrote them.
+**Bank accuracy** = same for bank statement fields.
+Track these monthly to detect AIDR model drift — a sustained drop in accuracy signals retraining needed.
 
 ---
 
@@ -807,7 +812,7 @@ CIBIL accuracy (0 finance edits): 81–88%. Bank accuracy: 81–85%.
 3. Run the query using `execute_sql_readonly`.
 4. Present results as a table. For %, show both count and %.
 5. Add a 2–3 line insight: trend direction, biggest failure reason, what improved or worsened.
-6. Flag if results look materially different from the Oct–Dec 2025 benchmarks.
+6. Flag significant MoM changes in funnel rates — a drop of >5pp in any gate warrants investigation.
 
 ---
 

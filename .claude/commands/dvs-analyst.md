@@ -661,34 +661,11 @@ Has failure log?
 
 ---
 
-#### OCP Restock Failure → Payment Behaviour (Validated Hypothesis)
+#### OCP Restock Failure → Payment Behaviour
 
 **Business hypothesis:** "When restock fails due to OCP, partners realise the business loss and pay within 1–2 days."
 
-**Validated finding (Feb–May 2026 data):**
-- Only **20.5% of OCP failure events** result in a payment within 2 days — hypothesis is partially true but significantly overstated
-- When payment does happen, it's fast: **median D+1, avg 0.95 days** — the urgency is real for those who act
-- **₹2.43 Cr collected** in 3 months purely triggered by OCP restock failure events (zero active intervention)
-- April OCP failures exploded 3.8x vs March (2,441 vs 646) — credit health deteriorating at start of FY27
-- Payment response rate declining: Mar 24.6% → Apr 19.4% → May 20.4%
-
-**Partner behaviour segments (across full period):**
-
-| Segment | Partners | Avg OCP Events | Response Rate | Amount Collected | Avg per Event |
-|---|---|---|---|---|---|
-| Always Pays | 27 | 3.0 | 100% | ₹49.24L | ₹54,715 |
-| Usually Pays | 69 | 5.4 | 60.8% | ₹73.02L | ₹35,304 |
-| One-time (paid) | 46 | 1.0 | 100% | ₹15.58L | ₹33,871 |
-| Rarely Pays | 135 | 13.1 | 23.4% | ₹1.06Cr | ₹31,078 |
-| Never Pays | 156 | 7.9 | 0% | ₹0 | — |
-
-**Key insight by segment:**
-- **Always Pays (27 partners):** Conditioned to respond. Avg ticket rising month-on-month (₹49K → ₹64K → ₹67K). Protect their credit health.
-- **Usually Pays (69 partners):** Highest ROI intervention target — call on days they don't pay to push toward 100%.
-- **Rarely Pays (135 partners):** Contribute most absolute collections (₹1.06Cr) but only 23% response rate. High-touch outreach on OCP failure day can unlock ~₹1.6Cr additional collections.
-- **Never Pays (156 partners):** OCP pain signal has no effect. Escalate to credit review — CL reduction or advance payment mandate needed.
-
-**How to validate OCP → payment hypothesis for any period:**
+**How to validate for any period:**
 ```sql
 -- Join chain: auto_restock_logs.farmer_id → csr_farmer.farmer_id → csr_farmer.user_id
 --             → wallet_creditwallettransaction.wallet_user_id (reason_id=4, transaction_type=1, cancelled=0)
@@ -696,12 +673,23 @@ Has failure log?
 -- Segment partners by: times_paid / total_ocp_events across the period
 ```
 
-**17 partners moved Rarely Pays (March) → Never Pays (April) — the most urgent cohort:**
-These partners proved they can pay (paid in March) but went silent in April. Top priority for direct outreach:
-- SHUBHANGI KRUSHI KENDRA, Buldhana MH — paid ₹1.25L in March, 18 April OCP events, silent
-- J P AGRO SALES SAMRAU, Jodhpur RJ — paid ₹3.9L in March, highest value recovery opportunity
-- mongali krashi sewa kendra, Seoni MP — 63% response in March, 8 April events, silent
-- SHIV SHAKTI KRISHI SEWA KENDRA, Raisen MP — 71% response in March, 6 April events, silent
+**Partner behaviour segmentation logic (apply to any period):**
+
+| Segment | Definition |
+|---|---|
+| Always Pays | response_rate = 100% across the period |
+| Usually Pays | response_rate between 50–99% |
+| One-time (paid) | total_ocp_events = 1 AND paid = 1 |
+| Rarely Pays | response_rate between 1–49% |
+| Never Pays | response_rate = 0% |
+
+**Key actions by segment:**
+- **Always Pays:** Protect their credit health — don't let OCP blocks pile up on good partners
+- **Usually Pays:** Highest ROI intervention — call on days they don't respond to push toward 100%
+- **Rarely Pays:** High-touch outreach on the day of OCP failure event
+- **Never Pays:** OCP pain signal has no effect — escalate to credit review (CL reduction or advance payment mandate)
+
+**Watch-out pattern:** Partners who paid in previous months but stopped responding in the current month — these are the most urgent outreach targets. Detect with: `paid_prev_period = TRUE AND paid_curr_period = FALSE`.
 
 ---
 
@@ -807,12 +795,11 @@ ROUND(6371 * ACOS(LEAST(1.0,
 )), 2) AS distance_km
 ```
 
-**Validated results (May 12, 2026 go-live):**
-- Total B2C demand: 1,418 orders
-- Store fulfilled: 977 (68.9%) | FC fulfilled: 441 (31.1%)
-- 0–15 KM store orders: 654 | 15–50 KM: 298 | **50–90 KM: 0 ✅ | >90 KM: 0 ✅**
-- Fallback fired (taluka mismatch + ≤15 KM): **75 orders confirmed**
-- No `no_distance` FC rejections yet — TAT records lag same-day; re-run end of day
+**How to validate routing logic on any go-live day:**
+- Check that 0 store orders fall outside the declared distance cap (e.g. 50 KM) — any such order = routing bug
+- Count fallback captures: `fulfillment_type = STORE` + `taluka_mismatch` + `distance_km ≤ 15`
+- `no_distance` FC rejections may lag same-day (TAT records take time to populate) — re-run end of day
+- Compare store-fulfilled % vs FC-fulfilled % as the headline metric
 
 ---
 
@@ -921,21 +908,8 @@ When an order is FC-fulfilled, classify the reason by checking in this order:
 | **No TAT Record** | `dvsResolutionReason IS NULL` | Order never went through DVS routing engine | Product/Engineering |
 
 **Coverage Gap — two sub-types (check district-level partner count):**
-- **Coverage Gap (partner exists in district)** — 162 orders on May 12. Partners are in the district but their `servingTaluka` doesn't include the farmer's specific taluka. Fix: expand partner's territory config.
-- **No DVS Coverage (zero partners in district)** — 51 orders on May 12. Genuine white space — no active DVS partner onboarded. Action: new partner enrollment.
-
-**Validated split (May 12, 2026):**
-
-| Reason | Orders | % |
-|---|---|---|
-| Partner SLA Miss (>24 hrs no action) | 186 | 75% of resolved-yes FC |
-| OCP / Credit Block | 60 | 24% of resolved-yes FC |
-| Coverage Gap (partners exist, taluka unserved) | 162 | — |
-| No DVS Coverage (zero partners) | 51 | — |
-| No LMD | 113 | — |
-| No License | 48 | — |
-| Clearance / Restricted SKU | 38 | — |
-| Distance Exceeded | 23 | — |
+- **Coverage Gap (partner exists in district)** — Partners are in the district but their `servingTaluka` doesn't include the farmer's specific taluka. Fix: expand partner's territory config.
+- **No DVS Coverage (zero partners in district)** — Genuine white space, no active DVS partner onboarded. Action: new partner enrollment.
 
 ---
 
@@ -947,7 +921,7 @@ Three types of SKUs are on the DVS restricted list (validated May 2026):
 
 | Type | Example SKUs | Why restricted |
 |---|---|---|
-| **Agrostar own-brand seeds** | AGS-S-2963 (Highrise Bajra), AGS-S-4135 (Ascent Bajra), AGS-S-4719 (Green Gram) | Largest volume (44 orders / ₹1.26L in 13 days). Policy: quality control & certified stock management |
+| **Agrostar own-brand seeds** | AGS-S-XXXX pattern (e.g. Highrise Bajra, Ascent Bajra, Green Gram variants) | Typically highest volume restricted reason. Policy: quality control & certified stock management |
 | **Welcome Kit / Advance** | AGS-AV-001 (AGRO+ ADVANCE WELCOME KIT) | Marketing/advance payment SKU — not a physical deliverable product. Correct to block. |
 | **Hardware & Organic Manure** | Tarpaulins, LED torches, bulk organic manure | Weight/bulk or non-agricultural category policy |
 

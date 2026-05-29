@@ -95,7 +95,7 @@ Determined by `galaxy_views.institution.lendingProvider`:
 **RF partners filter:** `lendingProvider IN ('RUPIFI', 'TYGER_CAPITAL', 'BLACKSOIL')`
 **Non-RF partners (Anchor books):** `lendingProvider = 'AGROSTAR'` OR `lendingProvider IS NULL`
 
-**Validated counts (May 2026):** Rupifi = 1,361 partners (1,301 active) | Tyger Capital = 49 (48 active) | BlackSoil = 0
+**To get current partner counts per lender:** `SELECT lendingProvider, COUNT(*) AS total, COUNTIF(status='ACTIVE') AS active FROM galaxy_views.institution WHERE lendingProvider IN ('RUPIFI','TYGER_CAPITAL','BLACKSOIL') GROUP BY 1`
 
 ---
 
@@ -205,36 +205,26 @@ SELECT * FROM partners WHERE rn = 1
 | `address_district` | District |
 | `address_taluka` | Taluka |
 
-### Google Sheet — Rupifi Onboarding Tracker (Manual, Daily Updated)
-**File:** `1pBblSZATtXO-ussR7bs12mIjPPZ9zhnRS2xSSVMujUg` (Google Drive)
-**Sheet:** `RupiFi Onboarding` (gid=1058010114)
+### `galaxy_views.b2blandingdetails` — Lender Credit Limit & Balance ⚠️ SOLE SOURCE
+**This is the ONLY source for lender-side credit limit and available balance.** Do NOT use the Google Sheet or any local CSV — that approach was replaced in May 2026.
 
-This sheet is maintained **manually every day** by the Portfolio Manager. It is the **only source of lender-side credit limit and available balance** — this data does NOT exist in BigQuery.
-
-**Key columns:**
+**Join:** `institution.user_id = SAFE_CAST(b2blandingdetails.merchantCustomerRefId AS INT64)`
 
 | Column | Meaning |
 |---|---|
-| `Partner Id` | ✅ AgroStar `farmer_id` — join key to all BQ tables |
-| `CREDITLINE ID` | Rupifi's internal UUID for the credit line |
-| `BUSINESS ID` | Rupifi's internal business ID — **NOT the same as Partner Id** |
-| `LIMIT` | Total lender credit limit sanctioned for this partner (₹) |
-| `BALANCE` | **Available limit right now** — how much can be disbursed or BT'd today |
-| `CRM LIMIT` | AgroStar's OCP credit limit for this partner |
-| `STATUS` | ACTIVE / INACTIVE on Rupifi's platform |
-| `Agrostar Status` | ACTIVE / INACTIVE in AgroStar's system |
-| `CREATED ON` | Date partner was activated on Rupifi |
-| `Month` | Onboarding month label |
+| `merchantCustomerRefId` | Partner's user_id — join key (SAFE_CAST to INT64) |
+| `account_limit_value` | Total sanctioned lender credit limit (₹) |
+| `account_balance_value` | **Available balance right now** — hard cap for BT greedy allocation |
+| `creditProvider` | Lender name (e.g. `RUPIFI`) |
+| `status` | `ACTIVE` / `INACTIVE` on lender's platform — drives B1/B3/B4 classification |
 
 **Critical rules:**
-- `BALANCE` is the **hard cap** on BT — you cannot push more invoices than the available `BALANCE`
-- `LIMIT - BALANCE` = amount currently outstanding with lender (already disbursed, not yet repaid)
-- `BALANCE = LIMIT` → fully available, nothing outstanding
-- `BALANCE = 0` → limit fully consumed, NO BT possible regardless of invoice eligibility
-- `BALANCE < 0` → overdrawn (should not happen but flag if seen)
-- Always use `Partner Id` (not `BUSINESS ID`) to join with BigQuery data
-
-**BT opportunity = eligible invoices (≤45 days, finbox IS NULL) capped by BALANCE from this sheet**
+- `account_balance_value` is the **hard cap** on BT — never push more than this
+- `account_limit_value - account_balance_value` = amount currently outstanding with lender
+- `account_balance_value = 0` → limit fully consumed, NO BT possible
+- NULL join result (partner not in table) → **Bucket 0** — flag to PM to investigate
+- Tyger Capital partners have no rows in this table — balance unknown for them
+- Balance has a lag vs Rupifi's live system; some B1 pushes may still fail with "insufficient balance"
 
 ### `offline_team.okr_data_live` — Sales Territory
 Maps each partner to their territory and sales hierarchy.
@@ -425,35 +415,54 @@ ORDER BY 1, 2
 ```
 
 ### 6. Balance Transfer Opportunities — Daily Scan (Portfolio Manager)
-Returns **one row per eligible order** for all active RUPIFI partners.
-Apply all 4 BT eligibility conditions + long credit term gate.
-Then do greedy allocation in Python (oldest-first, capped by sheet BALANCE).
+Returns **one row per eligible order** for all active RUPIFI partners, including Bucket 2 (waiting room) orders.
+Balance & lender status come from **`galaxy_views.b2blandingdetails`** — NOT the Google Sheet.
+Reconciliation fix applied: `bt_net_amount = debit.amount - SUM(recon.amount)`.
 
-**BQ returns order-level rows. Python does the greedy allocation per partner.**
+**BQ returns order-level rows with pre-computed bt_net_amount and bucket classification. Greedy allocation runs in Python.**
 
 ```sql
 WITH
 rf_partners AS (
   SELECT
-    reference_customer_id AS farmer_id,
-    name AS store_name,
-    partner_name,
-    address_state,
-    address_district,
-    ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
-  FROM `agrostar-data.galaxy_views.institution`
-  WHERE lendingProvider = 'RUPIFI'   -- change to 'TYGER_CAPITAL' for Tyger Capital
-    AND status = 'ACTIVE'
+    i.reference_customer_id AS farmer_id,
+    i.user_id,
+    i.name AS store_name,
+    i.partner_name,
+    i.address_state,
+    i.address_district,
+    ROW_NUMBER() OVER (PARTITION BY i.reference_customer_id ORDER BY i.created_on DESC) AS rn
+  FROM `agrostar-data.galaxy_views.institution` i
+  WHERE i.lendingProvider = 'RUPIFI'
+    AND i.status = 'ACTIVE'
+),
+-- Join b2blandingdetails for lender balance & status (SOLE SOURCE — not Google Sheet)
+partner_balance AS (
+  SELECT
+    p.farmer_id,
+    p.user_id,
+    p.store_name,
+    p.partner_name,
+    p.address_state,
+    p.address_district,
+    b.account_balance_value  AS available_balance,
+    b.account_limit_value    AS credit_limit,
+    b.status                 AS rupifi_status
+  FROM rf_partners p
+  LEFT JOIN `agrostar-data.galaxy_views.b2blandingdetails` b
+    ON p.user_id = SAFE_CAST(b.merchantCustomerRefId AS INT64)
+  WHERE p.rn = 1
 ),
 partner_wallet AS (
   SELECT f.farmer_id, f.user_id AS wallet_user_id
   FROM `agrostar-data.prod_db_views.csr_farmer` f
-  JOIN rf_partners p ON p.farmer_id = f.farmer_id AND p.rn = 1
+  JOIN partner_balance pb ON pb.farmer_id = f.farmer_id
 ),
--- ALL active debits for these partners (for total_amount + max_due_date per order)
+-- ALL active debits for these partners
 order_all_debits AS (
   SELECT
     CAST(t.reference_id AS STRING) AS order_id,
+    t.id                           AS debit_id,
     t.wallet_user_id,
     t.amount,
     t.due_date,
@@ -465,22 +474,37 @@ order_all_debits AS (
     AND t.transaction_type = 0
     AND t.cancelled = 0
 ),
--- Per-order aggregates
+-- Reconciliation fix: subtract amounts already collected from each debit entry
+debit_recon AS (
+  SELECT
+    d.order_id,
+    d.wallet_user_id,
+    d.due_date,
+    d.finbox_transaction_id,
+    d.is_reconciled,
+    -- Net amount = debit amount minus any reconciled repayments
+    d.amount - COALESCE(
+      (SELECT SUM(r.amount)
+       FROM `agrostar-data.prod_db_views.wallet_creditwallettransactionreconciliation` r
+       WHERE r.reconciled_for_id = d.debit_id AND r.cancelled = 0),
+      0
+    ) AS bt_net_amount
+  FROM order_all_debits d
+),
+-- Per-order aggregates (bt_net_amount > 0 AND finbox IS NULL AND is_reconciled = 0 = BT-able)
 order_summary AS (
   SELECT
     order_id,
     wallet_user_id,
-    SUM(amount)                                                              AS total_order_amount,
-    -- BT-able amount: unpushed AND unreconciled
-    SUM(CASE WHEN finbox_transaction_id IS NULL AND is_reconciled = 0
-             THEN amount ELSE 0 END)                                         AS bt_amount,
-    -- C1+C2: at least one debit that is unpushed + unreconciled
-    COUNTIF(finbox_transaction_id IS NULL AND is_reconciled = 0)            AS bt_eligible_debits,
-    MAX(due_date)                                                            AS max_due_date
-  FROM order_all_debits
+    SUM(amount)                                                                       AS total_order_amount,
+    SUM(CASE WHEN finbox_transaction_id IS NULL AND is_reconciled = 0 AND bt_net_amount > 0
+             THEN bt_net_amount ELSE 0 END)                                           AS bt_net_amount,
+    COUNTIF(finbox_transaction_id IS NULL AND is_reconciled = 0 AND bt_net_amount > 0) AS bt_eligible_debits,
+    MAX(due_date)                                                                     AS max_due_date
+  FROM debit_recon
   GROUP BY 1, 2
 ),
--- Invoice date per order (via order → invoiced_report)
+-- Invoice date per order (via order → invoiced_report) — dispatch gate applied
 invoice_dates AS (
   SELECT
     CAST(o.sales_order_id AS STRING) AS order_id,
@@ -500,84 +524,80 @@ invoice_dates AS (
     )
   GROUP BY 1
 ),
--- Apply all BT eligibility conditions
-eligible_orders AS (
+-- Classify orders: B1_ELIGIBLE or B2_WAITING (credit term gate)
+classified_orders AS (
   SELECT
     os.order_id,
     os.wallet_user_id,
-    os.bt_amount,
+    os.bt_net_amount,
     os.total_order_amount,
     id.invoice_created_date,
     DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY)  AS invoice_age_days,
-    DATE_DIFF(DATE(os.max_due_date), id.invoice_created_date, DAY)         AS credit_term_days
+    DATE_DIFF(DATE(os.max_due_date), id.invoice_created_date, DAY)         AS credit_term_days,
+    CASE
+      WHEN DATE_DIFF(DATE(os.max_due_date), id.invoice_created_date, DAY) > 120
+           AND DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) <= 33
+      THEN 'B2_WAITING'
+      ELSE 'B1_ELIGIBLE'
+    END AS bt_classification
   FROM order_summary os
   JOIN invoice_dates id ON os.order_id = id.order_id
   WHERE
-    os.bt_eligible_debits > 0                   -- C1+C2: unpushed + unreconciled debit exists
-    AND os.total_order_amount > 200              -- C3: total order > ₹200
-    AND DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) BETWEEN 0 AND 45  -- C4: ≤45 days
-    AND NOT (                                    -- Long credit term gate: wait 34 days
-      DATE_DIFF(DATE(os.max_due_date), id.invoice_created_date, DAY) > 120
-      AND DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) <= 33
-    )
+    os.bt_eligible_debits > 0
+    AND os.total_order_amount > 200
+    AND DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY) BETWEEN 0 AND 45
 )
--- Final: one row per eligible order
+-- Final: one row per order with balance data attached
 SELECT
-  pw.farmer_id                          AS partner_id,
-  p.store_name,
-  p.partner_name,
-  p.address_state                       AS state,
-  p.address_district                    AS district,
-  eo.order_id,
-  ROUND(eo.bt_amount, 0)                AS order_bt_amount,
-  eo.invoice_created_date,
-  eo.invoice_age_days,
-  eo.credit_term_days
-FROM eligible_orders eo
-JOIN partner_wallet pw ON pw.wallet_user_id = eo.wallet_user_id
-JOIN rf_partners p ON p.farmer_id = pw.farmer_id AND p.rn = 1
-ORDER BY pw.farmer_id, eo.invoice_age_days DESC
+  pb.farmer_id                          AS partner_id,
+  pb.store_name,
+  pb.partner_name,
+  pb.address_state                      AS state,
+  pb.address_district                   AS district,
+  pb.available_balance,
+  pb.credit_limit,
+  pb.rupifi_status,
+  co.order_id,
+  ROUND(co.bt_net_amount, 0)            AS order_bt_amount,
+  co.invoice_created_date,
+  co.invoice_age_days,
+  co.credit_term_days,
+  co.bt_classification
+FROM classified_orders co
+JOIN partner_wallet pw ON pw.wallet_user_id = co.wallet_user_id
+JOIN partner_balance pb ON pb.farmer_id = pw.farmer_id
+ORDER BY pb.farmer_id, co.invoice_age_days DESC
 ```
 
 **Python greedy allocation (run after BQ):**
 ```python
-# Step 0 — Identify partners in BQ but missing from sheet
-#   missing_from_sheet = {partner_id} in BQ results but NOT in sheet CSV
-#   These are ACTIVE AgroStar partners mapped to Rupifi in BQ but no LIMIT/BALANCE record
-#   → Flag as Bucket 0: show their eligible orders, alert PM to update sheet
-#   → Do NOT attempt greedy (balance unknown)
-#   → Print: "⚠ X partners have eligible BT orders but no Rupifi sheet record — update sheet"
+# Balance & status already in BQ results (from b2blandingdetails join) — no sheet CSV needed
 
-# Step 1 — Load BQ rows + sheet CSV (Partner Id, STATUS, BALANCE, LIMIT)
-# Group rows by partner_id
-# For each partner in sheet:
-#   rupifi_status = sheet STATUS (ACTIVE/INACTIVE)
-#   Sort orders by invoice_age_days DESC  (oldest = most urgent, first)
+# Bucket classification per partner:
+#   Bucket 0 — available_balance IS NULL (no b2blandingdetails record) → flag to PM, show all eligible orders
+#   Bucket 2 — bt_classification = 'B2_WAITING' → credit term gate, show eligible_from_date = invoice_date + 34d
+#   For B1_ELIGIBLE orders only:
+#     If rupifi_status = ACTIVE AND available_balance > 0:
+#       Sort by invoice_age_days DESC (oldest first)
+#       Greedy: if order_bt_amount <= remaining: pick → Bucket 1, remaining -= order_bt_amount
+#               else: skip → Bucket 3
+#     If rupifi_status = ACTIVE AND available_balance = 0: all → Bucket 3
+#     If rupifi_status = INACTIVE: all → Bucket 4
+#   A partner can appear in BOTH Bucket 1 AND Bucket 3 (some orders picked, some skipped)
 
-# Bucket classification:
-#   Bucket 0 — In BQ, ACTIVE AgroStar, NOT in sheet → flag, show all eligible orders
-#   Bucket 1 — ACTIVE Rupifi + balance > 0 → greedy pick → actionable today
-#   Bucket 2 — B2_WAITING orders (credit term gate, from BQ classification)
-#   Bucket 3 — ACTIVE Rupifi + greedy skipped (balance ran out) OR balance = 0
-#   Bucket 4 — INACTIVE Rupifi + balance > 0 → push Rupifi to activate
-
-#   remaining = sheet BALANCE
-#   For each order:
-#     if order_bt_amount <= remaining: select → Bucket 1, remaining -= order_bt_amount
-#     else: skip → Bucket 3
-#   actionable_bt_amount = sum of selected orders
+#   actionable_bt_amount = sum of Bucket 1 orders
 ```
 
 **Output columns to produce:**
-`partner_id | store_name | state | available_balance | total_bt_eligible_amount | actionable_bt_amount | actionable_orders / total_eligible_orders | oldest_invoice_age_days | selected_order_ids`
+`partner_id | store_name | state | rupifi_status | available_balance | total_bt_eligible_amount | actionable_bt_amount | actionable_orders / total_eligible_orders | oldest_invoice_age_days | selected_order_ids`
 
-**Bucket 0 flag output (missing sheet partners):**
+**Bucket 0 flag output (missing b2blandingdetails record):**
 Print a dedicated section at the top of the scan output:
 ```
-⚠ MISSING SHEET DATA — X partners active in AgroStar + Rupifi BQ but not in local CSV
-  Add these to the Rupifi onboarding sheet to enable balance-capped BT allocation.
+⚠ BUCKET 0 — X partners active in AgroStar + Rupifi BQ but NO b2blandingdetails record
+  Rupifi has not provisioned a credit line for these partners. Investigate with Rupifi.
   Showing all eligible orders (no balance cap applied):
-  partner_id | store_name | state | order_id | bt_net_amount | invoice_age_days
+  partner_id | store_name | state | order_id | order_bt_amount | invoice_age_days
 ```
 
 ### 7. CXO — Disbursement Rate (Disbursed ÷ Total B2B Billed)
@@ -662,8 +682,10 @@ ORDER BY total_partners DESC
 | Total order amount > ₹200 for BT | `SUM(amount)` across ALL debits of the order must exceed ₹200. Orders below this threshold are not raised to lender regardless of other conditions. |
 | Long credit term gate (>120 days) | If `DATE_DIFF(MAX(due_date), invoice_created_date, DAY) > 120`, the order is only BT-eligible after the invoice is 34+ days old. Filter: `NOT (credit_term > 120 AND invoice_age_days <= 33)`. |
 | BT greedy allocation: oldest-first, full orders only | When a partner has multiple eligible orders exceeding their balance, pick orders oldest-first (highest invoice_age_days first). Only include orders that fit entirely within remaining balance — no partial order raises. |
-| Lender LIMIT & BALANCE source | `account_limit_value` and `account_balance_value` come from `galaxy_views.b2blandingdetails`. Join: `institution.user_id = SAFE_CAST(b2blanding.merchantCustomerRefId AS INT64)`. Tyger Capital partners have no rows here — balance unknown for them. |
+| Lender LIMIT & BALANCE source | **`galaxy_views.b2blandingdetails` is the SOLE source** — NOT the Google Sheet (deprecated May 2026). Join: `institution.user_id = SAFE_CAST(b2blandingdetails.merchantCustomerRefId AS INT64)`. Columns: `account_balance_value` (hard cap), `account_limit_value` (sanctioned limit), `status` (ACTIVE/INACTIVE on lender). Tyger Capital partners have no rows here — balance unknown. |
 | `b2blandingdetails` balance has lag | `account_balance_value` is cached and not real-time from Rupifi. Some B1 orders will fail with "insufficient balance" at push time even though BQ shows balance available. |
+| Reconciliation fix for bt_net_amount | `is_reconciled = 0` alone is insufficient — debits can be partially reconciled. Always join `wallet_creditwallettransactionreconciliation` on `reconciled_for_id = debit.id` (filter `cancelled = 0`) and compute `bt_net_amount = debit.amount - COALESCE(SUM(recon.amount), 0)`. Only debits where `bt_net_amount > 0` AND `finbox IS NULL` AND `is_reconciled = 0` are BT-eligible. |
+| Bucket 2 — credit term waiting room | Orders with `credit_term_days > 120` AND `invoice_age_days <= 33` are NOT filtered out — they are classified as **Bucket 2 (B2_WAITING)**. Show `eligible_from_date = invoice_created_date + 34 days`. These become B1_ELIGIBLE automatically once invoice turns 34 days old. |
 
 ---
 
