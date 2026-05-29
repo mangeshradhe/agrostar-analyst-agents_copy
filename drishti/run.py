@@ -17,6 +17,13 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+# ── Learning cycle (Level 2 + 3) ─────────────────────────────────────────────
+try:
+    from drishti.learn import run_learning_cycle, format_learning_report
+except ImportError:
+    sys.path.insert(0, os.path.dirname(__file__))
+    from learn import run_learning_cycle, format_learning_report
+
 # ── Third-party ──────────────────────────────────────────────────────────────
 try:
     from google.cloud import bigquery
@@ -94,6 +101,7 @@ def _default_memory() -> dict:
         },
         "baselines": BASELINE.copy(),
         "last_run": None,
+        "candidate_rules": [],
     }
 
 
@@ -1308,6 +1316,20 @@ def run(dry_run: bool = False, no_predictions: bool = False) -> None:
     print("\n--- Scoring pending predictions ---")
     scored_preds = score_pending_predictions(memory, bq_client)
 
+    # ── 2b. Learning cycle (Level 2 + 3) ─────────────────────────────────────
+    print("\n--- Running learning cycle (Level 2 + Level 3) ---")
+    learning_result = run_learning_cycle(memory, bq_client)
+
+    # Weekly: post learning report to Slack
+    if learning_result.get("weekly_report"):
+        learning_msg = format_learning_report(
+            learning_result["diagnosed"],
+            learning_result["new_candidates"],
+            memory
+        )
+        if learning_msg:
+            post_to_slack(slack_client, SLACK_CHANNEL_SUMMARY, learning_msg, dry_run=dry_run)
+
     # ── 3. Health scan ───────────────────────────────────────────────────────
     print("\n--- Running health scan (7-day rolling) ---")
     health = run_health_scan(bq_client)
@@ -1373,6 +1395,9 @@ def run(dry_run: bool = False, no_predictions: bool = False) -> None:
     print(f"    OVERLOAD:       {sum(1 for l in lmd_flags if l['flag']=='GENUINE_OVERLOAD')}")
     print(f"    LAST_MILE:      {sum(1 for l in lmd_flags if l['flag']=='LAST_MILE_FAILURE')}")
     print(f"  Predictions:      {len(memory['predictions'])} total  |  {len(scored_preds)} scored today")
+    print(f"  Diagnosed wrongs:  {learning_result.get('diagnosed_count', 0)}")
+    print(f"  New lessons:       {learning_result.get('lessons_applied', 0)}")
+    print(f"  Candidate rules:   {len(memory.get('candidate_rules', []))}")
     print(f"  Accuracy (all):   {acc['correct']}/{acc['total']} correct ({acc['directional']} directional)")
     print(f"  Routing rate:     {health.get('routing_rate_pct', 0):.1f}%  (baseline {BASELINE['routing_rate_pct']}%)")
     print(f"  Fulfillment rate: {health.get('fulfillment_rate_pct', 0):.1f}%  (baseline {BASELINE['fulfillment_rate_pct']}%)")

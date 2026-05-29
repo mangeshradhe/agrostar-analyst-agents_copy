@@ -23,7 +23,12 @@
     "prediction_accuracy_lmd_hold": 68.5,
     "prediction_accuracy_gmv_direction": 100.0,
     "prediction_accuracy_gujarat_onhold": 100.0,
-    "notes": "Dead store persistence lowered from 70% to 55% after May backtesting. Rate-based decline scoring confirmed better than volume-based."
+    "notes": "Dead store persistence lowered from 70% to 55% after May backtesting. Rate-based decline scoring confirmed better than volume-based.",
+    "diagnosed_wrong_count": 0,
+    "ocp_recovery_count": 0,
+    "seasonal_recovery_count": 0,
+    "lmd_improved_count": 0,
+    "lessons_learned": []
   },
   "regime_boundaries": [
     {
@@ -84,5 +89,7 @@
     }
   },
   "predictions": [],
-  "pipeline_snapshots": []
+  "pipeline_snapshots": [],
+  "candidate_rules": [],
+  "last_pattern_discovery_date": null
 }
