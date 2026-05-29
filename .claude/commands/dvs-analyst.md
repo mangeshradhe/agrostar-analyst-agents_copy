@@ -411,16 +411,16 @@ LEFT JOIN reason_labels rl ON rl.string_id_id = sh.reason
 WHERE sh.delivery_status = 'hold'
 ```
 
-**Known hold reason taxonomy (validated May 2026):**
+**Known hold reason taxonomy:**
 
-| Category | Reasons | May 2026 % |
-|---|---|---|
-| Customer Issue | Customer not available at home, Customer wants delivery later, Customer not contactable, Customer does not have Money, Customer Does Not Want the Order | ~83.8% |
-| **Store — Inventory Not Available** | **Inventory not available at Store** | **9.4%** |
-| LMD / Operational | Delivery Partner Issue, We are late for delivery, Did not receive any call from LP | 6.3% |
-| Store — Other | Saathi Store is closed | 1.2% |
+| Category | Example Reasons |
+|---|---|
+| Customer Issue | Customer not available at home, Customer wants delivery later, Customer not contactable, Customer does not have Money, Customer Does Not Want the Order |
+| **Store — Inventory Not Available** | **Inventory not available at Store** |
+| LMD / Operational | Delivery Partner Issue, We are late for delivery, Did not receive any call from LP |
+| Store — Other | Saathi Store is closed |
 
-**Key finding (May 2026):** 48.8% of packed DVS orders had at least one HOLD_BY_LMD event (avg 1.84 holds/order). 9.4% of hold events cite "Inventory not available at Store" — meaning the store marked PACKED but didn't actually have stock. Cross-check with `order_management_holdreasons` ON_HOLD data: if the same store has both ON_HOLD events AND LMD inventory holds → genuine store inventory problem. If only LMD logs inventory holds (store has zero ON_HOLD) → suspect LMD is fabricating the reason.
+**Cross-check logic for "Inventory not available at Store" holds:** Join back to the store's `order_management_holdreasons` ON_HOLD data. If the same store has both ON_HOLD events AND LMD inventory holds → genuine store inventory problem (store marked PACKED without real stock). If only LMD logs inventory holds but store has zero ON_HOLD → suspect LMD is fabricating the reason to avoid pickup.
 
 **`delivery_shippingpackagestatushistory` has duplicate rows** — always use `SELECT DISTINCT package_id, reason` or `DISTINCT package_id, reason_en` when counting hold events per order. Counting raw rows will inflate counts ~5x.
 
@@ -493,9 +493,9 @@ RETURN_IN_TRANSIT → RETURNED_BY_LMD → RETURNED / STORE_RETURN_ACKNOWLEDGED
 
 **Important:** `RETURNED` count often exceeds `RETURNED_BY_LMD` count — many orders skip `RETURNED_BY_LMD` entirely and jump from `RETURN_IN_TRANSIT` → `RETURNED`. This is a logging gap (see SOP section below).
 
-**Stage TATs (validated May 2026):**
-- `RETURN_IN_TRANSIT` → `RETURNED_BY_LMD`: avg 44 hrs, p90 133 hrs (5.5 days)
-- `RETURNED_BY_LMD` → store acknowledged: avg 39 hrs, p90 122 hrs (5 days)
+**Stage TATs to compute:**
+- `RETURN_IN_TRANSIT` → `RETURNED_BY_LMD`: how long does return transit take?
+- `RETURNED_BY_LMD` → store acknowledged (`RETURNED`/`STORE_RETURN_ACKNOWLEDGED`): how fast does the store confirm receipt? This is the most operationally critical — a long lag means no confirmed inventory back at store, blocks restocking, and creates reconciliation exposure.
 
 #### RTO SOP Compliance
 
@@ -523,7 +523,7 @@ FROM (
 GROUP BY 1
 ```
 
-**Validated finding (May 2026):** Only 18% of RTO orders followed correct SOP. 49.4% had SOP violation (store acknowledged but LMD never logged `RETURNED_BY_LMD`).
+A high count of "SOP Violation" = LMD partners are physically dropping returns at the store without updating the app. This breaks accountability (no LMD timestamp to defend against disputes) and makes TAT reporting unreliable.
 
 #### LMD Shortcut Hypothesis
 
@@ -544,15 +544,11 @@ FROM `agrostar-data.prod_db_views.order_management_orderhistorymeta`
 GROUP BY order_id
 ```
 
-**Validated finding (May 2026):**
-| Hold count before RTO | Orders | % | Avg hrs pickup→RTO |
-|---|---|---|---|
-| 0 holds (no attempt logged) | 774 | 50.2% | 157 hrs |
-| 1 hold | 489 | 31.7% | 115 hrs |
-| 2–3 holds | 236 | 15.3% | 83 hrs |
-| 4+ holds | 43 | 2.8% | 29 hrs |
-
-50% of RTOs had zero hold events before return was triggered. 218 of those happened within 24 hrs of pickup — LMD picked up and returned same day without any logged delivery attempt.
+**How to read the output:**
+- `0 holds` = LMD picked up the order but never logged a single delivery attempt before triggering RTO — clearest shortcut signal
+- More holds = more genuine attempts before giving up
+- Also compute `hrs_picked_to_rto` and flag orders where RTO was triggered within 24 hrs of pickup — these are highest-confidence shortcuts
+- Segment by LMD partner to identify repeat offenders
 
 ```sql
 -- RTO rate by store
@@ -1102,7 +1098,7 @@ These were discovered through live testing — not in any schema documentation:
 | LMD hold status in package history is `'hold'` (lowercase) | `delivery_shippingpackagestatushistory.delivery_status = 'hold'` — NOT `'HOLD_BY_LMD'`. That status only exists in `order_management_orderhistorymeta`. Querying package history for `'HOLD_BY_LMD'` returns 0 rows. |
 | LMD hold reason table — use `prod_agroex_db_views.delivery_localisedstring` | `delivery_shippingpackagestatushistory.reason` is a UUID. Decode via `prod_agroex_db_views.delivery_localisedstring` on `string_id_id = reason`, filter `language = 'en'`. Do NOT use `prod_db_views.delivery_applicationstring` — it is incomplete and misses key reasons including "Inventory not available at Store". |
 | `delivery_shippingpackagestatushistory` has ~5x duplicate rows | The same event appears multiple times per package per status. Always `SELECT DISTINCT package_id, reason` (or equivalent) when counting hold events — raw row counts are inflated ~5x. |
-| `RETURNED` count can exceed `RETURNED_BY_LMD` count | Many RTO orders skip `RETURNED_BY_LMD` and go directly from `RETURN_IN_TRANSIT` → `RETURNED`. In May 2026, only 18% of RTOs had both steps logged correctly. Never assume RETURNED_BY_LMD → RETURNED is the only path. |
+| `RETURNED` count can exceed `RETURNED_BY_LMD` count | Many RTO orders skip `RETURNED_BY_LMD` and go directly from `RETURN_IN_TRANSIT` → `RETURNED`. Never assume RETURNED_BY_LMD → RETURNED is the only path. To measure SOP compliance: count orders where `RETURNED` exists but `RETURNED_BY_LMD` does not. |
 
 ---
 
