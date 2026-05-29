@@ -24,11 +24,15 @@
     "prediction_accuracy_gmv_direction": 100.0,
     "prediction_accuracy_gujarat_onhold": 100.0,
     "notes": "Dead store persistence lowered from 70% to 55% after May backtesting. Rate-based decline scoring confirmed better than volume-based.",
-    "diagnosed_wrong_count": 0,
+    "diagnosed_wrong_count": 2,
     "ocp_recovery_count": 0,
-    "seasonal_recovery_count": 0,
+    "seasonal_recovery_count": 1,
     "lmd_improved_count": 0,
-    "lessons_learned": []
+    "volume_scoring_errors": 1,
+    "lessons_learned": [
+      "SEASONAL_RECOVERY (May 2026): Dead store persistence prior must drop to ~35-40% in May-Jun. Kharif demand reactivates dormant stores. Filed 2026-05-31.",
+      "VOLUME_BASED_SCORING (May 2026): Never rank declining stores by volume. Use decline RATE. formula: priority_score = prev_orders × (1 - curr/prev) × urgency. Filed 2026-05-31."
+    ]
   },
   "regime_boundaries": [
     {
@@ -88,8 +92,117 @@
       "history": "Best overall LMD in network. Gujarat. Use as benchmark."
     }
   },
-  "predictions": [],
+  "predictions": [
+    {
+      "id": "PRED-2026-05-01-001",
+      "filed_date": "2026-05-01",
+      "type": "PROGRAM_LEVEL",
+      "entity_id": null,
+      "entity_name": "DVS Network — dead store persistence",
+      "prediction": "100 dead April stores → 70%+ will remain dead in May",
+      "confidence": "MEDIUM",
+      "evidence": "April had 100/144 dead stores. Historical pattern: once dead, stores rarely self-recover without intervention.",
+      "gmv_at_risk": null,
+      "result": "WRONG",
+      "scored_on": "2026-05-31",
+      "actual": "Only 54.2% stayed dead. 66 stores (46%) came back in May.",
+      "diagnosis": {
+        "cause_type": "SEASONAL_RECOVERY",
+        "evidence": "Filed during Apr (pre-Kharif trough). Scored in May when Kharif season prep began. Demand pulled dormant stores back to life — not an intervention, pure seasonal reactivation.",
+        "confidence": "HIGH",
+        "lesson": "Dead store persistence prior must be reduced to ~35-40% in May-Jun (Kharif season). Stores that look dead in Feb-Apr often reactivate when Kharif demand arrives. Current prior of 55% still too high for this period.",
+        "data": {"predicted_pct": 70, "actual_pct": 54.2, "month_filed": "April", "month_scored": "May"}
+      }
+    },
+    {
+      "id": "PRED-2026-05-01-002",
+      "filed_date": "2026-05-01",
+      "type": "STORE_COHORT",
+      "entity_id": null,
+      "entity_name": "Top 50 declining stores (by volume)",
+      "prediction": "Top 50 declining stores → 40%+ will go completely dead in May",
+      "confidence": "MEDIUM",
+      "evidence": "Top 50 stores by volume showing >10% decline from March to April. High volume + decline = at risk.",
+      "gmv_at_risk": null,
+      "result": "WRONG",
+      "scored_on": "2026-05-31",
+      "actual": "0% of top 50 declining stores went dead. All 50 continued to fulfill.",
+      "diagnosis": {
+        "cause_type": "VOLUME_BASED_SCORING",
+        "evidence": "Priority score used Apr_orders × 2 (volume-based). This selected the LARGEST declining stores. Large stores have inertia — they rarely die in a single month even with a 20-30% decline. The stores that actually die are SMALL stores with STEEP decline rates, not large stores with gradual ones.",
+        "confidence": "HIGH",
+        "lesson": "CRITICAL: Never rank declining stores by volume. Rank by decline RATE. A store dropping from 10→2 orders (80% drop) is 10x more at risk than a store dropping from 100→80 (20% drop). Formula: priority_score = prev_orders × decline_rate × urgency where decline_rate = 1 - (current/prev).",
+        "data": {"predicted_pct": 40, "actual_pct": 0, "scoring_bug": "volume_not_rate"}
+      }
+    },
+    {
+      "id": "PRED-2026-05-01-003",
+      "filed_date": "2026-05-01",
+      "type": "LMD_COHORT",
+      "entity_id": null,
+      "entity_name": "333 stores with HOLD_BY_LMD > 40% (April)",
+      "prediction": "LMD hold problem will persist in May — majority of 333 stores still >40% HOLD",
+      "confidence": "HIGH",
+      "evidence": "333 stores (33% of network) had HOLD_BY_LMD > 40% in April. This is structural LMD behavior, not random.",
+      "gmv_at_risk": null,
+      "result": "CORRECT",
+      "scored_on": "2026-05-31",
+      "actual": "68.5% of those 333 stores still had HOLD_BY_LMD > 40% in May. Problem persisted without intervention.",
+      "diagnosis": null
+    },
+    {
+      "id": "PRED-2026-05-01-004",
+      "filed_date": "2026-05-01",
+      "type": "PROGRAM_LEVEL",
+      "entity_id": null,
+      "entity_name": "DVS Network — May GMV",
+      "prediction": "May DVS GMV will recover vs April (April was a shock month)",
+      "confidence": "MEDIUM",
+      "evidence": "April shock caused by 3 simultaneous events (24hr rule, OCP explosion, Gujarat strike). These were one-time events. May should normalize.",
+      "gmv_at_risk": null,
+      "result": "CORRECT",
+      "scored_on": "2026-05-31",
+      "actual": "May: 16,771 orders vs April: 11,489 orders (+46%). Full recovery confirmed."
+    },
+    {
+      "id": "PRED-2026-05-01-005",
+      "filed_date": "2026-05-01",
+      "type": "STATE_LEVEL",
+      "entity_id": null,
+      "entity_name": "Gujarat — ON_HOLD rate",
+      "prediction": "Gujarat on-hold rate will stay above 35% in May",
+      "confidence": "HIGH",
+      "evidence": "Gujarat had 41.5% avg on-hold rate in April. This is structural LMD coverage gap, not seasonal.",
+      "gmv_at_risk": null,
+      "result": "CORRECT",
+      "scored_on": "2026-05-31",
+      "actual": "Gujarat May avg on-hold: 37.1%. Above 35% threshold confirmed. Structural problem persists."
+    }
+  ],
   "pipeline_snapshots": [],
-  "candidate_rules": [],
-  "last_pattern_discovery_date": null
+  "candidate_rules": [
+    {
+      "pattern_id": "PAT-2026-05-31-001",
+      "discovered_date": "2026-05-31",
+      "type": "THRESHOLD_ADJUSTMENT",
+      "description": "Dead store persistence prior is too high in May-June (Kharif season). 46% of April dead stores reactivated in May — nearly double the 25% we assumed.",
+      "evidence": "1 of 1 SEASONAL_RECOVERY diagnoses shows this pattern (100%). Small sample but high confidence due to known agricultural cycle.",
+      "suggested_rule": "Reduce dead_persistence_prior from 0.55 to 0.35 during May-June. Restore to 0.55 in July onwards.",
+      "requires_validation": true,
+      "status": "CANDIDATE",
+      "human_note": null
+    },
+    {
+      "pattern_id": "PAT-2026-05-31-002",
+      "discovered_date": "2026-05-31",
+      "type": "SCORING_FIX",
+      "description": "Volume-based decline scoring selects wrong stores. Large stores with moderate declines never die. Small stores with steep declines always die.",
+      "evidence": "PRED-002 was 100% wrong. Top 50 by volume = 0% mortality. The correct signal is decline RATE, not volume.",
+      "suggested_rule": "Replace priority_score = apr_orders × 2 with priority_score = prev_orders × (1 - curr/prev) × urgency. Apply immediately.",
+      "requires_validation": true,
+      "status": "CANDIDATE",
+      "human_note": null
+    }
+  ],
+  "last_pattern_discovery_date": "2026-05-31"
 }
