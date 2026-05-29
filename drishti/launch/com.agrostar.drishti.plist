@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <key>Label</key>
+    <string>com.agrostar.drishti</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/darpan/Documents/claude code/DVS Analysis/drishti/launch/run_drishti.sh</string>
+    </array>
+
+    <!-- Fire at 10:00 AM every day.
+         If laptop is asleep at 10 AM, launchd fires this the moment it wakes. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>10</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- Logs -->
+    <key>StandardOutPath</key>
+    <string>/Users/darpan/Documents/claude code/DVS Analysis/drishti/logs/launchd_out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/darpan/Documents/claude code/DVS Analysis/drishti/logs/launchd_err.log</string>
+
+    <!-- Keep alive on failure: no — don't restart on crash -->
+    <key>KeepAlive</key>
+    <false/>
+
+    <!-- Don't run on load (only on schedule) -->
+    <key>RunAtLoad</key>
+    <false/>
+
+</dict>
+</plist>
