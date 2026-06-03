@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "last_run": null,
+  "last_run": "2026-05-30T10:00:00+05:30",
   "baselines": {
     "routing_rate_pct": 48.5,
     "fulfillment_rate_pct": 43.7,
@@ -40,7 +40,8 @@
     "volume_scoring_errors": 1,
     "lessons_learned": [
       "SEASONAL_RECOVERY (May 2026): Dead store persistence prior must drop to ~35-40% in May-Jun. Kharif demand reactivates dormant stores. Filed 2026-05-31.",
-      "VOLUME_BASED_SCORING (May 2026): Never rank declining stores by volume. Use decline RATE. formula: priority_score = prev_orders × (1 - curr/prev) × urgency. Filed 2026-05-31."
+      "VOLUME_BASED_SCORING (May 2026): Never rank declining stores by volume. Use decline RATE. formula: priority_score = prev_orders × (1 - curr/prev) × urgency. Filed 2026-05-31.",
+      "GUJARAT_SYSTEMIC (May 2026): Gujarat LMD network can fail systemically, not just individual bad actors. In May 2026, dinesh.sarvaiya (424h median), dipak.sarvaiya (345h), vishal.solanki (211h) all failed simultaneously. Even benchmark jignesh.jani deteriorated from 32% to 52% hold rate. When 3+ Gujarat LMDs fail at once, look for territory-level cause (coverage expansion growing pains, demand surge, ops gap). Filed 2026-05-30."
     ]
   },
   "regime_boundaries": [
@@ -62,7 +63,7 @@
     {
       "date": "2026-04-01",
       "event": "LMD coverage expansion",
-      "impact": "No-LMD blocks: 6715 (Mar) → 163 (Apr) → 0 (May). Major coverage gap closed."
+      "impact": "No-LMD blocks: 6715 (Mar) → 163 (Apr) → 0 (May). Major coverage gap closed. New LMDs added (likely priyanka.gautam, ankita.khanzode, baliram.nagare) — still ramping up efficiency in May 2026."
     }
   ],
   "seasonal_calendar": {
@@ -79,26 +80,77 @@
       "state": "UP",
       "flag": "GENUINE_OVERLOAD",
       "fc_delivery_pct": 63.7,
-      "dvs_hold_pct": 78.7,
-      "history": "Flagged multiple times. 83.6% HOLD in prior analysis. Consistent underperformer."
+      "dvs_hold_pct": 80.3,
+      "dvs_hold_pct_prev": 78.7,
+      "picked_by_lmd_median_hrs": 305,
+      "picked_by_lmd_stuck_count": 29,
+      "history": "Flagged multiple times. 83.6% HOLD in prior analysis. Consistently bad. 80.3% hold rate as of 2026-05-30 (slightly worse). 29 PICKED_BY_LMD packages at 305h median custody.",
+      "last_updated": "2026-05-30"
     },
     "franchise_9070": {
       "name": "narayan.up",
       "code": "AGROSTARUP179",
       "state": "UP",
-      "flag": "SELECTIVE_DEPRIORITIZATION",
+      "flag": "IMPROVING",
       "fc_delivery_pct": 90.6,
-      "dvs_hold_pct": 54.2,
-      "history": "Best FC performer in UP. Deliberately ignoring DVS stores. Incentive misalignment."
+      "dvs_hold_pct": 32.3,
+      "dvs_hold_pct_prev": 54.2,
+      "history": "Was flagged as SELECTIVE_DEPRIORITIZATION with 54.2% hold rate. Improved significantly to 32.3% as of 2026-05-30. Something changed in behavior — worth investigating what worked.",
+      "last_updated": "2026-05-30"
     },
     "franchise_1230": {
       "name": "jignesh.jani",
       "code": "AGROSTARGJ083",
       "state": "GJ",
-      "flag": "HEALTHY",
+      "flag": "DETERIORATING",
       "fc_delivery_pct": 97.3,
-      "dvs_hold_pct": 32.1,
-      "history": "Best overall LMD in network. Gujarat. Use as benchmark."
+      "dvs_hold_pct": 52.2,
+      "dvs_hold_pct_prev": 32.1,
+      "history": "Was benchmark LMD — best in network. Gujarat. Deteriorated significantly from 32.1% to 52.2% hold rate as of 2026-05-30. Part of Gujarat systemic failure. Do NOT use as benchmark until recovered.",
+      "last_updated": "2026-05-30"
+    },
+    "franchise_14231": {
+      "name": "priyanka.gautam",
+      "code": "unknown",
+      "state": "UP",
+      "flag": "CRITICAL",
+      "dvs_hold_pct": 85.7,
+      "dvs_pkg_count": 42,
+      "history": "Newly identified 2026-05-30. 85.7% hold rate on 42 DVS packages — highest of all tracked LMDs. Worse than Ravikaran Singh. Was not on radar before this run.",
+      "last_updated": "2026-05-30"
+    },
+    "franchise_13803": {
+      "name": "dinesh.sarvaiya",
+      "code": "unknown",
+      "state": "GJ",
+      "flag": "CRITICAL",
+      "picked_by_lmd_stuck_count": 30,
+      "picked_by_lmd_median_hrs": 424,
+      "picked_by_lmd_past_7day": 28,
+      "history": "Newly identified 2026-05-30. 30 PICKED_BY_LMD packages with median 424 hours (17.7 days) in custody. 28 of 30 past 7-day mark. Most dangerous LMD in network today for delivery outcomes.",
+      "last_updated": "2026-05-30"
+    },
+    "franchise_1414": {
+      "name": "dipak.sarvaiya",
+      "code": "unknown",
+      "state": "GJ",
+      "flag": "CRITICAL",
+      "picked_by_lmd_stuck_count": 23,
+      "picked_by_lmd_median_hrs": 345,
+      "picked_by_lmd_past_7day": 22,
+      "history": "Newly identified 2026-05-30. 23 PICKED_BY_LMD packages at 345h median. Part of Gujarat systemic failure. Likely related to dinesh.sarvaiya (same surname — possibly same operation).",
+      "last_updated": "2026-05-30"
+    },
+    "franchise_15760": {
+      "name": "vishal.solanki",
+      "code": "unknown",
+      "state": "GJ",
+      "flag": "CONCERNING",
+      "picked_by_lmd_stuck_count": 44,
+      "picked_by_lmd_median_hrs": 211,
+      "picked_by_lmd_past_7day": 27,
+      "history": "Newly identified 2026-05-30. Highest stuck count (44 packages) in PICKED_BY_LMD stage at 211h median. Part of Gujarat systemic failure.",
+      "last_updated": "2026-05-30"
     }
   },
   "predictions": [
@@ -186,9 +238,86 @@
       "result": "CORRECT",
       "scored_on": "2026-05-31",
       "actual": "Gujarat May avg on-hold: 37.1%. Above 35% threshold confirmed. Structural problem persists."
+    },
+    {
+      "id": "PRED-2026-05-30-001",
+      "filed_date": "2026-05-30",
+      "type": "DEAD_STORE_RISK",
+      "entity_id": 12182308,
+      "entity_name": "OMKARESHWAR AGRO (store 12182308, Parbhani, Maharashtra)",
+      "prediction": "Will receive 10+ DVS demand orders in the week of June 1-7 and fulfill zero — active ignoring of demand, not a routing gap.",
+      "confidence": "HIGH",
+      "evidence": "Got 23 demand assignments in last 30 days (TRULY_DEAD category), fulfilled zero. High-volume store with 6 prev_orders. Not STARVED — demand is reaching them.",
+      "score_by": "2026-06-07",
+      "result": "PENDING"
+    },
+    {
+      "id": "PRED-2026-05-30-002",
+      "filed_date": "2026-05-30",
+      "type": "LMD_RTO",
+      "entity_id": 13803,
+      "entity_name": "dinesh.sarvaiya (FID 13803, Gujarat)",
+      "prediction": "80%+ of his 30 PICKED_BY_LMD packages (median 424h in custody) will resolve as RTOs, not farmer deliveries.",
+      "confidence": "HIGH",
+      "evidence": "30 packages at 424h median custody (17.7 days). 28 of 30 past 7-day mark. Packages in LMD hands this long almost never reach farmers — SLA breach threshold is typically 120h.",
+      "score_by": "2026-06-13",
+      "result": "PENDING"
+    },
+    {
+      "id": "PRED-2026-05-30-003",
+      "filed_date": "2026-05-30",
+      "type": "PROGRAM_LEVEL",
+      "entity_id": null,
+      "entity_name": "DVS Network — RTO rate",
+      "prediction": "Network RTO rate will cross 27% in the 14-day window ending June 13, driven by aged PICKED_BY_LMD backlog.",
+      "confidence": "MEDIUM",
+      "evidence": "1,745 PICKED_BY_LMD orders currently stuck (median 186h, 996 past 7-day). Gujarat alone has 97 packages in custody 211-424h. When LMD clears backlog, these come back as RTOs, spiking the rate above the 24.1% baseline.",
+      "score_by": "2026-06-13",
+      "result": "PENDING"
+    },
+    {
+      "id": "PRED-2026-05-30-004",
+      "filed_date": "2026-05-30",
+      "type": "LMD_IMPROVEMENT",
+      "entity_id": 9070,
+      "entity_name": "narayan.up (FID 9070, UP)",
+      "prediction": "Hold rate stays below 40% through June 13. The improvement from 54.2% to 32.3% is behavioral, not noise.",
+      "confidence": "MEDIUM",
+      "evidence": "Hold rate dropped from 54.2% to 32.3% over 14-day window. Previous flag was SELECTIVE_DEPRIORITIZATION — if incentives/management changed, recovery is real. Large enough sample (31 DVS packages) to trust the signal.",
+      "score_by": "2026-06-13",
+      "result": "PENDING"
+    },
+    {
+      "id": "PRED-2026-05-30-005",
+      "filed_date": "2026-05-30",
+      "type": "LMD_COHORT",
+      "entity_id": 14231,
+      "entity_name": "priyanka.gautam (FID 14231, UP)",
+      "prediction": "Hold rate will still be above 75% in the next 14-day check (June 13). She is a new Ravikaran-class actor.",
+      "confidence": "MEDIUM",
+      "evidence": "85.7% hold rate on 42 packages in first data appearance. Pattern matches structural HOLD_BY_LMD behavior seen in Ravikaran (80.3% sustained for months). New LMD from coverage expansion, likely undertrained/underaligned.",
+      "score_by": "2026-06-13",
+      "result": "PENDING"
     }
   ],
-  "pipeline_snapshots": [],
+  "pipeline_snapshots": [
+    {
+      "date": "2026-05-30",
+      "total_live_orders": 7721,
+      "stages": {
+        "PACKED": {"orders": 2515, "median_hrs": 92, "past_3day": 1460, "past_7day": 937},
+        "PICKED_BY_LMD": {"orders": 1745, "median_hrs": 186, "past_3day": 1474, "past_7day": 996},
+        "ON_HOLD": {"orders": 1500, "median_hrs": 88, "past_3day": 871, "past_7day": 408},
+        "HOLD_BY_LMD": {"orders": 1392, "median_hrs": 109, "past_3day": 932, "past_7day": 464},
+        "WAITING_FIRST_ACTION": {"orders": 461, "median_hrs": 10, "past_3day": 3, "past_7day": 1},
+        "PUSHED": {"orders": 95, "median_hrs": 907, "past_3day": 86, "past_7day": 78}
+      },
+      "total_past_3day_sla": 4737,
+      "total_past_7day": 2805,
+      "fulfillment_rate_7day": 48.5,
+      "note": "Rate at best-ever but delivery broken. Gujarat LMD systemic failure."
+    }
+  ],
   "candidate_rules": [
     {
       "pattern_id": "PAT-2026-05-31-001",
