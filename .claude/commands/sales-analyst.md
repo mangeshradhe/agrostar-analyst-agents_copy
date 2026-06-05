@@ -515,3 +515,84 @@ ORDER BY ty.month, ty.channel
 8. One specific next drill-down.
 
 **Efficiency rules:** No restating. No explaining SQL. If a simple filter change is needed, just run it.
+
+---
+
+## Clearance Sales Offers Analysis
+
+**What it is:** Orders placed under active promotional/clearance offers. These are identified from `order_management_orderitem` — not from the invoiced_report — because the offer metadata lives at the order-item level.
+
+**How to identify clearance offer orders:**
+```sql
+AND LENGTH(offer_id) > 10    -- has a real offer attached (short/null offer_ids are noise)
+AND max_expiry_days > 0      -- offer has an expiry, confirming it's a clearance/time-bound offer
+AND selling_price > 0        -- exclude zero-price lines
+```
+
+**Dashboard:** `DVS Analysis/offer_analysis_dashboard.html` — channel filter, MoM P&L charts, SKU-level tables.
+
+---
+
+### Tables Used
+
+| Table | Role | Join key |
+|-------|------|----------|
+| `prod_db_views.order_management_orderitem` | Primary fact — item-level order data including `offer_id`, `max_expiry_days`, `selling_price`, `discount`, `adj_discount`, `quantity` | — |
+| `prod_db_views.order_management_order` | Provides `initiating_source` (channel + state), `status`, `unicommerce_status` | `omoi.order_id = omo.sales_order_id` |
+| `static_tables.monthly_cogs` | Per-unit COGS rate by SKU and state; use `MAX(cogs_rate)` grouped by `sku_code, state` to get the latest rate | `omoi.item_sku = cogs_tbl.sku_code AND state = RIGHT(initiating_source, 2)` |
+
+---
+
+### Base Query Pattern
+
+```sql
+WITH base AS (
+  SELECT
+    order_id, DATE(omoi.created_on) AS created_on, omoi.item_sku, item_name,
+    offer_id, quantity, max_expiry_days, selling_price, discount, adj_discount,
+    offer_name, initiating_source, omo.status, omo.unicommerce_status,
+    CASE WHEN initiating_source LIKE 'B2B%' THEN 'B2B' ELSE 'B2C' END AS channel,
+    RIGHT(initiating_source, 2) AS state,
+    cogs_tbl.cogs AS cogs
+  FROM `prod_db_views.order_management_orderitem` omoi
+  LEFT JOIN (
+    SELECT sales_order_id, initiating_source, status, unicommerce_status
+    FROM `prod_db_views.order_management_order`
+    WHERE created_on > '<start_date>'
+  ) omo ON omoi.order_id = omo.sales_order_id
+  LEFT JOIN (
+    SELECT sku_code, state, MAX(cogs_rate) AS cogs
+    FROM `static_tables.monthly_cogs`
+    WHERE month > '<cogs_month_floor>'
+    GROUP BY 1, 2
+  ) cogs_tbl ON omoi.item_sku = cogs_tbl.sku_code
+            AND RIGHT(initiating_source, 2) = cogs_tbl.state
+  WHERE omoi.created_on > '<start_date>'
+    AND LENGTH(offer_id) > 10
+    AND max_expiry_days > 0
+    AND selling_price > 0
+    AND unicommerce_status NOT IN ('CANCELLED')
+    AND omo.status NOT IN ('MOB_APP_UNVERIFIED', 'FUTURE ORDER')
+)
+```
+
+**Critical quirks:**
+- Always alias the COGS subquery as `cogs_tbl` (not `cogs`) — BigQuery will confuse the subquery struct with the scalar column if both share the name `cogs`, causing a type mismatch on `COALESCE`.
+- State is extracted as `RIGHT(initiating_source, 2)` — the last 2 characters of `initiating_source` encode the state (e.g. `B2B_DIST_MH` → `MH`). This is the join key to `monthly_cogs.state`.
+- `adj_discount` is a per-unit field just like `discount`. Always add them together: `(discount + COALESCE(adj_discount, 0)) * quantity`.
+
+---
+
+### Metric Definitions (all per-unit fields must be multiplied by quantity)
+
+| Metric | Formula |
+|--------|---------|
+| Gross Revenue | `selling_price × quantity` |
+| Total Discount | `(discount + COALESCE(adj_discount, 0)) × quantity` |
+| Net Revenue | `(selling_price − discount − COALESCE(adj_discount, 0)) × quantity` |
+| Total COGS | `COALESCE(cogs, 0) × quantity` |
+| Gross Margin | `Net Revenue − Total COGS` |
+| GM% | `Gross Margin / Net Revenue × 100` |
+| Discount % | `Total Discount / Gross Revenue × 100` |
+
+**Known data gap:** Some states (e.g. AD, BH) may have no matching rows in `static_tables.monthly_cogs`, resulting in `cogs = NULL` and an artificially inflated margin. Always check `COUNTIF(cogs IS NULL)` when reporting GM% by state.

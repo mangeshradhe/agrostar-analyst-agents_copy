@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Offer Order P&L Dashboard — Sep 2025 to Jun 2026</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232738;
+    --border: #2e3347;
+    --accent-blue: #4f8ef7;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --text: #e2e8f0;
+    --text-muted: #8892a4;
+    --b2b: #4f8ef7;
+    --b2c: #34d399;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; font-size: 13px; }
+
+  .header { padding: 24px 32px 16px; border-bottom: 1px solid var(--border); }
+  .header h1 { font-size: 20px; font-weight: 700; color: #fff; }
+  .header p  { color: var(--text-muted); margin-top: 4px; font-size: 12px; }
+
+  .controls { display: flex; gap: 12px; padding: 14px 32px; border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; }
+  .controls label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-right: 4px; }
+  .btn-group { display: flex; gap: 6px; }
+  .btn { padding: 5px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-muted); cursor: pointer; font-size: 12px; transition: all .15s; }
+  .btn.active { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+  .btn.b2b.active { background: var(--b2b); border-color: var(--b2b); color:#fff; }
+  .btn.b2c.active { background: var(--b2c); border-color: var(--b2c); color:#fff; }
+
+  .main { padding: 24px 32px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* Cards */
+  .cards { display: grid; grid-template-columns: repeat(7, 1fr); gap: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+  .card .val   { font-size: 22px; font-weight: 700; margin-top: 6px; }
+  .card .sub   { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .card .delta { font-size: 12px; font-weight: 600; margin-top: 6px; }
+  .pos     { color: var(--accent-green); }
+  .neg     { color: var(--accent-red); }
+  .neutral { color: var(--accent-amber); }
+
+  .section-title { font-size: 14px; font-weight: 600; color: #fff; border-left: 3px solid var(--accent-blue); padding-left: 10px; }
+
+  /* Primary chart — full width, tall */
+  .chart-primary { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 24px; }
+  .chart-primary h3 { font-size: 13px; color: #fff; font-weight: 600; margin-bottom: 6px; }
+  .chart-primary .subtitle { font-size: 11px; color: var(--text-muted); margin-bottom: 20px; }
+  .chart-primary canvas { max-height: 340px; }
+
+  /* Secondary 2-col charts */
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .chart-box h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 16px; }
+  .chart-box canvas { max-height: 240px; }
+
+  /* Table */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: var(--surface2); padding: 10px 14px; text-align: right; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; font-weight: 600; white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+  thead th:first-child, thead th:nth-child(2) { text-align: left; }
+  tbody tr { border-top: 1px solid var(--border); transition: background .1s; }
+  tbody tr:hover { background: rgba(255,255,255,.03); }
+  tbody tr.b2b-row { border-left: 3px solid var(--b2b); }
+  tbody tr.b2c-row { border-left: 3px solid var(--b2c); }
+  tbody tr.subtotal-row { background: var(--surface2); font-weight: 600; border-top: 2px solid var(--border); }
+  tbody td { padding: 9px 14px; text-align: right; font-size: 12px; }
+  tbody td:first-child { text-align: left; font-weight: 600; }
+  tbody td:nth-child(2) { text-align: left; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .badge.b2b { background: rgba(79,142,247,.15); color: var(--b2b); }
+  .badge.b2c { background: rgba(52,211,153,.15); color: var(--b2c); }
+  .gm-neg  { color: var(--accent-red);   font-weight: 600; }
+  .gm-pos  { color: var(--accent-green); font-weight: 600; }
+  .gm-warn { color: var(--accent-amber); font-weight: 600; }
+
+  .footer { padding: 16px 32px; color: var(--text-muted); font-size: 11px; border-top: 1px solid var(--border); }
+
+  .legend-pill { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Offer Order P&amp;L Dashboard</h1>
+  <p>Sep 2025 – Jun 2026 &nbsp;·&nbsp; Offer orders only (offer_id, max_expiry_days, selling_price filtered) &nbsp;·&nbsp; All per-unit values multiplied by quantity</p>
+</div>
+
+<div class="controls">
+  <label>Channel</label>
+  <div class="btn-group">
+    <button class="btn active" id="ch-all" onclick="setChannel('ALL')">All</button>
+    <button class="btn b2b"   id="ch-b2b" onclick="setChannel('B2B')">B2B</button>
+    <button class="btn b2c"   id="ch-b2c" onclick="setChannel('B2C')">B2C</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- 1. Summary Cards -->
+  <div>
+    <div class="section-title" style="margin-bottom:14px">Overall Summary</div>
+    <div class="cards" id="summary-cards"></div>
+  </div>
+
+  <!-- 2. PRIMARY CHART: B2B vs B2C Gross vs Net Revenue -->
+  <div>
+    <div class="section-title" style="margin-bottom:14px">B2B vs B2C — Gross Revenue vs Net Revenue (MoM)</div>
+    <div class="chart-primary">
+      <h3>Gross Revenue vs Net Revenue by Channel</h3>
+      <div class="subtitle">
+        <span class="legend-pill" style="background:#4f8ef7"></span>B2B Gross &nbsp;
+        <span class="legend-pill" style="background:rgba(79,142,247,.35);border:1px dashed #4f8ef7"></span>B2B Net &nbsp;&nbsp;
+        <span class="legend-pill" style="background:#34d399"></span>B2C Gross &nbsp;
+        <span class="legend-pill" style="background:rgba(52,211,153,.35);border:1px dashed #34d399"></span>B2C Net &nbsp;&nbsp;
+        Gap between Gross and Net = Total Discounts given
+      </div>
+      <canvas id="chartPrimary"></canvas>
+    </div>
+  </div>
+
+  <!-- 3. Detailed Table -->
+  <div>
+    <div class="section-title" style="margin-bottom:14px">Month × Channel Detailed Breakdown</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Channel</th>
+            <th>Orders</th>
+            <th>Units</th>
+            <th>Gross Rev (₹)</th>
+            <th>Total Discount (₹)</th>
+            <th>Net Rev (₹)</th>
+            <th>COGS (₹)</th>
+            <th>Gross Margin (₹)</th>
+            <th>GM%</th>
+            <th>Disc%</th>
+            <th>P&amp;L View</th>
+          </tr>
+        </thead>
+        <tbody id="main-table"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 4. Top SKUs -->
+  <div>
+    <div class="section-title" style="margin-bottom:14px">Top 20 SKUs — B2B</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">#</th>
+            <th style="text-align:left">SKU</th>
+            <th style="text-align:left">Product Name</th>
+            <th>Units</th>
+            <th>Gross Rev (₹)</th>
+            <th>Total Discount (₹)</th>
+            <th>Net Rev (₹)</th>
+            <th>COGS (₹)</th>
+            <th>Gross Margin (₹)</th>
+            <th>GM%</th>
+            <th>Disc%</th>
+            <th>P&amp;L View</th>
+          </tr>
+        </thead>
+        <tbody id="sku-table-b2b"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title" style="margin-bottom:14px">Top 20 SKUs — B2C</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">#</th>
+            <th style="text-align:left">SKU</th>
+            <th style="text-align:left">Product Name</th>
+            <th>Units</th>
+            <th>Gross Rev (₹)</th>
+            <th>Total Discount (₹)</th>
+            <th>Net Rev (₹)</th>
+            <th>COGS (₹)</th>
+            <th>Gross Margin (₹)</th>
+            <th>GM%</th>
+            <th>Disc%</th>
+            <th>P&amp;L View</th>
+          </tr>
+        </thead>
+        <tbody id="sku-table-b2c"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 5. Secondary Charts -->
+  <div>
+    <div class="section-title" style="margin-bottom:14px">Supporting Trends</div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <h3>Gross Margin % &amp; Discount %</h3>
+        <canvas id="chartMargin"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>Net Revenue vs COGS</h3>
+        <canvas id="chartNetCogs"></canvas>
+      </div>
+    </div>
+    <div class="chart-row" style="margin-top:20px">
+      <div class="chart-box">
+        <h3>Orders per Month</h3>
+        <canvas id="chartOrders"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>Units per Month</h3>
+        <canvas id="chartUnits"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  ⚠️ AD (Andhra Pradesh) and BH (Bihar) B2B rows have no COGS match in <code>static_tables.monthly_cogs</code> — their margin is overstated. &nbsp;·&nbsp; Jun 2026 is month-to-date (5 days). &nbsp;·&nbsp; Total Discount = discount + adj_discount (adj_discount is negligible for B2B, &lt;₹200 total).
+</div>
+
+<script>
+// ── RAW DATA ──────────────────────────────────
+const raw = [
+  {month:"2025-09",channel:"B2B",orders:16,  units:611,  gross:320463,  disc:217918,  adjDisc:0,    net:102545,  cogs:109095,  gm:-6550,    gmPct:-6.39, discPct:68.0},
+  {month:"2025-09",channel:"B2C",orders:119, units:1056, gross:458644,  disc:274493,  adjDisc:1508, net:182643,  cogs:146348,  gm:36295,    gmPct:19.87, discPct:60.18},
+  {month:"2025-10",channel:"B2B",orders:6,   units:221,  gross:128168,  disc:80265,   adjDisc:0,    net:47903,   cogs:49762,   gm:-1859,    gmPct:-3.88, discPct:62.62},
+  {month:"2025-10",channel:"B2C",orders:53,  units:392,  gross:128640,  disc:62434,   adjDisc:615,  net:65591,   cogs:55105,   gm:10486,    gmPct:15.99, discPct:49.01},
+  {month:"2025-11",channel:"B2B",orders:3,   units:32,   gross:20099,   disc:7250,    adjDisc:0,    net:12849,   cogs:1848,    gm:11001,    gmPct:85.62, discPct:36.07},
+  {month:"2025-11",channel:"B2C",orders:62,  units:377,  gross:156401,  disc:77582,   adjDisc:1550, net:77269,   cogs:76269,   gm:1000,     gmPct:1.29,  discPct:50.6},
+  {month:"2025-12",channel:"B2B",orders:9,   units:131,  gross:45910,   disc:24894,   adjDisc:0,    net:21016,   cogs:16545,   gm:4471,     gmPct:21.27, discPct:54.22},
+  {month:"2025-12",channel:"B2C",orders:109, units:656,  gross:361819,  disc:209100,  adjDisc:2887, net:149832,  cogs:173308,  gm:-23476,   gmPct:-15.67,discPct:58.59},
+  {month:"2026-01",channel:"B2B",orders:23,  units:1402, gross:385954,  disc:159141,  adjDisc:0,    net:226813,  cogs:210771,  gm:16042,    gmPct:7.07,  discPct:41.23},
+  {month:"2026-01",channel:"B2C",orders:148, units:1039, gross:372208,  disc:178318,  adjDisc:2730, net:191160,  cogs:192055,  gm:-895,     gmPct:-0.47, discPct:48.64},
+  {month:"2026-02",channel:"B2B",orders:55,  units:3847, gross:1377372, disc:603258,  adjDisc:8,    net:774106,  cogs:705804,  gm:68302,    gmPct:8.82,  discPct:43.8},
+  {month:"2026-02",channel:"B2C",orders:188, units:1393, gross:525499,  disc:261479,  adjDisc:4027, net:259993,  cogs:239506,  gm:20487,    gmPct:7.88,  discPct:50.52},
+  {month:"2026-03",channel:"B2B",orders:194, units:11764,gross:3907129, disc:2052780, adjDisc:184,  net:1854165, cogs:1937915, gm:-83750,   gmPct:-4.52, discPct:52.54},
+  {month:"2026-03",channel:"B2C",orders:268, units:1433, gross:795691,  disc:399903,  adjDisc:4480, net:391308,  cogs:301573,  gm:89735,    gmPct:22.93, discPct:50.82},
+  {month:"2026-04",channel:"B2B",orders:316, units:29869,gross:9695233, disc:6009595, adjDisc:0,    net:3685638, cogs:4568109, gm:-882471,  gmPct:-23.94,discPct:61.99},
+  {month:"2026-04",channel:"B2C",orders:1269,units:8645, gross:4709116, disc:2999108, adjDisc:13649,net:1696359, cogs:1736997, gm:-40638,   gmPct:-2.4,  discPct:63.98},
+  {month:"2026-05",channel:"B2B",orders:434, units:58889,gross:18775350,disc:12360279,adjDisc:0,    net:6415071, cogs:8667149, gm:-2252078, gmPct:-35.11,discPct:65.83},
+  {month:"2026-05",channel:"B2C",orders:1248,units:6905, gross:4572780, disc:3108508, adjDisc:1296, net:1462976, cogs:1689413, gm:-226436,  gmPct:-15.48,discPct:68.01},
+  {month:"2026-06",channel:"B2B",orders:34,  units:2974, gross:1861414, disc:1203652, adjDisc:0,    net:657762,  cogs:1200128, gm:-542366,  gmPct:-82.46,discPct:64.66},
+  {month:"2026-06",channel:"B2C",orders:165, units:841,  gross:531394,  disc:365423,  adjDisc:99,   net:165872,  cogs:185863,  gm:-19990,   gmPct:-12.05,discPct:68.79},
+];
+
+const MONTHS = [...new Set(raw.map(r=>r.month))].sort();
+const MONTHS_DESC = [...MONTHS].reverse();
+const LABELS = {
+  "2025-09":"Sep'25","2025-10":"Oct'25","2025-11":"Nov'25","2025-12":"Dec'25",
+  "2026-01":"Jan'26","2026-02":"Feb'26","2026-03":"Mar'26","2026-04":"Apr'26",
+  "2026-05":"May'26","2026-06":"Jun'26*"
+};
+
+let activeChannel = 'ALL';
+
+// ── HELPERS ───────────────────────────────────
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  const abs = Math.abs(n), sign = n < 0 ? '-' : '';
+  if (abs >= 10000000)    return sign + '₹' + (abs/10000000).toFixed(2) + ' Cr';
+  if (abs >= 100000)      return sign + '₹' + (abs/100000).toFixed(2) + ' L';
+  return sign + '₹' + abs.toLocaleString('en-IN');
+}
+function fmtN(n)   { return n == null ? '—' : n.toLocaleString('en-IN'); }
+function fmtPct(n) { if (n == null) return '—'; return (n > 0 ? '+' : '') + n.toFixed(1) + '%'; }
+
+function gmClass(p) {
+  if (p == null) return '';
+  if (p >= 15)  return 'gm-pos';
+  if (p >= 0)   return 'gm-warn';
+  return 'gm-neg';
+}
+
+function filtered()  { return activeChannel === 'ALL' ? raw : raw.filter(r => r.channel === activeChannel); }
+
+function byMonthB2X() {
+  const b2b = {}, b2c = {};
+  raw.forEach(r => {
+    const map = r.channel === 'B2B' ? b2b : b2c;
+    if (!map[r.month]) map[r.month] = {gross:0,net:0,cogs:0,disc:0,adjDisc:0,gm:0,orders:0,units:0};
+    const m = map[r.month];
+    m.gross += r.gross; m.net += r.net; m.cogs += r.cogs;
+    m.disc += r.disc; m.adjDisc += r.adjDisc; m.gm += r.gm;
+    m.orders += r.orders; m.units += r.units;
+  });
+  return { b2b, b2c };
+}
+
+function totalOf(arr) {
+  const d = arr.reduce((a,r)=>({
+    orders:a.orders+r.orders, units:a.units+r.units,
+    gross:a.gross+r.gross, disc:a.disc+r.disc, adjDisc:a.adjDisc+r.adjDisc,
+    net:a.net+r.net, cogs:a.cogs+r.cogs, gm:a.gm+r.gm
+  }), {orders:0,units:0,gross:0,disc:0,adjDisc:0,net:0,cogs:0,gm:0});
+  d.gmPct   = d.net   ? 100*(d.gm/d.net)               : null;
+  d.discPct = d.gross ? 100*(d.disc+d.adjDisc)/d.gross  : null;
+  return d;
+}
+
+// ── CARDS ─────────────────────────────────────
+function renderCards() {
+  const t = totalOf(filtered());
+  const gc = t.gmPct != null ? (t.gmPct>=15?'pos':t.gmPct>=0?'neutral':'neg') : '';
+  document.getElementById('summary-cards').innerHTML = `
+    <div class="card">
+      <div class="label">Total Orders</div>
+      <div class="val">${fmtN(t.orders)}</div>
+      <div class="sub">Unique orders</div>
+    </div>
+    <div class="card">
+      <div class="label">Total Units Sold</div>
+      <div class="val">${fmtN(t.units)}</div>
+      <div class="sub">Qty across all SKUs</div>
+    </div>
+    <div class="card">
+      <div class="label">Total COGS</div>
+      <div class="val" style="color:var(--accent-amber)">${fmt(t.cogs)}</div>
+      <div class="sub">Qty × per-unit COGS</div>
+    </div>
+    <div class="card">
+      <div class="label">Gross Revenue</div>
+      <div class="val">${fmt(t.gross)}</div>
+      <div class="sub">Before discounts</div>
+    </div>
+    <div class="card">
+      <div class="label">Total Discounts</div>
+      <div class="val neg">-${fmt(t.disc+t.adjDisc)}</div>
+      <div class="sub neg">${t.discPct ? t.discPct.toFixed(1)+'% of Gross' : '—'}</div>
+    </div>
+    <div class="card">
+      <div class="label">Net Revenue</div>
+      <div class="val">${fmt(t.net)}</div>
+      <div class="sub">After discounts</div>
+    </div>
+    <div class="card">
+      <div class="label">Gross Margin</div>
+      <div class="val ${gc}">${fmt(t.gm)}</div>
+      <div class="delta ${gc}">GM% ${fmtPct(t.gmPct)}</div>
+    </div>`;
+}
+
+// ── CHARTS ────────────────────────────────────
+let charts = {};
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+// PRIMARY: B2B Gross, B2B Net, B2C Gross, B2C Net — grouped bars
+function renderPrimary() {
+  destroyChart('primary');
+  const { b2b, b2c } = byMonthB2X();
+  const labels = MONTHS.map(m => LABELS[m]);
+  const ctx = document.getElementById('chartPrimary').getContext('2d');
+  charts['primary'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'B2B Gross Revenue',
+          data: MONTHS.map(m => b2b[m]?.gross || 0),
+          backgroundColor: 'rgba(79,142,247,0.85)',
+          borderRadius: 3,
+        },
+        {
+          label: 'B2B Net Revenue',
+          data: MONTHS.map(m => b2b[m]?.net || 0),
+          backgroundColor: 'rgba(79,142,247,0.35)',
+          borderColor: '#4f8ef7',
+          borderWidth: 1,
+          borderRadius: 3,
+        },
+        {
+          label: 'B2C Gross Revenue',
+          data: MONTHS.map(m => b2c[m]?.gross || 0),
+          backgroundColor: 'rgba(52,211,153,0.85)',
+          borderRadius: 3,
+        },
+        {
+          label: 'B2C Net Revenue',
+          data: MONTHS.map(m => b2c[m]?.net || 0),
+          backgroundColor: 'rgba(52,211,153,0.35)',
+          borderColor: '#34d399',
+          borderWidth: 1,
+          borderRadius: 3,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#8892a4' } },
+        y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#8892a4', callback: v => fmt(v) } }
+      },
+      plugins: {
+        legend: { labels: { color: '#c0c8d8', font: { size: 12 }, padding: 16 } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.raw)}` } }
+      }
+    }
+  });
+}
+
+function renderChartMargin() {
+  destroyChart('margin');
+  const { b2b, b2c } = byMonthB2X();
+  const labels = MONTHS.map(m => LABELS[m]);
+  const b2bGM  = MONTHS.map(m => { const d=b2b[m]; return d&&d.net ? +(100*d.gm/d.net).toFixed(2) : null; });
+  const b2cGM  = MONTHS.map(m => { const d=b2c[m]; return d&&d.net ? +(100*d.gm/d.net).toFixed(2) : null; });
+  const b2bDP  = MONTHS.map(m => { const d=b2b[m]; return d&&d.gross ? +(100*(d.disc+d.adjDisc)/d.gross).toFixed(2) : null; });
+  const b2cDP  = MONTHS.map(m => { const d=b2c[m]; return d&&d.gross ? +(100*(d.disc+d.adjDisc)/d.gross).toFixed(2) : null; });
+  const ctx = document.getElementById('chartMargin').getContext('2d');
+  charts['margin'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'B2B GM%',       data:b2bGM,  borderColor:'#4f8ef7', borderWidth:2, pointRadius:3, fill:false, tension:.3 },
+        { label:'B2C GM%',       data:b2cGM,  borderColor:'#34d399', borderWidth:2, pointRadius:3, fill:false, tension:.3 },
+        { label:'B2B Disc%',     data:b2bDP,  borderColor:'rgba(79,142,247,.5)', borderWidth:1.5, pointRadius:2, fill:false, tension:.3, borderDash:[4,3] },
+        { label:'B2C Disc%',     data:b2cDP,  borderColor:'rgba(52,211,153,.5)', borderWidth:1.5, pointRadius:2, fill:false, tension:.3, borderDash:[4,3] },
+      ]
+    },
+    options: {
+      responsive:true, interaction:{mode:'index',intersect:false},
+      scales: {
+        x: { grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#8892a4'} },
+        y: { grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#8892a4', callback:v=>v+'%'} }
+      },
+      plugins: {
+        legend: { labels:{ color:'#8892a4', font:{size:11}, padding:10 } },
+        tooltip: { callbacks:{ label: ctx => `${ctx.dataset.label}: ${ctx.raw}%` } }
+      }
+    }
+  });
+}
+
+function renderChartNetCogs() {
+  destroyChart('netcogs');
+  const { b2b, b2c } = byMonthB2X();
+  const labels = MONTHS.map(m => LABELS[m]);
+  const ctx = document.getElementById('chartNetCogs').getContext('2d');
+  charts['netcogs'] = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        { label:'B2B Net Rev',  data:MONTHS.map(m=>b2b[m]?.net||0), borderColor:'#4f8ef7', borderWidth:2, pointRadius:3, fill:false, tension:.3 },
+        { label:'B2B COGS',     data:MONTHS.map(m=>b2b[m]?.cogs||0), borderColor:'rgba(79,142,247,.5)', borderWidth:1.5, pointRadius:2, fill:false, tension:.3, borderDash:[4,3] },
+        { label:'B2C Net Rev',  data:MONTHS.map(m=>b2c[m]?.net||0), borderColor:'#34d399', borderWidth:2, pointRadius:3, fill:false, tension:.3 },
+        { label:'B2C COGS',     data:MONTHS.map(m=>b2c[m]?.cogs||0), borderColor:'rgba(52,211,153,.5)', borderWidth:1.5, pointRadius:2, fill:false, tension:.3, borderDash:[4,3] },
+      ]
+    },
+    options:{
+      responsive:true, interaction:{mode:'index',intersect:false},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a4'}},
+        y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a4',callback:v=>fmt(v)}}
+      },
+      plugins:{
+        legend:{labels:{color:'#8892a4',font:{size:11},padding:10}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmt(ctx.raw)}`}}
+      }
+    }
+  });
+}
+
+function renderChartOrders() {
+  destroyChart('orders');
+  const { b2b, b2c } = byMonthB2X();
+  const labels = MONTHS.map(m => LABELS[m]);
+  const ctx = document.getElementById('chartOrders').getContext('2d');
+  charts['orders'] = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'B2B',data:MONTHS.map(m=>b2b[m]?.orders||0),backgroundColor:'rgba(79,142,247,0.75)',borderRadius:3},
+        {label:'B2C',data:MONTHS.map(m=>b2c[m]?.orders||0),backgroundColor:'rgba(52,211,153,0.75)',borderRadius:3}
+      ]
+    },
+    options:{
+      responsive:true, interaction:{mode:'index',intersect:false},
+      scales:{x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a4'}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a4'}}},
+      plugins:{legend:{labels:{color:'#8892a4',font:{size:11}}}}
+    }
+  });
+}
+
+function renderChartUnits() {
+  destroyChart('units');
+  const { b2b, b2c } = byMonthB2X();
+  const labels = MONTHS.map(m => LABELS[m]);
+  const ctx = document.getElementById('chartUnits').getContext('2d');
+  charts['units'] = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'B2B',data:MONTHS.map(m=>b2b[m]?.units||0),backgroundColor:'rgba(79,142,247,0.75)',borderRadius:3},
+        {label:'B2C',data:MONTHS.map(m=>b2c[m]?.units||0),backgroundColor:'rgba(52,211,153,0.75)',borderRadius:3}
+      ]
+    },
+    options:{
+      responsive:true, interaction:{mode:'index',intersect:false},
+      scales:{x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a4'}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a4'}}},
+      plugins:{legend:{labels:{color:'#8892a4',font:{size:11}}}}
+    }
+  });
+}
+
+// ── TABLE ─────────────────────────────────────
+function plBar(gross, totalDisc, net, cogs) {
+  const g = gross || 1;
+  const dp = Math.round(80 * totalDisc / g);
+  const np = Math.round(80 * net / g);
+  const cp = Math.round(80 * cogs / g);
+  return `<div style="display:inline-flex;gap:1px;height:10px;align-items:center">
+    <div title="Discount" style="width:${dp}px;height:10px;background:rgba(248,113,113,.65);border-radius:2px 0 0 2px"></div>
+    <div title="COGS" style="width:${Math.min(cp,np)}px;height:10px;background:rgba(251,191,36,.7)"></div>
+    <div title="Gross Margin" style="width:${Math.max(np-cp,0)}px;height:10px;background:rgba(52,211,153,.65);border-radius:0 2px 2px 0"></div>
+    <div title="COGS > Net" style="width:${Math.max(cp-np,0)}px;height:10px;background:rgba(248,113,113,.35);border-radius:0 2px 2px 0"></div>
+  </div>`;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('main-table');
+  const rows  = [];
+  const monthMap = {};
+  raw.forEach(r => { if (!monthMap[r.month]) monthMap[r.month] = []; monthMap[r.month].push(r); });
+
+  // Latest month first
+  MONTHS_DESC.forEach(mo => {
+    const entries = monthMap[mo] || [];
+    const show = activeChannel === 'ALL' ? entries : entries.filter(r => r.channel === activeChannel);
+    if (!show.length) return;
+
+    show.forEach(r => {
+      const totalDisc = r.disc + r.adjDisc;
+      const discPct   = r.gross ? 100 * totalDisc / r.gross : 0;
+      rows.push(`<tr class="${r.channel.toLowerCase()}-row">
+        <td>${LABELS[mo]}</td>
+        <td><span class="badge ${r.channel.toLowerCase()}">${r.channel}</span></td>
+        <td>${fmtN(r.orders)}</td>
+        <td>${fmtN(r.units)}</td>
+        <td>${fmt(r.gross)}</td>
+        <td style="color:#f87171">${fmt(totalDisc)}</td>
+        <td style="font-weight:600">${fmt(r.net)}</td>
+        <td style="color:#fbbf24">${fmt(r.cogs)}</td>
+        <td class="${gmClass(r.gmPct)}">${fmt(r.gm)}</td>
+        <td class="${gmClass(r.gmPct)}">${fmtPct(r.gmPct)}</td>
+        <td style="color:#f87171">${discPct.toFixed(1)}%</td>
+        <td>${plBar(r.gross, totalDisc, r.net, r.cogs)}</td>
+      </tr>`);
+    });
+
+    // Subtotal when both channels visible
+    if (activeChannel === 'ALL' && entries.length === 2) {
+      const s = totalOf(entries);
+      rows.push(`<tr class="subtotal-row">
+        <td>${LABELS[mo]} Total</td>
+        <td style="color:#8892a4;font-size:11px">B2B + B2C</td>
+        <td>${fmtN(s.orders)}</td>
+        <td>${fmtN(s.units)}</td>
+        <td>${fmt(s.gross)}</td>
+        <td style="color:#f87171">${fmt(s.disc+s.adjDisc)}</td>
+        <td style="font-weight:700">${fmt(s.net)}</td>
+        <td style="color:#fbbf24">${fmt(s.cogs)}</td>
+        <td class="${gmClass(s.gmPct)}">${fmt(s.gm)}</td>
+        <td class="${gmClass(s.gmPct)}">${fmtPct(s.gmPct)}</td>
+        <td style="color:#f87171">${s.discPct ? s.discPct.toFixed(1)+'%' : '—'}</td>
+        <td>${plBar(s.gross, s.disc+s.adjDisc, s.net, s.cogs)}</td>
+      </tr>`);
+    }
+  });
+
+  tbody.innerHTML = rows.join('');
+}
+
+// ── FILTER ────────────────────────────────────
+function setChannel(ch) {
+  activeChannel = ch;
+  ['all','b2b','b2c'].forEach(id => {
+    document.getElementById('ch-'+id).classList.toggle('active', id === ch.toLowerCase());
+  });
+  renderCards();
+  renderTable();
+}
+
+// ── SKU DATA ─────────────────────────────────
+const skuData = {
+  B2B: [
+    {sku:"AGS-CP-1496",name:"Agrostar Agetate Gold (Acephate 50% + Imidacloprid 1.8% SP) 1kg",units:2391,gross:2024161,disc:1168802,net:855359,cogs:1253721,gm:-398362,gmPct:-46.57,discPct:57.74},
+    {sku:"AGS-CP-1722",name:"Quiz Master Plus (Quizalofop Ethyl 10% EC) 1 litre",units:1317,gross:1870205,disc:1303323,net:566882,cogs:658588,gm:-91706,gmPct:-16.18,discPct:69.69},
+    {sku:"AGS-CP-1437",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 1 litre",units:2081,gross:1720415,disc:1179410,net:541005,cogs:662130,gm:-121125,gmPct:-22.39,discPct:68.55},
+    {sku:"AGS-CP-1631",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 1 litre",units:1039,gross:1587117,disc:1075829,net:511288,cogs:387458,gm:123830,gmPct:24.22,discPct:67.79},
+    {sku:"AGS-CP-1294",name:"Parashoot (Imazethapyr 10% SL) 1 litre",units:2123,gross:1484908,disc:912601,net:572307,cogs:936913,gm:-364606,gmPct:-63.71,discPct:61.46},
+    {sku:"AGS-CP-1632",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 500 ml",units:1808,gross:1397348,disc:969300,net:428048,cogs:345451,gm:82597,gmPct:19.3,discPct:69.37},
+    {sku:"AGS-CP-1309",name:"Omni Star (Bispyribac Sodium 10%SC) 500 ml",units:1933,gross:1365723,disc:853589,net:512134,cogs:793819,gm:-281685,gmPct:-55.0,discPct:62.5},
+    {sku:"AGS-CP-1500",name:"Weedlift (Pretilachlor 37% EW) 300 ml",units:6981,gross:1343169,disc:1005817,net:337352,cogs:587024,gm:-249672,gmPct:-74.01,discPct:74.88},
+    {sku:"AGS-CP-1536",name:"Eleos (Thiamethoxam 1% + Chlorantraniliprole 0.5% GR) 5 kg",units:1152,gross:1262916,disc:713644,net:549272,cogs:977898,gm:-428626,gmPct:-78.04,discPct:56.51},
+    {sku:"AGS-CP-1475",name:"Modesty (Imazethapyr 35% + Imazamox 35% WG) 200 gm",units:353,gross:1244509,disc:1079830,net:164679,cogs:703574,gm:-538895,gmPct:-327.24,discPct:86.77},
+    {sku:"AGS-CP-1540",name:"AgroStar Danzhi (Clothianidin 50% WG) 6 g",units:34020,gross:1208220,disc:967116,net:241104,cogs:487442,gm:-246338,gmPct:-102.17,discPct:80.04},
+    {sku:"AGS-CP-1563",name:"Unostar (Novaluron 5.25% + Emamectin Benzoate 0.9% SC) 1 litre",units:670,gross:1111430,disc:568192,net:543238,cogs:488034,gm:55204,gmPct:10.16,discPct:51.12},
+    {sku:"AGS-CP-1436",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 500 ml",units:2176,gross:952184,disc:690035,net:262149,cogs:389524,gm:-127375,gmPct:-48.59,discPct:72.47},
+    {sku:"AGS-CP-1568",name:"Mesozin Xtra (Mesotrione 2.27% + Atrazine 22.7% SC) 3.5lt",units:216,gross:774970,disc:550463,net:224507,cogs:460998,gm:-236491,gmPct:-105.34,discPct:71.03},
+    {sku:"AGS-CP-1755",name:"Treza (Tolfenpyrad 15% + Bifenthrin 7.5% SE) 1 Litre",units:199,gross:750625,disc:476088,net:274537,cogs:370152,gm:-95615,gmPct:-34.83,discPct:63.43},
+    {sku:"AGS-CP-926", name:"TeBull (Tebuconazole 10% + Sulphur 65% WG) 500 g",units:2736,gross:655294,disc:355331,net:299963,cogs:317662,gm:-17699,gmPct:-5.9,discPct:54.22},
+    {sku:"AGS-CP-1499",name:"Agrostar Agetate Gold (Acephate 50% + Imidacloprid 1.8% SP) 100g",units:5600,gross:530400,disc:361350,net:169050,cogs:350137,gm:-181087,gmPct:-107.12,discPct:68.13},
+    {sku:"AGS-CP-1713",name:"Petra 3D (Pyraclostrobin 3.5% + Thiram 15% + Clothianidin 22.5% FS) 500 ml",units:242,gross:528548,disc:409038,net:119510,cogs:327777,gm:-208267,gmPct:-174.27,discPct:77.39},
+    {sku:"AGS-CP-1308",name:"Omni Star (Bispyribac Sodium 10%SC) 200 ml",units:1570,gross:497690,disc:343476,net:154214,cogs:268746,gm:-114532,gmPct:-74.27,discPct:69.01},
+    {sku:"AGS-CP-1757",name:"Treza (Tolfenpyrad 15% + Bifenthrin 7.5% SE) 250 ml",units:460,gross:441380,disc:269545,net:171835,cogs:166237,gm:5598,gmPct:3.26,discPct:61.07},
+  ],
+  B2C: [
+    {sku:"AGS-CP-1722",name:"Quiz Master Plus (Quizalofop Ethyl 10% EC) 1 litre",units:403,gross:907837,disc:730388,net:177449,cogs:199019,gm:-21570,gmPct:-12.16,discPct:80.45},
+    {sku:"AGS-CP-1500",name:"Weedlift (Pretilachlor 37% EW) 300 ml",units:1398,gross:402048,disc:321612,net:80436,cogs:128946,gm:-48510,gmPct:-60.31,discPct:79.99},
+    {sku:"AGS-CP-1756",name:"Treza (Tolfenpyrad 15% + Bifenthrin 7.5% SE) 500 ml",units:171,gross:397987,disc:290108,net:107879,cogs:183279,gm:-75400,gmPct:-69.89,discPct:72.89},
+    {sku:"AGS-CP-1568",name:"Mesozin Xtra (Mesotrione 2.27% + Atrazine 22.7% SC) 3.5lt",units:78,gross:373458,disc:238568,net:134890,cogs:168194,gm:-33304,gmPct:-24.69,discPct:63.88},
+    {sku:"AGS-CP-1496",name:"Agrostar Agetate Gold (Acephate 50% + Imidacloprid 1.8% SP) 1kg",units:308,gross:327890,disc:186093,net:141797,cogs:178739,gm:-36942,gmPct:-26.05,discPct:56.75},
+    {sku:"AGS-CP-1437",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 1 litre",units:241,gross:323596,disc:213460,net:110136,cogs:83431,gm:26705,gmPct:24.25,discPct:65.97},
+    {sku:"AGS-CP-1631",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 1 litre",units:141,gross:319480,disc:196061,net:123419,cogs:72820,gm:50599,gmPct:41.0,discPct:61.37},
+    {sku:"AGS-CP-1636",name:"Agrostar Danzhi (Clothianidin 50% WDG) 50g",units:694,gross:293762,disc:226319,net:67443,cogs:69705,gm:-2262,gmPct:-3.35,discPct:77.04},
+    {sku:"AGS-CP-896", name:"Heliox (Profenophos 40% + Cypermethrin 4% EC) 250 ml",units:1218,gross:266742,disc:154942,net:111800,cogs:166415,gm:-54616,gmPct:-48.85,discPct:58.09},
+    {sku:"AGS-CP-1294",name:"Parashoot (Imazethapyr 10% SL) 1 litre",units:229,gross:264228,disc:174806,net:89422,cogs:102219,gm:-12797,gmPct:-14.31,discPct:66.16},
+    {sku:"AGS-CP-1436",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 500 ml",units:369,gross:261693,disc:174305,net:87388,cogs:69873,gm:17514,gmPct:20.04,discPct:66.61},
+    {sku:"AGS-CP-1713",name:"Petra 3D (Pyraclostrobin 3.5% + Thiram 15% + Clothianidin 22.5% FS) 500 ml",units:81,gross:234012,disc:173199,net:60813,cogs:109585,gm:-48772,gmPct:-80.2,discPct:74.01},
+    {sku:"AGS-CP-1560",name:"Kopigo (Chlorantraniliprole 9.3% + Lambda 4.6% ZC) 1 litre",units:42,gross:228788,disc:143657,net:85131,cogs:130854,gm:-45723,gmPct:-53.71,discPct:62.79},
+    {sku:"AGS-CP-1452",name:"AgroStar Zenith (Tolfenpyrad 15% EC) 1litre",units:102,gross:225453,disc:128693,net:96760,cogs:82810,gm:13950,gmPct:14.42,discPct:57.08},
+    {sku:"AGS-CP-1537",name:"AgroStar Danzhi (Clothianidin 50% WG) 100 g",units:273,gross:217000,disc:152520,net:64480,cogs:52231,gm:12249,gmPct:19.0,discPct:70.29},
+    {sku:"AGS-CP-1499",name:"Agrostar Agetate Gold (Acephate 50% + Imidacloprid 1.8% SP) 100g",units:1758,gross:216674,disc:147942,net:68732,cogs:112713,gm:-43981,gmPct:-63.99,discPct:68.28},
+    {sku:"AGS-CP-899", name:"Cooper 1 (Copper Oxychloride 50% WG) 500 g",units:316,gross:207219,disc:133782,net:73437,cogs:106762,gm:-33325,gmPct:-45.38,discPct:64.56},
+    {sku:"AGS-CP-1632",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 500 ml",units:166,gross:190599,disc:113171,net:77428,cogs:44216,gm:33212,gmPct:42.89,discPct:59.38},
+    {sku:"AGS-CP-926", name:"TeBull (Tebuconazole 10% + Sulphur 65% WG) 500 g",units:516,gross:185262,disc:103834,net:81428,cogs:61806,gm:19622,gmPct:24.1,discPct:56.05},
+    {sku:"AGS-CP-1714",name:"Petra 3D (Pyraclostrobin 3.5% + Thiram 15% + Clothianidin 22.5% FS) 250 ml",units:126,gross:183351,disc:141835,net:41516,cogs:87791,gm:-46275,gmPct:-111.46,discPct:77.36},
+  ]
+};
+
+function renderSkuTable(channel) {
+  const tbodyId = 'sku-table-' + channel.toLowerCase();
+  const tbody   = document.getElementById(tbodyId);
+  const rows    = [];
+  skuData[channel].forEach((r, i) => {
+    rows.push(`<tr class="${channel.toLowerCase()}-row">
+      <td style="text-align:left;color:var(--text-muted)">${i+1}</td>
+      <td style="text-align:left;font-size:11px;color:var(--text-muted)">${r.sku}</td>
+      <td style="text-align:left;max-width:280px;white-space:normal;line-height:1.4">${r.name}</td>
+      <td>${fmtN(r.units)}</td>
+      <td>${fmt(r.gross)}</td>
+      <td style="color:#f87171">${fmt(r.disc)}</td>
+      <td style="font-weight:600">${fmt(r.net)}</td>
+      <td style="color:#fbbf24">${fmt(r.cogs)}</td>
+      <td class="${gmClass(r.gmPct)}">${fmt(r.gm)}</td>
+      <td class="${gmClass(r.gmPct)}">${fmtPct(r.gmPct)}</td>
+      <td style="color:#f87171">${r.discPct.toFixed(1)}%</td>
+      <td>${plBar(r.gross, r.disc, r.net, r.cogs)}</td>
+    </tr>`);
+  });
+  tbody.innerHTML = rows.join('');
+}
+
+// ── INIT ──────────────────────────────────────
+renderCards();
+renderPrimary();
+renderTable();
+renderSkuTable('B2B');
+renderSkuTable('B2C');
+renderChartMargin();
+renderChartNetCogs();
+renderChartOrders();
+renderChartUnits();
+</script>
+</body>
+</html>
