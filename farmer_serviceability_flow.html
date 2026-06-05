@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Serviceability Analysis</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 24px 16px; color: #1a1a2e; }
+
+  /* ── TABS ── */
+  .tab-bar { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; }
+  .tab-btn {
+    padding: 9px 28px; border-radius: 8px; border: 2px solid #e2e8f0;
+    background: #fff; font-size: 13px; font-weight: 700; cursor: pointer; color: #64748b;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { border-color: #6366f1; color: #6366f1; }
+  .tab-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── PAGE HEADER ── */
+  .page-title { text-align: center; font-size: 17px; font-weight: 700; margin-bottom: 3px; }
+  .page-sub   { text-align: center; font-size: 11px; color: #666; margin-bottom: 18px; }
+
+  /* ── OVERALL STRIP ── */
+  .overall {
+    max-width: 1000px; margin: 0 auto 14px; background: #1e293b; color: #f8fafc;
+    border-radius: 14px; padding: 16px 24px;
+    display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 8px;
+  }
+  .overall-item { text-align: center; }
+  .overall-item .ol { font-size: 10px; color: #94a3b8; }
+  .overall-item .ov { font-size: 20px; font-weight: 800; }
+  .ov.green { color: #34d399; } .ov.red { color: #f87171; }
+  .ov.amber { color: #fbbf24; } .ov.white { color: #f8fafc; }
+  .sep { width: 1px; height: 32px; background: #334155; }
+
+  /* ── STATE CARDS ── */
+  .state-section { max-width: 1000px; margin: 0 auto 22px; }
+  .state-section h2 { font-size: 11px; color: #64748b; font-weight: 700; margin-bottom: 8px;
+    text-transform: uppercase; letter-spacing: 0.5px; }
+  .state-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .s-card {
+    background: #fff; border-radius: 10px; padding: 11px 8px; text-align: center;
+    border: 2px solid #e2e8f0; cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  }
+  .s-card:hover { border-color: #6366f1; box-shadow: 0 2px 10px rgba(99,102,241,0.15); transform: translateY(-1px); }
+  .s-card.active { border-color: #6366f1; background: #eef2ff; box-shadow: 0 3px 12px rgba(99,102,241,0.25); }
+  .s-state   { font-size: 9px; color: #64748b; font-weight: 700; margin-bottom: 3px; }
+  .s-total   { font-size: 12px; font-weight: 800; color: #1e293b; }
+  .s-svc     { font-size: 9px; font-weight: 600; color: #059669; margin: 1px 0; }
+  .s-orphan  { font-size: 9px; font-weight: 600; color: #d97706; margin: 1px 0; }
+  .s-pct     { font-size: 16px; font-weight: 800; margin: 2px 0; }
+  .bar-wrap  { background: #e5e7eb; border-radius: 4px; height: 5px; margin-top: 4px; }
+  .bar-fill  { height: 5px; border-radius: 4px; }
+  .deselect-hint { font-size: 9px; color: #6366f1; margin-top: 3px; display: none; }
+  .s-card.active .deselect-hint { display: block; }
+
+  /* ── FLOW ── */
+  .flow { display: flex; flex-direction: column; align-items: center; }
+  .arrow-down { width: 2px; height: 22px; background: #94a3b8; margin: 0 auto; }
+  .arrow-down::after { content:'▼'; display:block; text-align:center; color:#94a3b8; font-size:10px; margin-top:-2px; }
+  .split-row { display:flex; align-items:flex-start; justify-content:center; gap:0; width:100%; max-width:1300px; }
+  .split-col { display:flex; flex-direction:column; align-items:center; flex:1; }
+  .h-line { height:2px; background:#94a3b8; flex:1; margin-top:14px; }
+  .h-line-left  { border-radius:2px 0 0 0; }
+  .h-line-right { border-radius:0 2px 0 0; }
+  .v-stub { width:2px; height:14px; background:#94a3b8; }
+  .branch-label { font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; margin-bottom:5px; white-space:nowrap; }
+  .yes-label { background:#d1fae5; color:#065f46; }
+  .no-label  { background:#fee2e2; color:#991b1b; }
+
+  /* ── BOXES ── */
+  .box { border-radius:10px; padding:9px 13px; text-align:center; min-width:160px; max-width:230px; }
+  .box-title { font-size:11px; font-weight:700; margin-bottom:3px; }
+  .box-num   { font-size:18px; font-weight:800; margin:2px 0; }
+  .box-pct   { font-size:10px; color:#666; }
+  .box-note  { font-size:9px; color:#888; margin-top:3px; font-style:italic; }
+  .of-total  { display:inline-flex; align-items:center; background:#1e293b; color:#fbbf24;
+               font-size:10px; font-weight:800; padding:2px 7px; border-radius:20px; margin-top:4px; }
+  .box-root     { background:#1e293b; color:#f8fafc; min-width:260px; }
+  .box-root .box-pct { color:#94a3b8; }
+  .box-decision { background:#fff; border:2px solid #6366f1; }
+  .box-decision .box-title { color:#6366f1; }
+  .box-matched  { background:#ede9fe; border:2px solid #7c3aed; }
+  .box-matched .box-title { color:#5b21b6; }
+  .box-unmatched{ background:#fef3c7; border:2px solid #d97706; }
+  .box-unmatched .box-title { color:#92400e; }
+  .box-active   { background:#dbeafe; border:2px solid #2563eb; }
+  .box-active .box-title { color:#1d4ed8; }
+  .box-archived { background:#fce7f3; border:2px solid #db2777; }
+  .box-archived .box-title { color:#9d174d; }
+  .box-svc      { background:#d1fae5; border:2px solid #059669; }
+  .box-svc .box-title { color:#065f46; }
+  .box-not-svc  { background:#fee2e2; border:2px solid #dc2626; }
+  .box-not-svc .box-title { color:#991b1b; }
+  .box-repl     { background:#ffedd5; border:2px solid #ea580c; }
+  .box-repl .box-title { color:#9a3412; }
+  .box-norepl   { background:#f3f4f6; border:2px solid #6b7280; }
+  .box-norepl .box-title { color:#374151; }
+  .box-orphan   { background:#fef9c3; border:2px solid #d97706; }
+  .box-orphan .box-title { color:#92400e; }
+
+  .bucket { display:inline-block; font-size:9px; font-weight:800; padding:2px 5px; border-radius:3px; margin-bottom:3px; }
+  .b-svc     { background:#059669; color:#fff; }
+  .b-not-svc { background:#dc2626; color:#fff; }
+  .b-orphan  { background:#d97706; color:#fff; }
+  .conf { font-size:9px; padding:1px 5px; border-radius:3px; display:inline-block; margin-top:2px; }
+  .conf-high { background:#dbeafe; color:#1e40af; }
+  .conf-best { background:#fef9c3; color:#78350f; }
+</style>
+</head>
+<body>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('farmer')">🌾 Farmer Coverage</button>
+  <button class="tab-btn" onclick="switchTab('village')">🗺️ Village Address Master</button>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     TAB 1 — FARMER COVERAGE
+════════════════════════════════════════════════════ -->
+<div id="tab-farmer" class="tab-panel active">
+
+  <div class="page-title">Farmer Serviceability — Process Flow</div>
+  <div class="page-sub" id="f-page-sub">B2C Transacting Farmers · Last 3 Years · 5 States (GJ, MH, RJ, MP, UP) · Total Base = 7,07,652</div>
+
+  <!-- OVERALL STRIP -->
+  <div class="overall">
+    <div class="overall-item"><div class="ol">Total Farmers</div><div class="ov white" id="f-ov-total">7,07,652</div></div>
+    <div class="sep"></div>
+    <div class="overall-item"><div class="ol">Serviceable (B1+B3+B5+B7)</div><div class="ov green" id="f-ov-svc">5,30,442</div></div>
+    <div class="sep"></div>
+    <div class="overall-item"><div class="ol">Not Serviceable (B2+B4+B6+B8)</div><div class="ov red" id="f-ov-not">1,77,210</div></div>
+    <div class="sep"></div>
+    <div class="overall-item"><div class="ol">Overall Coverage</div><div class="ov green" id="f-ov-pct">74.9%</div></div>
+  </div>
+
+  <!-- STATE CARDS -->
+  <div class="state-section">
+    <h2>Filter by State — click to filter · click again to clear</h2>
+    <div class="state-grid">
+      <div class="s-card" data-tab="farmer" data-state="gujarat" onclick="selectState('farmer','gujarat')">
+        <div class="s-state">GUJARAT</div>
+        <div class="s-total">1,21,467 farmers</div>
+        <div class="s-svc">1,00,852 serviceable</div>
+        <div class="s-pct" style="color:#059669">83.0%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:83%;background:#059669"></div></div>
+        <div class="deselect-hint">✕ click to clear</div>
+      </div>
+      <div class="s-card" data-tab="farmer" data-state="maharashtra" onclick="selectState('farmer','maharashtra')">
+        <div class="s-state">MAHARASHTRA</div>
+        <div class="s-total">2,48,041 farmers</div>
+        <div class="s-svc">1,89,147 serviceable</div>
+        <div class="s-pct" style="color:#2563eb">76.3%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:76.3%;background:#2563eb"></div></div>
+        <div class="deselect-hint">✕ click to clear</div>
+      </div>
+      <div class="s-card" data-tab="farmer" data-state="madhya_pradesh" onclick="selectState('farmer','madhya_pradesh')">
+        <div class="s-state">MADHYA PRADESH</div>
+        <div class="s-total">90,978 farmers</div>
+        <div class="s-svc">68,174 serviceable</div>
+        <div class="s-pct" style="color:#7c3aed">74.9%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:74.9%;background:#7c3aed"></div></div>
+        <div class="deselect-hint">✕ click to clear</div>
+      </div>
+      <div class="s-card" data-tab="farmer" data-state="uttar_pradesh" onclick="selectState('farmer','uttar_pradesh')">
+        <div class="s-state">UTTAR PRADESH</div>
+        <div class="s-total">1,01,974 farmers</div>
+        <div class="s-svc">71,767 serviceable</div>
+        <div class="s-pct" style="color:#d97706">70.4%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:70.4%;background:#d97706"></div></div>
+        <div class="deselect-hint">✕ click to clear</div>
+      </div>
+      <div class="s-card" data-tab="farmer" data-state="rajasthan" onclick="selectState('farmer','rajasthan')">
+        <div class="s-state">RAJASTHAN</div>
+        <div class="s-total">1,45,192 farmers</div>
+        <div class="s-svc">1,00,502 serviceable</div>
+        <div class="s-pct" style="color:#dc2626">69.2%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:69.2%;background:#dc2626"></div></div>
+        <div class="deselect-hint">✕ click to clear</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FARMER FLOW -->
+  <div class="flow">
+    <div class="box box-root">
+      <div class="box-title">Total B2C Transacting Farmers</div>
+      <div class="box-num" id="f-n-total">7,07,652</div>
+      <div class="box-pct" id="f-n-sub">5 States · Last 3 Years · Latest order per farmer</div>
+    </div>
+    <div class="arrow-down"></div>
+    <div class="box box-decision" style="min-width:300px">
+      <div class="box-title">Is shipping address found in Village Master?</div>
+      <div class="box-note" style="color:#888;font-size:9px">concat match: state | district | taluka | village | pin_code</div>
+    </div>
+    <div class="split-row">
+      <!-- YES PATH -->
+      <div class="split-col" style="max-width:820px">
+        <div style="display:flex;align-items:center;width:100%">
+          <div class="h-line h-line-left"></div><div class="v-stub"></div>
+          <div class="h-line" style="max-width:50px;border-radius:0"></div>
+        </div>
+        <span class="branch-label yes-label">YES — Found in Master</span>
+        <div class="box box-matched">
+          <div class="box-title">Matched in Village Master</div>
+          <div class="box-num" id="f-n-matched">6,26,499</div>
+          <div class="box-pct"><span id="f-p-matched">88.5</span>% of total farmers</div>
+          <span class="of-total"><span id="f-b-matched">88.5%</span> <span class="f-lbl">of 7.07L</span></span>
+        </div>
+        <div class="arrow-down"></div>
+        <div class="box box-decision" style="min-width:260px">
+          <div class="box-title">Is the matched record Archived?</div>
+          <div class="box-note" style="color:#888;font-size:9px">is_archived = 0 (LGD active) · is_archived = 1 (old)</div>
+        </div>
+        <div class="split-row">
+          <!-- NOT ARCHIVED -->
+          <div class="split-col">
+            <div style="display:flex;align-items:center;width:100%">
+              <div class="h-line h-line-left"></div><div class="v-stub"></div>
+              <div class="h-line" style="max-width:36px;border-radius:0"></div>
+            </div>
+            <span class="branch-label yes-label">NOT ARCHIVED (LGD Record)</span>
+            <div class="box box-active">
+              <div class="box-title">Active / Clean LGD Record</div>
+              <div class="box-num" id="f-n-active">3,14,297</div>
+              <div class="box-pct"><span id="f-p-active">50.2</span>% of matched</div>
+              <span class="of-total"><span id="f-b-active">44.4%</span> <span class="f-lbl">of 7.07L</span></span>
+            </div>
+            <div class="arrow-down"></div>
+            <div class="box box-decision" style="min-width:190px">
+              <div class="box-title">Serviceable?</div>
+              <div class="box-note" style="color:#888;font-size:9px">village+pincode / taluka / pincode coverage</div>
+            </div>
+            <div class="split-row">
+              <div class="split-col">
+                <div style="display:flex;align-items:center;width:100%">
+                  <div class="h-line h-line-left"></div><div class="v-stub"></div>
+                  <div class="h-line" style="max-width:18px;border-radius:0"></div>
+                </div>
+                <span class="branch-label yes-label">YES</span>
+                <div class="box box-svc" style="min-width:138px">
+                  <span class="bucket b-svc">BUCKET 1</span>
+                  <div class="box-title">Serviceable ✅</div>
+                  <div class="box-num" id="f-n-b1">2,67,553</div>
+                  <div class="box-pct"><span id="f-p-b1">85.1</span>% of active</div>
+                  <span class="of-total"><span id="f-b-b1">37.8%</span> <span class="f-lbl">of 7.07L</span></span><br>
+                  <span class="conf conf-high">High confidence</span>
+                </div>
+              </div>
+              <div style="width:14px"></div>
+              <div class="split-col">
+                <div style="display:flex;align-items:center;width:100%">
+                  <div class="h-line" style="max-width:18px;border-radius:0"></div><div class="v-stub"></div>
+                  <div class="h-line h-line-right"></div>
+                </div>
+                <span class="branch-label no-label">NO</span>
+                <div class="box box-not-svc" style="min-width:138px">
+                  <span class="bucket b-not-svc">BUCKET 2</span>
+                  <div class="box-title">Not Serviceable ❌</div>
+                  <div class="box-num" id="f-n-b2">46,744</div>
+                  <div class="box-pct"><span id="f-p-b2">14.9</span>% of active</div>
+                  <span class="of-total"><span id="f-b-b2">6.6%</span> <span class="f-lbl">of 7.07L</span></span><br>
+                  <span class="conf conf-high">High confidence</span>
+                  <div class="box-note">Expansion target</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="width:22px"></div>
+          <!-- ARCHIVED -->
+          <div class="split-col">
+            <div style="display:flex;align-items:center;width:100%">
+              <div class="h-line" style="max-width:36px;border-radius:0"></div><div class="v-stub"></div>
+              <div class="h-line h-line-right"></div>
+            </div>
+            <span class="branch-label no-label">ARCHIVED (Old Record)</span>
+            <div class="box box-archived">
+              <div class="box-title">Archived Record</div>
+              <div class="box-num" id="f-n-archived">3,12,202</div>
+              <div class="box-pct"><span id="f-p-archived">49.8</span>% of matched</div>
+              <span class="of-total"><span id="f-b-archived">44.1%</span> <span class="f-lbl">of 7.07L</span></span>
+            </div>
+            <div class="arrow-down"></div>
+            <div class="box box-decision" style="min-width:230px">
+              <div class="box-title">Has replaced_by_id?</div>
+              <div class="box-note" style="color:#888;font-size:9px">points to canonical LGD replacement record</div>
+            </div>
+            <div class="split-row">
+              <!-- HAS REPL -->
+              <div class="split-col">
+                <div style="display:flex;align-items:center;width:100%">
+                  <div class="h-line h-line-left"></div><div class="v-stub"></div>
+                  <div class="h-line" style="max-width:26px;border-radius:0"></div>
+                </div>
+                <span class="branch-label yes-label">YES — Has Replacement</span>
+                <div class="box box-repl" style="min-width:158px">
+                  <div class="box-title">Resolve to Replacement Record</div>
+                  <div class="box-num" id="f-n-has-repl">2,88,223</div>
+                  <div class="box-pct"><span id="f-p-has-repl">92.3</span>% of archived</div>
+                  <span class="of-total"><span id="f-b-has-repl">40.7%</span> <span class="f-lbl">of 7.07L</span></span>
+                </div>
+                <div class="arrow-down"></div>
+                <div class="box box-decision" style="min-width:178px">
+                  <div class="box-title">Replacement Serviceable?</div>
+                </div>
+                <div class="split-row">
+                  <div class="split-col">
+                    <div style="display:flex;align-items:center;width:100%">
+                      <div class="h-line h-line-left"></div><div class="v-stub"></div>
+                      <div class="h-line" style="max-width:16px;border-radius:0"></div>
+                    </div>
+                    <span class="branch-label yes-label">YES</span>
+                    <div class="box box-svc" style="min-width:118px">
+                      <span class="bucket b-svc">BUCKET 3</span>
+                      <div class="box-title">Serviceable ✅</div>
+                      <div class="box-num" id="f-n-b3">2,15,806</div>
+                      <div class="box-pct"><span id="f-p-b3">74.9</span>% of has-repl</div>
+                      <span class="of-total"><span id="f-b-b3">30.5%</span> <span class="f-lbl">of 7.07L</span></span><br>
+                      <span class="conf conf-high">High confidence</span>
+                    </div>
+                  </div>
+                  <div style="width:12px"></div>
+                  <div class="split-col">
+                    <div style="display:flex;align-items:center;width:100%">
+                      <div class="h-line" style="max-width:16px;border-radius:0"></div><div class="v-stub"></div>
+                      <div class="h-line h-line-right"></div>
+                    </div>
+                    <span class="branch-label no-label">NO</span>
+                    <div class="box box-not-svc" style="min-width:118px">
+                      <span class="bucket b-not-svc">BUCKET 4</span>
+                      <div class="box-title">Not Serviceable ❌</div>
+                      <div class="box-num" id="f-n-b4">72,417</div>
+                      <div class="box-pct"><span id="f-p-b4">25.1</span>% of has-repl</div>
+                      <span class="of-total"><span id="f-b-b4">10.2%</span> <span class="f-lbl">of 7.07L</span></span><br>
+                      <span class="conf conf-high">High confidence</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="width:16px"></div>
+              <!-- NO REPL -->
+              <div class="split-col">
+                <div style="display:flex;align-items:center;width:100%">
+                  <div class="h-line" style="max-width:26px;border-radius:0"></div><div class="v-stub"></div>
+                  <div class="h-line h-line-right"></div>
+                </div>
+                <span class="branch-label no-label">NO — Truly Retired</span>
+                <div class="box box-norepl" style="min-width:158px">
+                  <div class="box-title">No Replacement Record</div>
+                  <div class="box-num" id="f-n-no-repl">23,979</div>
+                  <div class="box-pct"><span id="f-p-no-repl">7.7</span>% of archived</div>
+                  <span class="of-total"><span id="f-b-no-repl">3.4%</span> <span class="f-lbl">of 7.07L</span></span>
+                  <div class="box-note">Fall to raw address check</div>
+                </div>
+                <div class="arrow-down"></div>
+                <div class="box box-decision" style="min-width:178px">
+                  <div class="box-title">Raw Address Serviceable?</div>
+                  <div class="box-note" style="color:#888;font-size:9px">state+taluka+village+pincode vs coverage</div>
+                </div>
+                <div class="split-row">
+                  <div class="split-col">
+                    <div style="display:flex;align-items:center;width:100%">
+                      <div class="h-line h-line-left"></div><div class="v-stub"></div>
+                      <div class="h-line" style="max-width:16px;border-radius:0"></div>
+                    </div>
+                    <span class="branch-label yes-label">YES</span>
+                    <div class="box box-svc" style="min-width:108px">
+                      <span class="bucket b-svc">BUCKET 5</span>
+                      <div class="box-title">Serviceable ✅</div>
+                      <div class="box-num" id="f-n-b5">7,280</div>
+                      <div class="box-pct"><span id="f-p-b5">30.4</span>% of no-repl</div>
+                      <span class="of-total"><span id="f-b-b5">1.0%</span> <span class="f-lbl">of 7.07L</span></span><br>
+                      <span class="conf conf-best">Best effort</span>
+                    </div>
+                  </div>
+                  <div style="width:12px"></div>
+                  <div class="split-col">
+                    <div style="display:flex;align-items:center;width:100%">
+                      <div class="h-line" style="max-width:16px;border-radius:0"></div><div class="v-stub"></div>
+                      <div class="h-line h-line-right"></div>
+                    </div>
+                    <span class="branch-label no-label">NO</span>
+                    <div class="box box-not-svc" style="min-width:108px">
+                      <span class="bucket b-not-svc">BUCKET 6</span>
+                      <div class="box-title">Not Serviceable ❌</div>
+                      <div class="box-num" id="f-n-b6">16,699</div>
+                      <div class="box-pct"><span id="f-p-b6">69.6</span>% of no-repl</div>
+                      <span class="of-total"><span id="f-b-b6">2.4%</span> <span class="f-lbl">of 7.07L</span></span><br>
+                      <span class="conf conf-best">Best effort</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- NO PATH -->
+      <div class="split-col" style="max-width:240px">
+        <div style="display:flex;align-items:center;width:100%">
+          <div class="h-line" style="max-width:50px;border-radius:0"></div><div class="v-stub"></div>
+          <div class="h-line h-line-right"></div>
+        </div>
+        <span class="branch-label no-label">NO — Not in Master</span>
+        <div class="box box-unmatched">
+          <div class="box-title">Address Not in Village Master</div>
+          <div class="box-num" id="f-n-unmatched">81,153</div>
+          <div class="box-pct"><span id="f-p-unmatched">11.5</span>% of total farmers</div>
+          <span class="of-total"><span id="f-b-unmatched">11.5%</span> <span class="f-lbl">of 7.07L</span></span>
+          <div class="box-note">Free-text entry — typos, non-standard names</div>
+        </div>
+        <div class="arrow-down"></div>
+        <div class="box box-decision" style="min-width:198px">
+          <div class="box-title">Raw Address Serviceable?</div>
+          <div class="box-note" style="color:#888;font-size:9px">state+taluka+village+pincode vs coverage</div>
+        </div>
+        <div class="split-row" style="max-width:240px">
+          <div class="split-col">
+            <div style="display:flex;align-items:center;width:100%">
+              <div class="h-line h-line-left"></div><div class="v-stub"></div>
+              <div class="h-line" style="max-width:16px;border-radius:0"></div>
+            </div>
+            <span class="branch-label yes-label">YES</span>
+            <div class="box box-svc" style="min-width:98px">
+              <span class="bucket b-svc">BUCKET 7</span>
+              <div class="box-title">Serviceable ✅</div>
+              <div class="box-num" id="f-n-b7">39,803</div>
+              <div class="box-pct"><span id="f-p-b7">49.0</span>% of no-match</div>
+              <span class="of-total"><span id="f-b-b7">5.6%</span> <span class="f-lbl">of 7.07L</span></span><br>
+              <span class="conf conf-best">Best effort</span>
+            </div>
+          </div>
+          <div style="width:12px"></div>
+          <div class="split-col">
+            <div style="display:flex;align-items:center;width:100%">
+              <div class="h-line" style="max-width:16px;border-radius:0"></div><div class="v-stub"></div>
+              <div class="h-line h-line-right"></div>
+            </div>
+            <span class="branch-label no-label">NO</span>
+            <div class="box box-not-svc" style="min-width:98px">
+              <span class="bucket b-not-svc">BUCKET 8</span>
+              <div class="box-title">Not Serviceable ❌</div>
+              <div class="box-num" id="f-n-b8">41,350</div>
+              <div class="box-pct"><span id="f-p-b8">51.0</span>% of no-match</div>
+              <span class="of-total"><span id="f-b-b8">5.8%</span> <span class="f-lbl">of 7.07L</span></span><br>
+              <span class="conf conf-best">Best effort</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- end farmer flow -->
+</div><!-- end tab-farmer -->
+
+
+<!-- ════════════════════════════════════════════════════
+     TAB 2 — VILLAGE ADDRESS MASTER
+════════════════════════════════════════════════════ -->
+<div id="tab-village" class="tab-panel">
+
+  <div class="page-title">Village Address Master — Serviceability Coverage</div>
+  <div class="page-sub" id="v-page-sub">All Villages in Master · 5 States (GJ, MH, RJ, MP, UP) · Total = 6,52,140</div>
+
+  <!-- OVERALL STRIP -->
+  <div class="overall">
+    <div class="overall-item"><div class="ol">Total Villages</div><div class="ov white" id="v-ov-total">6,52,140</div></div>
+    <div class="sep"></div>
+    <div class="overall-item"><div class="ol">Serviceable (B1+B3)</div><div class="ov green" id="v-ov-svc">3,23,767</div></div>
+    <div class="sep"></div>
+    <div class="overall-item"><div class="ol">Not Serviceable (B2+B4)</div><div class="ov red" id="v-ov-not">2,35,126</div></div>
+    <div class="sep"></div>
+    <div class="overall-item"><div class="ol">Orphaned — No Mapping (B5)</div><div class="ov amber" id="v-ov-orphan">93,247</div></div>
+    <div class="sep"></div>
+    <div class="overall-item"><div class="ol">Coverage (of evaluable)</div><div class="ov green" id="v-ov-pct">57.9%</div></div>
+  </div>
+
+  <!-- STATE CARDS -->
+  <div class="state-section">
+    <h2>Filter by State — click to filter · click again to clear</h2>
+    <div class="state-grid">
+      <div class="s-card" data-tab="village" data-state="gujarat" onclick="selectState('village','gujarat')">
+        <div class="s-state">GUJARAT</div>
+        <div class="s-total">65,509 villages</div>
+        <div class="s-svc">43,551 serviceable</div>
+        <div class="s-orphan">9,396 orphaned</div>
+        <div class="s-pct" style="color:#059669">77.8%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:77.8%;background:#059669"></div></div>
+        <div class="deselect-hint">✕ click to clear</div>
+      </div>
+      <div class="s-card" data-tab="village" data-state="maharashtra" onclick="selectState('village','maharashtra')">
+        <div class="s-state">MAHARASHTRA</div>
+        <div class="s-total">94,683 villages</div>
+        <div class="s-svc">49,429 serviceable</div>
+        <div class="s-orphan">4,663 orphaned</div>
+        <div class="s-pct" style="color:#2563eb">54.8%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:54.8%;background:#2563eb"></div></div>
+        <div class="deselect-hint">✕ click to clear</div>
+      </div>
+      <div class="s-card" data-tab="village" data-state="madhya_pradesh" onclick="selectState('village','madhya_pradesh')">
+        <div class="s-state">MADHYA PRADESH</div>
+        <div class="s-total">1,23,932 villages</div>
+        <div class="s-svc">57,625 serviceable</div>
+        <div class="s-orphan">6,245 orphaned</div>
+        <div class="s-pct" style="color:#7c3aed">48.9%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:48.9%;background:#7c3aed"></div></div>
+        <div class="deselect-hint">✕ click to clear</div>
+      </div>
+      <div class="s-card" data-tab="village" data-state="uttar_pradesh" onclick="selectState('village','uttar_pradesh')">
+        <div class="s-state">UTTAR PRADESH</div>
+        <div class="s-total">2,62,772 villages</div>
+        <div class="s-svc">1,25,827 serviceable</div>
+        <div class="s-orphan">68,031 orphaned</div>
+        <div class="s-pct" style="color:#d97706">64.3%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:64.3%;background:#d97706"></div></div>
+        <div class="deselect-hint">✕ click to clear</div>
+      </div>
+      <div class="s-card" data-tab="village" data-state="rajasthan" onclick="selectState('village','rajasthan')">
+        <div class="s-state">RAJASTHAN</div>
+        <div class="s-total">1,05,244 villages</div>
+        <div class="s-svc">47,335 serviceable</div>
+        <div class="s-orphan">4,912 orphaned</div>
+        <div class="s-pct" style="color:#dc2626">47.4%</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:47.4%;background:#dc2626"></div></div>
+        <div class="deselect-hint">✕ click to clear</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VILLAGE FLOW -->
+  <div class="flow">
+    <div class="box box-root">
+      <div class="box-title">Total Villages in Address Master</div>
+      <div class="box-num" id="v-n-total">6,52,140</div>
+      <div class="box-pct" id="v-n-sub">5 States · LGD active + archived records combined</div>
+    </div>
+    <div class="arrow-down"></div>
+    <div class="box box-decision" style="min-width:280px">
+      <div class="box-title">Is the village record Archived?</div>
+      <div class="box-note" style="color:#888;font-size:9px">is_archived = 0 (LGD active) · is_archived = 1 (old / retired)</div>
+    </div>
+
+    <div class="split-row">
+      <!-- NOT ARCHIVED PATH -->
+      <div class="split-col" style="max-width:480px">
+        <div style="display:flex;align-items:center;width:100%">
+          <div class="h-line h-line-left"></div><div class="v-stub"></div>
+          <div class="h-line" style="max-width:44px;border-radius:0"></div>
+        </div>
+        <span class="branch-label yes-label">NOT ARCHIVED — Active LGD Record</span>
+        <div class="box box-active">
+          <div class="box-title">Active / Clean LGD Record</div>
+          <div class="box-num" id="v-n-active">2,84,064</div>
+          <div class="box-pct"><span id="v-p-active">43.6</span>% of total villages</div>
+          <span class="of-total"><span id="v-b-active">43.6%</span> <span class="v-lbl">of 6.52L</span></span>
+        </div>
+        <div class="arrow-down"></div>
+        <div class="box box-decision" style="min-width:200px">
+          <div class="box-title">Is this village Serviceable?</div>
+          <div class="box-note" style="color:#888;font-size:9px">village+pincode / taluka / pincode coverage match</div>
+        </div>
+        <div class="split-row">
+          <div class="split-col">
+            <div style="display:flex;align-items:center;width:100%">
+              <div class="h-line h-line-left"></div><div class="v-stub"></div>
+              <div class="h-line" style="max-width:18px;border-radius:0"></div>
+            </div>
+            <span class="branch-label yes-label">YES</span>
+            <div class="box box-svc" style="min-width:148px">
+              <span class="bucket b-svc">BUCKET 1</span>
+              <div class="box-title">Serviceable ✅</div>
+              <div class="box-num" id="v-n-b1">1,60,726</div>
+              <div class="box-pct"><span id="v-p-b1">56.6</span>% of active</div>
+              <span class="of-total"><span id="v-b-b1">56.6%</span> <span class="v-lbl-active">of 2.84L</span></span><br>
+              <span class="conf conf-high">High confidence</span>
+            </div>
+          </div>
+          <div style="width:14px"></div>
+          <div class="split-col">
+            <div style="display:flex;align-items:center;width:100%">
+              <div class="h-line" style="max-width:18px;border-radius:0"></div><div class="v-stub"></div>
+              <div class="h-line h-line-right"></div>
+            </div>
+            <span class="branch-label no-label">NO</span>
+            <div class="box box-not-svc" style="min-width:148px">
+              <span class="bucket b-not-svc">BUCKET 2</span>
+              <div class="box-title">Not Serviceable ❌</div>
+              <div class="box-num" id="v-n-b2">1,23,338</div>
+              <div class="box-pct"><span id="v-p-b2">43.4</span>% of active</div>
+              <span class="of-total"><span id="v-b-b2">43.4%</span> <span class="v-lbl-active">of 2.84L</span></span><br>
+              <span class="conf conf-high">High confidence</span>
+              <div class="box-note">Logistics gap — expansion opportunity</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:28px"></div>
+
+      <!-- ARCHIVED PATH -->
+      <div class="split-col" style="max-width:600px">
+        <div style="display:flex;align-items:center;width:100%">
+          <div class="h-line" style="max-width:44px;border-radius:0"></div><div class="v-stub"></div>
+          <div class="h-line h-line-right"></div>
+        </div>
+        <span class="branch-label no-label">ARCHIVED — Old / Retired Record</span>
+        <div class="box box-archived">
+          <div class="box-title">Archived Record</div>
+          <div class="box-num" id="v-n-archived">3,68,076</div>
+          <div class="box-pct"><span id="v-p-archived">56.4</span>% of total villages</div>
+          <span class="of-total"><span id="v-b-archived">56.4%</span> <span class="v-lbl">of 6.52L</span></span>
+          <div class="box-note">Old DB records — spelling errors, wrong geography</div>
+        </div>
+        <div class="arrow-down"></div>
+        <div class="box box-decision" style="min-width:250px">
+          <div class="box-title">Has replaced_by_id?</div>
+          <div class="box-note" style="color:#888;font-size:9px">points to the canonical LGD replacement record</div>
+        </div>
+
+        <div class="split-row">
+          <!-- HAS REPLACEMENT -->
+          <div class="split-col">
+            <div style="display:flex;align-items:center;width:100%">
+              <div class="h-line h-line-left"></div><div class="v-stub"></div>
+              <div class="h-line" style="max-width:28px;border-radius:0"></div>
+            </div>
+            <span class="branch-label yes-label">YES — Mapped to New Record</span>
+            <div class="box box-repl" style="min-width:168px">
+              <div class="box-title">Resolve to Replacement Record</div>
+              <div class="box-num" id="v-n-has-repl">2,74,829</div>
+              <div class="box-pct"><span id="v-p-has-repl">74.7</span>% of archived</div>
+              <span class="of-total"><span id="v-b-has-repl">74.7%</span> <span class="v-lbl-archived">of 3.68L</span></span>
+            </div>
+            <div class="arrow-down"></div>
+            <div class="box box-decision" style="min-width:190px">
+              <div class="box-title">Replacement Serviceable?</div>
+              <div class="box-note" style="color:#888;font-size:9px">check serviceability of the new canonical record</div>
+            </div>
+            <div class="split-row">
+              <div class="split-col">
+                <div style="display:flex;align-items:center;width:100%">
+                  <div class="h-line h-line-left"></div><div class="v-stub"></div>
+                  <div class="h-line" style="max-width:16px;border-radius:0"></div>
+                </div>
+                <span class="branch-label yes-label">YES</span>
+                <div class="box box-svc" style="min-width:128px">
+                  <span class="bucket b-svc">BUCKET 3</span>
+                  <div class="box-title">Serviceable ✅</div>
+                  <div class="box-num" id="v-n-b3">1,63,041</div>
+                  <div class="box-pct"><span id="v-p-b3">59.3</span>% of has-repl</div>
+                  <span class="of-total"><span id="v-b-b3">44.3%</span> <span class="v-lbl-archived">of 3.68L</span></span><br>
+                  <span class="conf conf-high">High confidence</span>
+                </div>
+              </div>
+              <div style="width:12px"></div>
+              <div class="split-col">
+                <div style="display:flex;align-items:center;width:100%">
+                  <div class="h-line" style="max-width:16px;border-radius:0"></div><div class="v-stub"></div>
+                  <div class="h-line h-line-right"></div>
+                </div>
+                <span class="branch-label no-label">NO</span>
+                <div class="box box-not-svc" style="min-width:128px">
+                  <span class="bucket b-not-svc">BUCKET 4</span>
+                  <div class="box-title">Not Serviceable ❌</div>
+                  <div class="box-num" id="v-n-b4">1,11,788</div>
+                  <div class="box-pct"><span id="v-p-b4">40.7</span>% of has-repl</div>
+                  <span class="of-total"><span id="v-b-b4">30.4%</span> <span class="v-lbl-archived">of 3.68L</span></span><br>
+                  <span class="conf conf-high">High confidence</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="width:18px"></div>
+
+          <!-- NO REPLACEMENT — ORPHANED -->
+          <div class="split-col">
+            <div style="display:flex;align-items:center;width:100%">
+              <div class="h-line" style="max-width:28px;border-radius:0"></div><div class="v-stub"></div>
+              <div class="h-line h-line-right"></div>
+            </div>
+            <span class="branch-label no-label">NO — No Mapping Exists</span>
+            <div class="box box-orphan" style="min-width:168px">
+              <span class="bucket b-orphan">BUCKET 5</span>
+              <div class="box-title">Orphaned ⚠️</div>
+              <div class="box-num" id="v-n-b5">93,247</div>
+              <div class="box-pct"><span id="v-p-b5">25.3</span>% of archived</div>
+              <span class="of-total"><span id="v-b-b5">25.3%</span> <span class="v-lbl-archived">of 3.68L</span></span>
+              <div class="box-note">Retired with no LGD equivalent — serviceability cannot be determined</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- end village flow -->
+</div><!-- end tab-village -->
+
+
+<script>
+/* ── FARMER DATA ── */
+const F = {
+  all:           { b1:267553, b2:46744,  b3:215806, b4:72417, b5:7280,  b6:16699, b7:39803, b8:41350 },
+  gujarat:       { b1:46736,  b2:1869,   b3:49117,  b4:15696, b5:1410,  b6:713,   b7:3589,  b8:2337  },
+  maharashtra:   { b1:117132, b2:23244,  b3:57800,  b4:14787, b5:416,   b6:4983,  b7:13799, b8:15880 },
+  madhya_pradesh:{ b1:42085,  b2:6001,   b3:25727,  b4:12574, b5:24,    b6:1209,  b7:338,   b8:3020  },
+  uttar_pradesh: { b1:34862,  b2:5934,   b3:15263,  b4:4208,  b5:5430,  b6:5787,  b7:16212, b8:14278 },
+  rajasthan:     { b1:26738,  b2:9696,   b3:67899,  b4:25152, b5:0,     b6:4007,  b7:5865,  b8:5835  }
+};
+
+/* ── VILLAGE DATA (b1=active svc, b2=active not-svc, b3=archived repl svc, b4=archived repl not-svc, b5=orphaned) ── */
+const V = {
+  all:           { b1:160726, b2:123338, b3:163041, b4:111788, b5:93247 },
+  gujarat:       { b1:13205,  b2:5940,   b3:30346,  b4:6622,   b5:9396  },
+  maharashtra:   { b1:24540,  b2:20305,  b3:24889,  b4:20286,  b5:4663  },
+  madhya_pradesh:{ b1:27443,  b2:30398,  b3:30182,  b4:29664,  b5:6245  },
+  uttar_pradesh: { b1:71252,  b2:39378,  b3:54575,  b4:29536,  b5:68031 },
+  rajasthan:     { b1:24286,  b2:27317,  b3:23049,  b4:25680,  b5:4912  }
+};
+
+const STATE_LABELS = {
+  all:'5 States (GJ, MH, RJ, MP, UP)', gujarat:'Gujarat', maharashtra:'Maharashtra',
+  madhya_pradesh:'Madhya Pradesh', uttar_pradesh:'Uttar Pradesh', rajasthan:'Rajasthan'
+};
+
+let activeF = null, activeV = null;
+
+function fmt(n) {
+  if (n === 0) return '0';
+  const s = String(n);
+  if (s.length <= 3) return s;
+  let res = s.slice(-3), rem = s.slice(0, s.length - 3);
+  while (rem.length > 2) { res = rem.slice(-2) + ',' + res; rem = rem.slice(0, rem.length - 2); }
+  return rem + ',' + res;
+}
+function pct(a, b) { return b === 0 ? '0.0' : (a * 100 / b).toFixed(1); }
+function lac(n)    { return (Math.floor(n / 1000) / 100).toFixed(2) + 'L'; }
+function set(id, v){ const e = document.getElementById(id); if (e) e.textContent = v; }
+
+/* ── FARMER UPDATE ── */
+function updateFarmer(sk) {
+  const d = F[sk || 'all'];
+  const total   = d.b1+d.b2+d.b3+d.b4+d.b5+d.b6+d.b7+d.b8;
+  const matched = d.b1+d.b2+d.b3+d.b4+d.b5+d.b6;
+  const active  = d.b1+d.b2, archived = d.b3+d.b4+d.b5+d.b6;
+  const hasR    = d.b3+d.b4, noR = d.b5+d.b6, unm = d.b7+d.b8;
+  const svc     = d.b1+d.b3+d.b5+d.b7, not = d.b2+d.b4+d.b6+d.b8;
+  const lbl = STATE_LABELS[sk||'all'], L = lac(total);
+
+  set('f-page-sub',  `B2C Transacting Farmers · Last 3 Years · ${lbl} · Total Base = ${fmt(total)}`);
+  set('f-ov-total', fmt(total)); set('f-ov-svc', fmt(svc)); set('f-ov-not', fmt(not));
+  set('f-ov-pct',   pct(svc,total)+'%');
+  set('f-n-total', fmt(total));
+  set('f-n-sub',   `${lbl} · Last 3 Years · Latest order per farmer`);
+
+  set('f-n-matched',  fmt(matched)); set('f-p-matched',  pct(matched,total)); set('f-b-matched',  pct(matched,total)+'%');
+  set('f-n-active',   fmt(active));  set('f-p-active',   pct(active,matched)); set('f-b-active',   pct(active,total)+'%');
+  set('f-n-archived', fmt(archived));set('f-p-archived',  pct(archived,matched));set('f-b-archived', pct(archived,total)+'%');
+  set('f-n-has-repl', fmt(hasR));    set('f-p-has-repl',  pct(hasR,archived)); set('f-b-has-repl',  pct(hasR,total)+'%');
+  set('f-n-no-repl',  fmt(noR));     set('f-p-no-repl',   pct(noR,archived));  set('f-b-no-repl',   pct(noR,total)+'%');
+  set('f-n-unmatched',fmt(unm));     set('f-p-unmatched', pct(unm,total));      set('f-b-unmatched', pct(unm,total)+'%');
+
+  [['b1',active],['b2',active],['b3',hasR],['b4',hasR],['b5',noR],['b6',noR],['b7',unm],['b8',unm]].forEach(([b,par])=>{
+    set(`f-n-${b}`, fmt(d[b]));
+    set(`f-p-${b}`, pct(d[b],par));
+    set(`f-b-${b}`, pct(d[b],total)+'%');
+  });
+  document.querySelectorAll('.f-lbl').forEach(e => e.textContent = `of ${L}`);
+}
+
+/* ── VILLAGE UPDATE ── */
+function updateVillage(sk) {
+  const d = V[sk || 'all'];
+  const total   = d.b1+d.b2+d.b3+d.b4+d.b5;
+  const active  = d.b1+d.b2, archived = d.b3+d.b4+d.b5;
+  const hasR    = d.b3+d.b4, orphaned = d.b5;
+  const svc     = d.b1+d.b3, not = d.b2+d.b4;
+  const evalBase = total - orphaned;
+  const lbl = STATE_LABELS[sk||'all'], L = lac(total);
+
+  set('v-page-sub',  `All Villages in Master · ${lbl} · Total = ${fmt(total)}`);
+  set('v-ov-total',  fmt(total)); set('v-ov-svc', fmt(svc)); set('v-ov-not', fmt(not));
+  set('v-ov-orphan', fmt(orphaned));
+  set('v-ov-pct',    pct(svc,evalBase)+'%');
+  set('v-n-total',   fmt(total));
+  set('v-n-sub',     `${lbl} · LGD active + archived records combined`);
+
+  set('v-n-active',   fmt(active));   set('v-p-active',   pct(active,total));   set('v-b-active',   pct(active,total)+'%');
+  set('v-n-archived', fmt(archived)); set('v-p-archived',  pct(archived,total)); set('v-b-archived', pct(archived,total)+'%');
+  set('v-n-has-repl', fmt(hasR));     set('v-p-has-repl',  pct(hasR,archived));  set('v-b-has-repl', pct(hasR,archived)+'%');
+  set('v-n-b1', fmt(d.b1)); set('v-p-b1', pct(d.b1,active));  set('v-b-b1', pct(d.b1,active)+'%');
+  set('v-n-b2', fmt(d.b2)); set('v-p-b2', pct(d.b2,active));  set('v-b-b2', pct(d.b2,active)+'%');
+  set('v-n-b3', fmt(d.b3)); set('v-p-b3', pct(d.b3,hasR));    set('v-b-b3', pct(d.b3,archived)+'%');
+  set('v-n-b4', fmt(d.b4)); set('v-p-b4', pct(d.b4,hasR));    set('v-b-b4', pct(d.b4,archived)+'%');
+  set('v-n-b5', fmt(orphaned)); set('v-p-b5', pct(orphaned,archived)); set('v-b-b5', pct(orphaned,archived)+'%');
+  document.querySelectorAll('.v-lbl').forEach(e => e.textContent = `of ${L}`);
+  document.querySelectorAll('.v-lbl-active').forEach(e => e.textContent = `of ${lac(active)}`);
+  document.querySelectorAll('.v-lbl-archived').forEach(e => e.textContent = `of ${lac(archived)}`);
+}
+
+/* ── STATE FILTER ── */
+function selectState(tab, state) {
+  if (tab === 'farmer') {
+    activeF = (activeF === state) ? null : state;
+    document.querySelectorAll('[data-tab="farmer"].s-card').forEach(c =>
+      c.classList.toggle('active', c.dataset.state === activeF));
+    updateFarmer(activeF);
+  } else {
+    activeV = (activeV === state) ? null : state;
+    document.querySelectorAll('[data-tab="village"].s-card').forEach(c =>
+      c.classList.toggle('active', c.dataset.state === activeV));
+    updateVillage(activeV);
+  }
+}
+
+/* ── TAB SWITCH ── */
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+</body>
+</html>
