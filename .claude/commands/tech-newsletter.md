@@ -23,6 +23,62 @@ You are the **Tech & Product Newsletter Writer** for AgroStar. Sender is always 
 
 ---
 
+## UI/UX Design Standards (Apply to Every Edition)
+
+These are non-negotiable design upgrades based on 2025 email design research. Apply all of them when building the HTML in Step 5.
+
+### Typography
+- **Body text: minimum 14px.** Never 13px or below — breaks on mobile.
+- **Display stat: 48–60px** for the single most important number (e.g. ₹ GMV). One number gets huge treatment; the rest stay at body scale. Creates instant visual hierarchy.
+- Max 2 fonts across the entire email. Stick to `-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif`.
+
+### Color Blocking (Section Separation)
+- Alternate section backgrounds: `#ffffff` → `#f9f9f9` → `#ffffff` — no horizontal `<hr>` dividers needed.
+- Keep the red `#8B1A1A` header and aim banner. Add `color-scheme: light dark` meta tag so the email doesn't break in dark-mode Gmail.
+- One strong accent color per section (yellow for TL;DR, red for Aim, light blue for Coming Soon) — don't introduce new colors mid-email.
+
+### "By the Numbers" Grid — Mobile-First
+- Desktop: 4-column grid. Mobile (below 480px): **2×2 grid** using `@media` queries. The 4-column layout collapses unreadably on phones.
+- One stat gets the display-size treatment (the ₹ number). The others are 28–32px bold.
+
+### Single CTA Button (Non-negotiable)
+- Every newsletter must have **exactly one CTA button**. Emails with a single CTA convert up to 3× better than those with two or more.
+- Options: "Read the full analysis →" (link to Confluence/Notion), "Reply with your questions", or "See the dashboard →"
+- Style: `background: #8B1A1A; color: #fff; padding: 12px 28px; border-radius: 4px; font-weight: 600; display: inline-block;`
+- Place it after the Impact section, before Coming Soon.
+
+### Before vs After Comparison Block
+- When the newsletter is about replacing a manual process, include a two-column comparison:
+  - Left column: grey background `#f5f5f5`, label "Before", muted text — describe the old process
+  - Right column: light green background `#E8F5E9`, label "Now", normal text — describe what changed
+- This communicates transformation faster than any paragraph of text.
+
+### Series Progress Indicator
+- Show "Edition X of Y" visually in the header as filled/unfilled dots or a segmented bar.
+- Example: `● ● ○` for Edition 2 of 3. Readers feel part of a series.
+
+### HTML/CSS Bar Chart for Tabular Data
+- When showing store-by-store or partner-by-partner performance tables, convert to a **horizontal bar chart in pure HTML/CSS** (no images, renders everywhere).
+- Pattern: a `<div>` with `width` set to `calc(value / max * 100%)` and `background: #8B1A1A; height: 8px; border-radius: 4px;` inline.
+- Show the number after the bar. Far more scannable than a table.
+
+### Animated GIF (When Available)
+- If a product UI flow exists (screen recording), embed one 3–5 second looping GIF of the key user action (e.g. farmer search → invoice generated).
+- Max 1 GIF per email, placed in the "What We Built" section.
+- Supported in Gmail. Drives engagement significantly over static screenshots.
+
+### Reader Reply Hook
+- End the email body (before Kudos) with a genuine open question to the reader.
+- Examples: "Which store do you think will cross ₹1L first?" / "What should Edition 3 cover?"
+- Makes it a conversation, not a broadcast. Style as a light `#E3F2FD` box with italic text.
+
+### Dark Mode Compatibility
+- Add `<meta name="color-scheme" content="light dark">` in the `<head>`.
+- Avoid pure black text on white — use `#111111` or `#1a1a1a` for body text so it renders well in both modes.
+- Test: red header `#8B1A1A` is fine; yellow TL;DR box needs `border-left: 4px solid #FFA000` to remain visible in dark mode.
+
+---
+
 ## Step 1 — Gather Inputs
 
 Ask for or identify:
@@ -169,15 +225,26 @@ For every JIRA ticket ID, call `mcp__claude_ai_Atlassian__getJiraIssue` (cloudId
 
 ## Step 5 — Create Gmail Draft with HTML
 
-Use `mcp__claude_ai_Gmail__create_draft` with full HTML formatting:
-- AgroStar header with red bar (`#8B1A1A`)
-- Yellow TL;DR box (left border `#FFA000`, background `#FFF8E1`)
-- 4-column numbers table with red bold stats
-- Red aim banner
-- Impact as a styled table (alternating rows)
-- Grey "Honest Part" box (left border `#BDBDBD`)
-- Blue "Coming Soon" box (background `#E3F2FD`)
-- Edition marker in footer
+Use `mcp__claude_ai_Gmail__create_draft` with full HTML. Apply ALL UI/UX Design Standards above. Checklist before sending to draft:
+
+**Structure (in order):**
+- `<head>`: `color-scheme: light dark` meta + responsive `@media` styles
+- AgroStar header: red bar `#8B1A1A` + series progress dots (e.g. `● ● ○`)
+- Yellow TL;DR box (left border `#FFA000`, background `#FFF8E1`) — 14px min
+- "By the Numbers": 4-column desktop / 2×2 mobile grid; one stat at 48–60px display size
+- Red Aim banner
+- Before vs After block (if replacing a manual process)
+- The Problem / What We Built
+- Animated GIF slot (if available)
+- Impact: HTML/CSS bar chart preferred over plain table
+- Single CTA button (`#8B1A1A` background, one only)
+- Reader reply hook box (`#E3F2FD` background, italic question)
+- Coming Soon (one sentence, blue box)
+- Kudos (named individuals)
+- Footer: edition marker, date, "Numbers pulled live from BigQuery"
+
+**Typography:** body 14px min · display stat 48–60px · max 2 fonts
+**Colors:** `#111111` body text · `#8B1A1A` red · `#FFA000` yellow · `#E3F2FD` blue · alternate section backgrounds `#ffffff`/`#f9f9f9`
 
 **Never send. Only create draft. Confirm with user before any action.**
 
