@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>AgroStar POS — The Complete Store, On One Screen</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #e8e8e8;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      color: #111111;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrapper { max-width: 620px; margin: 32px auto; background: #fff; border-radius: 6px; overflow: hidden; }
+
+    /* ── HEADER ── */
+    .header {
+      background: #8B1A1A;
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      isolation: isolate;
+    }
+    .header-brand { display: flex; align-items: center; gap: 10px; }
+    .header-logo {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: #fff; font-weight: 700;
+    }
+    .header-title { color: #fff; font-size: 14px; font-weight: 700; line-height: 1.3; }
+    .header-sub { color: rgba(255,255,255,0.55); font-size: 11px; }
+    .header-right { text-align: right; }
+    .header-edition { color: rgba(255,255,255,0.5); font-size: 11px; line-height: 1.6; }
+    .series-dots { display: flex; gap: 5px; justify-content: flex-end; margin-top: 4px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-filled { background: #fff; }
+    .dot-empty { background: rgba(255,255,255,0.25); }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(160deg, #2c1a1a 0%, #3d2020 40%, #1a1a2e 100%);
+      padding: 48px 28px 40px;
+      position: relative;
+    }
+    .hero-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: rgba(255,255,255,0.45);
+      margin-bottom: 14px;
+    }
+    .hero-headline {
+      font-size: 40px; font-weight: 800; line-height: 1.1;
+      color: #fff; letter-spacing: -1px; margin-bottom: 16px;
+    }
+    .hero-sub {
+      font-size: 15px; color: rgba(255,255,255,0.65); line-height: 1.7;
+      max-width: 420px;
+    }
+
+    /* ── AIM BANNER ── */
+    .aim {
+      background: #7a1717;
+      padding: 18px 28px 20px;
+    }
+    .aim-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: rgba(255,255,255,0.45); margin-bottom: 6px;
+    }
+    .aim-text {
+      font-size: 15px; font-weight: 600; color: #fff; line-height: 1.55;
+    }
+
+    /* ── TLDR ── */
+    .tldr {
+      background: #FFF8E1;
+      border-left: 4px solid #FFA000;
+      padding: 16px 20px 18px 20px;
+      margin: 0;
+    }
+    .tldr-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 2.5px;
+      text-transform: uppercase; color: #FFA000; margin-bottom: 10px;
+    }
+    .tldr ul { list-style: none; }
+    .tldr li {
+      font-size: 14px; color: #333; line-height: 1.65; padding: 3px 0;
+    }
+    .tldr li::before { content: "→ "; color: #FFA000; font-weight: 700; }
+
+    /* ── BY THE NUMBERS ── */
+    .numbers-section { padding: 20px 28px 20px; background: #f9f9f9; }
+    .section-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 2.5px;
+      text-transform: uppercase; color: #8B1A1A; margin-bottom: 14px;
+    }
+    .numbers-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 0;
+    }
+    .number-cell {
+      background: #fff;
+      border: 1px solid #ececec;
+      border-radius: 5px;
+      padding: 14px 10px;
+      text-align: center;
+    }
+    .number-value {
+      font-size: 32px; font-weight: 800; color: #8B1A1A;
+      line-height: 1.1; letter-spacing: -1px;
+    }
+    .number-value.big { font-size: 28px; }
+    .number-label { font-size: 10px; color: #888; line-height: 1.4; margin-top: 5px; }
+    .number-highlight { font-size: 48px !important; }
+
+    /* ── POS IN ACTION ── */
+    .pos-action-section {
+      background: #111111;
+      padding: 32px 24px 28px;
+    }
+    .pos-action-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: rgba(255,255,255,0.4);
+      text-align: center; margin-bottom: 28px;
+    }
+    .pos-phones-row {
+      display: flex; align-items: flex-end; justify-content: center; gap: 14px;
+    }
+    .pos-phone-col { display: flex; flex-direction: column; align-items: center; flex: 1; }
+    .pos-phone-col.pos-phone-center { flex: 1.15; }
+    .pos-phone-frame {
+      width: 100%; border-radius: 16px; overflow: hidden;
+      border: 1.5px solid rgba(255,255,255,0.08);
+    }
+    .pos-phone-frame-center {
+      border-color: rgba(139,26,26,0.6);
+      box-shadow: 0 8px 32px rgba(139,26,26,0.25);
+    }
+    .pos-phone-placeholder {
+      font-size: 11px; color: rgba(255,255,255,0.2);
+      text-align: center; line-height: 1.6;
+    }
+    .pos-phone-caption {
+      margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.45);
+      letter-spacing: 0.5px; text-align: center;
+    }
+
+    /* ── MAGIC MOMENTS ── */
+    .moment { padding: 24px 28px; }
+    .moment.alt { background: #f9f9f9; }
+    .moment-num {
+      font-size: 9px; font-weight: 700; letter-spacing: 2.5px;
+      text-transform: uppercase; color: #8B1A1A; margin-bottom: 6px;
+    }
+    .moment-title {
+      font-size: 22px; font-weight: 700; line-height: 1.25;
+      color: #111; margin-bottom: 12px; letter-spacing: -0.3px;
+    }
+    .moment-body {
+      font-size: 14px; color: #444; line-height: 1.75; margin-bottom: 16px;
+    }
+    .feat-list { list-style: none; }
+    .feat-list li {
+      font-size: 13px; color: #555; line-height: 1.6;
+      padding: 4px 0; padding-left: 4px;
+    }
+
+    /* ── INLINE MOMENT SCREENSHOTS ── */
+    .moment-screens {
+      display: flex; gap: 12px; margin-top: 20px;
+    }
+    .moment-screen-col { flex: 1; display: flex; flex-direction: column; align-items: center; }
+    .moment-screen-frame {
+      width: 100%; border-radius: 14px; overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+    .moment-screen-label {
+      margin-top: 8px; font-size: 11px; color: #888;
+      text-align: center; letter-spacing: 0.2px;
+    }
+    @media (max-width: 480px) {
+      .moment-screens { flex-direction: column; }
+    }
+
+    /* ── MOMENT SPLIT (text left, image right) ── */
+    .moment-split {
+      display: flex; gap: 24px; align-items: flex-start;
+    }
+    .moment-split-content { flex: 1 1 55%; min-width: 0; }
+    .moment-split-image {
+      flex: 0 0 40%; max-width: 40%;
+      display: flex; align-items: flex-start; padding-top: 4px;
+    }
+    .moment-split-image img { width: 100%; display: block; border-radius: 14px; }
+    @media (max-width: 520px) {
+      .moment-split { flex-direction: column; }
+      .moment-split-image { flex: none; max-width: 100%; width: 100%; }
+    }
+
+    /* ── ARCHITECTURE ── */
+    .arch-section { padding: 24px 28px; background: #fff; }
+    .arch-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 2.5px;
+      text-transform: uppercase; color: #8B1A1A; margin-bottom: 8px;
+    }
+    .arch-desc { font-size: 14px; color: #444; line-height: 1.7; margin-bottom: 18px; }
+    .arch-row {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .arch-box {
+      border: 1.5px solid #e0e0e0; border-radius: 5px;
+      padding: 10px 14px; text-align: center; flex: 1;
+    }
+    .arch-box-center {
+      background: #8B1A1A; border: none; border-radius: 5px;
+      padding: 10px 14px; text-align: center; flex: 1.2;
+    }
+    .arch-box-title { font-size: 11px; font-weight: 700; color: #8B1A1A; }
+    .arch-box-center .arch-box-title { color: #fff; }
+    .arch-box-sub { font-size: 9px; color: #aaa; margin-top: 2px; }
+    .arch-box-center .arch-box-sub { color: rgba(255,255,255,0.55); }
+    .arch-arrow { font-size: 18px; color: #ccc; flex-shrink: 0; }
+
+    /* ── STORE PERFORMANCE BAR CHART ── */
+    .stores-section { padding: 24px 28px; background: #f9f9f9; }
+    .store-row { margin-bottom: 12px; }
+    .store-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+    .store-name { font-size: 13px; color: #333; font-weight: 500; }
+    .store-gmv { font-size: 13px; color: #8B1A1A; font-weight: 700; }
+    .store-bar-bg { background: #e8e8e8; border-radius: 4px; height: 8px; }
+    .store-bar-fill { background: #8B1A1A; border-radius: 4px; height: 8px; }
+    .store-orders { font-size: 11px; color: #aaa; margin-top: 3px; }
+    .store-new-badge {
+      display: inline-block; background: #E8F5E9; color: #2e7d32;
+      font-size: 9px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; padding: 1px 5px; border-radius: 3px;
+      margin-left: 6px; vertical-align: middle;
+    }
+
+    /* ── REPLY HOOK ── */
+    .reply-hook {
+      background: #E3F2FD;
+      margin: 0 28px;
+      border-radius: 5px;
+      padding: 16px 18px;
+      margin-bottom: 0;
+    }
+    .reply-hook-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: #1565C0; margin-bottom: 6px;
+    }
+    .reply-hook-text { font-size: 14px; color: #1a1a3e; font-style: italic; line-height: 1.6; }
+
+    /* ── COMING NEXT ── */
+    .coming-section { padding: 24px 28px; background: #fff; }
+    .coming-box { background: #E3F2FD; border-radius: 5px; padding: 18px 20px; }
+    .coming-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: #1565C0; margin-bottom: 8px;
+    }
+    .coming-text { font-size: 14px; color: #1a1a3e; line-height: 1.7; }
+
+    /* ── KUDOS ── */
+    .kudos-section { padding: 20px 28px 24px; background: #f9f9f9; }
+    .kudos-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: #8B1A1A; margin-bottom: 10px;
+    }
+    .kudos-text { font-size: 14px; color: #444; line-height: 1.75; }
+
+    /* ── FOOTER ── */
+    .footer {
+      background: #f0f0f0;
+      border-top: 1px solid #e8e8e8;
+      padding: 14px 28px;
+      font-size: 11px; color: #aaa; line-height: 1.6;
+    }
+
+    /* ── MOBILE RESPONSIVE ── */
+    @media (max-width: 480px) {
+      .wrapper { margin: 0; border-radius: 0; }
+      .hero { padding: 36px 20px 32px; }
+      .hero-headline { font-size: 30px; }
+      .numbers-grid { grid-template-columns: repeat(2, 1fr); }
+      .number-highlight { font-size: 36px !important; }
+      .bva-grid { grid-template-columns: 1fr; }
+      .arch-row { flex-wrap: wrap; }
+      .moment, .arch-section, .stores-section,
+      .coming-section, .kudos-section { padding: 20px 16px; }
+      .tldr { padding: 14px 16px; }
+      .reply-hook { margin: 0 16px; }
+      .header { padding: 12px 16px; }
+      .footer { padding: 12px 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-brand">
+      <!-- AgroStar logo — white SVG rebuild for red header -->
+      <svg width="158" height="40" viewBox="0 0 158 40" xmlns="http://www.w3.org/2000/svg" aria-label="AgroStar — Helping Farmers Win">
+        <!-- Main star (5-pointed, cx=13 cy=22) -->
+        <polygon points="13,9 15.9,17 24.4,17.3 17.8,22.6 20,30.7 13,26 6,30.7 8.2,22.6 1.6,17.3 10.1,17" fill="white"/>
+        <!-- Small star 1 (cx=24 cy=10) -->
+        <polygon points="24,4.5 25.3,8.2 29.2,8.3 26.1,10.7 27.2,14.4 24,12.2 20.8,14.4 21.9,10.7 18.8,8.3 22.7,8.2" fill="white"/>
+        <!-- Small star 2 (cx=31 cy=5.5) -->
+        <polygon points="31,1.5 31.9,4.2 34.7,4.3 32.5,5.9 33.3,8.6 31,7 28.7,8.6 29.5,5.9 27.3,4.3 30.1,4.2" fill="white"/>
+        <!-- AgroStar text -->
+        <text x="37" y="24" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="17" font-weight="800" fill="white" letter-spacing="-0.4">AgroStar</text>
+        <!-- ® superscript after AgroStar (~x=116) -->
+        <text x="116" y="17" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="7" fill="white" opacity="0.85">®</text>
+        <!-- Helping Farmers Win tagline -->
+        <text x="38" y="34" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="9" fill="white" opacity="0.72" letter-spacing="0.2">Helping Farmers Win</text>
+        <!-- ® after tagline -->
+        <text x="148" y="31" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="5.5" fill="white" opacity="0.72">®</text>
+      </svg>
+    </div>
+    <div class="header-right">
+      <div class="header-edition">May 2026 &nbsp;·&nbsp; AgroStar POS Launched</div>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-label">Launched May 2026</div>
+    <div class="hero-headline">The Operating System (POS).<br>Built to run AgroStar's Retail at scale.</div>
+    <div class="hero-sub">AgroStar POS is built from the ground up to run our Company Owned stores — connecting orders, inventory, and finance into a single mobile-first experience.</div>
+  </div>
+
+  <!-- AIM BANNER -->
+  <div class="aim">
+    <div class="aim-label">Aim</div>
+    <div class="aim-text">Give every store manager a Digital Platform to run their entire store — stock, sales, payments, and reconciliation — without touching any other system.</div>
+  </div>
+
+  <!-- TLDR -->
+  <div class="tldr">
+    <div class="tldr-label">At a Glance — 30 Seconds</div>
+    <ul>
+      <li>We built AgroStar POS to scale operations across every Company Owned store — one platform, end-to-end, from stock receipt to financial settlement.</li>
+      <li>One screen replaces CRM + WMS + NAV-BC — all talking to each other in real time.</li>
+      <li>Live since May 15 · 88 orders · 77 farmers served · ₹1,07,379 GMV · growing every week.</li>
+    </ul>
+  </div>
+
+  <!-- BY THE NUMBERS -->
+  <div class="numbers-section">
+    <div class="section-label">By the Numbers — Since May 15, 2026</div>
+    <div class="numbers-grid">
+      <div class="number-cell">
+        <div class="number-value">9</div>
+        <div class="number-label">COCO Stores<br>Live</div>
+      </div>
+      <div class="number-cell">
+        <div class="number-value">88</div>
+        <div class="number-label">Orders<br>Placed</div>
+      </div>
+      <div class="number-cell">
+        <div class="number-value">77</div>
+        <div class="number-label">Farmers<br>Served</div>
+      </div>
+      <div class="number-cell">
+        <div class="number-value big number-highlight" style="font-size:26px;">₹1,07,379</div>
+        <div class="number-label">GMV in<br>23 Days</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- POS IN ACTION -->
+  <div class="pos-action-section">
+    <div class="pos-action-label">AgroStar POS — In Action</div>
+    <div class="pos-phones-row">
+      <div class="pos-phone-col">
+        <div class="pos-phone-frame">
+          <img src="/Users/darpan/Desktop/Store Inventory.png" alt="Inventory" style="width:100%;display:block;border-radius:14px;">
+        </div>
+        <div class="pos-phone-caption">Inventory</div>
+      </div>
+      <div class="pos-phone-col pos-phone-center">
+        <div class="pos-phone-frame pos-phone-frame-center">
+          <img src="/Users/darpan/Desktop/Farmer Search.png" alt="Farmer Search" style="width:100%;display:block;border-radius:14px;">
+        </div>
+        <div class="pos-phone-caption">Farmer Search</div>
+      </div>
+      <div class="pos-phone-col">
+        <div class="pos-phone-frame">
+          <img src="/Users/darpan/Desktop/Farmer and DVS orders.png" alt="Orders" style="width:100%;display:block;border-radius:14px;">
+        </div>
+        <div class="pos-phone-caption">Orders</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAGIC MOMENT 01 -->
+  <div class="moment alt">
+    <div class="moment-num">Magic Moment 01</div>
+    <div class="moment-title">New stock arrived.<br>Or needs to be raised. POS handles both.</div>
+    <div class="moment-body">When any new stock arrives at the store via Stock Transfer, the store manager opens POS on their phone. They tap through incoming inventory — <strong>batch by batch, good or damaged</strong> — and hit confirm. The warehouse system updates automatically. No calls. No email. No waiting.</div>
+    <ul class="feat-list">
+      <li>📦 &nbsp;Raise stock requests from the store — auto-converts to a warehouse transfer order</li>
+      <li>✅ &nbsp;Receive incoming stock with good/bad capture per batch — WMS updates instantly</li>
+      <li>🔄 &nbsp;Mark damaged inventory — moves to the correct bin in the warehouse system automatically</li>
+    </ul>
+    <!-- Inline screenshots -->
+    <div class="moment-screens">
+      <div class="moment-screen-col">
+        <div class="moment-screen-frame">
+          <img src="/Users/darpan/Desktop/View STO.png" alt="View STO" style="width:100%;display:block;border-radius:12px;">
+        </div>
+        <div class="moment-screen-label">Track Incoming Transfers</div>
+      </div>
+      <div class="moment-screen-col">
+        <div class="moment-screen-frame">
+          <img src="/Users/darpan/Desktop/Inward STO.png" alt="Inward STO" style="width:100%;display:block;border-radius:12px;">
+        </div>
+        <div class="moment-screen-label">Receive Stock Batch by Batch</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAGIC MOMENT 02 -->
+  <div class="moment moment-split">
+    <div class="moment-split-content">
+      <div class="moment-num">Magic Moment 02</div>
+      <div class="moment-title">A farmer walks in.<br>Billed and out in under 3 minutes.</div>
+      <div class="moment-body">The manager searches the farmer by mobile. <strong>Profile appears instantly.</strong> The farmer browses live prices, active offers, real stock. They pick what they need. The system selects the right batch automatically. <strong>Invoice gets generated and is sent on the WhatsApp number of the farmer. Payment collected</strong> — cash or digital payment via UPI. Ledger gets settled if paid digitally, directly.</div>
+      <ul class="feat-list">
+        <li>🔍 &nbsp;Search any farmer by mobile — or register a new one instantly</li>
+        <li>🛒 &nbsp;Full catalog with live prices, offers, stock count — same data as the CRM</li>
+        <li>🧾 &nbsp;Invoice generated will be pushed to financial system NAV-BC automatically — no manual entry</li>
+        <li>💳 &nbsp;Cash collected will be deposited to the store VAN account — this will reconcile to the ledger automatically</li>
+        <li>↩️ &nbsp;Returns on the same screen — condition captured, credit posted automatically</li>
+      </ul>
+    </div>
+    <div class="moment-split-image">
+      <div style="border-radius:14px; overflow:hidden; box-shadow:0 4px 18px rgba(0,0,0,0.13); border:1px solid rgba(0,0,0,0.06);">
+        <img src="/Users/darpan/.claude/image-cache/ded68070-1346-4645-a52e-36ff523e7b54/14.png" alt="Checkout" style="width:100%;display:block;border-radius:14px;">
+      </div>
+    </div>
+  </div>
+
+  <!-- MAGIC MOMENT 03 -->
+  <div class="moment alt">
+    <div class="moment-num">Magic Moment 03</div>
+    <div class="moment-title">An online DVS order just came in.<br>The store can handle it.</div>
+    <div class="moment-body">A farmer in the store's catchment placed an order on the AgroStar app. It routes directly to the nearest COCO store. The manager sees it in POS, <strong>marks it available and triggers the invoice in one tap.</strong> Returns handled on the same screen — logged, inventory updated, credit posted.</div>
+    <ul class="feat-list">
+      <li>📱 &nbsp;DVS orders routed to the store appear directly in POS — accept, flag OOS, or process</li>
+      <li>🚚 &nbsp;Invoice is generated via POS and the order will be picked up by the LMD partner</li>
+    </ul>
+  </div>
+
+  <!-- ARCHITECTURE -->
+  <div class="arch-section">
+    <div class="arch-label">Under the Hood</div>
+    <div class="arch-desc">POS is not a billing app. It is the <strong>connective layer</strong> between three systems that now work as one. When a sale happens on POS, all three know about it <strong>instantly and automatically.</strong></div>
+    <div class="arch-row">
+      <div class="arch-box">
+        <div class="arch-box-title">CRM</div>
+        <div class="arch-box-sub">Orders &amp; Pricing</div>
+      </div>
+      <div class="arch-arrow">⇄</div>
+      <div class="arch-box-center">
+        <div class="arch-box-title">AgroStar POS</div>
+        <div class="arch-box-sub">The Store OS</div>
+      </div>
+      <div class="arch-arrow">⇄</div>
+      <div class="arch-box">
+        <div class="arch-box-title">WMS</div>
+        <div class="arch-box-sub">Inventory</div>
+      </div>
+      <div class="arch-arrow">⇄</div>
+      <div class="arch-box">
+        <div class="arch-box-title">NAV-BC</div>
+        <div class="arch-box-sub">Finance</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STORE PERFORMANCE BAR CHART -->
+  <div class="stores-section">
+    <div class="section-label">Store Performance — May 15 to June 6, 2026</div>
+
+    <div class="store-row">
+      <div class="store-meta">
+        <span class="store-name">COCO Pargaon Tarf Ale</span>
+        <span class="store-gmv">₹25,846</span>
+      </div>
+      <div class="store-bar-bg"><div class="store-bar-fill" style="width:100%"></div></div>
+      <div class="store-orders">19 orders · 19 farmers</div>
+    </div>
+
+    <div class="store-row">
+      <div class="store-meta">
+        <span class="store-name">COCO Narayangaon</span>
+        <span class="store-gmv">₹23,941</span>
+      </div>
+      <div class="store-bar-bg"><div class="store-bar-fill" style="width:92.6%"></div></div>
+      <div class="store-orders">14 orders · 10 farmers</div>
+    </div>
+
+    <div class="store-row">
+      <div class="store-meta">
+        <span class="store-name">COCO Manchar</span>
+        <span class="store-gmv">₹17,850</span>
+      </div>
+      <div class="store-bar-bg"><div class="store-bar-fill" style="width:69%"></div></div>
+      <div class="store-orders">14 orders · 9 farmers</div>
+    </div>
+
+    <div class="store-row">
+      <div class="store-meta">
+        <span class="store-name">COCO Kalamb</span>
+        <span class="store-gmv">₹12,431</span>
+      </div>
+      <div class="store-bar-bg"><div class="store-bar-fill" style="width:48%"></div></div>
+      <div class="store-orders">11 orders · 11 farmers</div>
+    </div>
+
+    <div class="store-row">
+      <div class="store-meta">
+        <span class="store-name">COCO Malegaon</span>
+        <span class="store-gmv">₹8,067</span>
+      </div>
+      <div class="store-bar-bg"><div class="store-bar-fill" style="width:31%"></div></div>
+      <div class="store-orders">9 orders · 8 farmers</div>
+    </div>
+
+    <div class="store-row">
+      <div class="store-meta">
+        <span class="store-name">COCO Sansar</span>
+        <span class="store-gmv">₹7,507</span>
+      </div>
+      <div class="store-bar-bg"><div class="store-bar-fill" style="width:29%"></div></div>
+      <div class="store-orders">4 orders · 4 farmers</div>
+    </div>
+
+    <div class="store-row">
+      <div class="store-meta">
+        <span class="store-name">COCO Sangavi</span>
+        <span class="store-gmv">₹5,729</span>
+      </div>
+      <div class="store-bar-bg"><div class="store-bar-fill" style="width:22%"></div></div>
+      <div class="store-orders">12 orders · 11 farmers</div>
+    </div>
+
+    <div class="store-row">
+      <div class="store-meta">
+        <span class="store-name">COCO Wadgaon Rasai <span class="store-new-badge">New</span></span>
+        <span class="store-gmv">₹5,727</span>
+      </div>
+      <div class="store-bar-bg"><div class="store-bar-fill" style="width:22%"></div></div>
+      <div class="store-orders">4 orders · 4 farmers</div>
+    </div>
+
+    <div class="store-row">
+      <div class="store-meta">
+        <span class="store-name">COCO Nhavara <span class="store-new-badge">New</span></span>
+        <span class="store-gmv">₹281</span>
+      </div>
+      <div class="store-bar-bg"><div class="store-bar-fill" style="width:3%"></div></div>
+      <div class="store-orders">1 order · 1 farmer · just went live</div>
+    </div>
+  </div>
+
+  <!-- READER REPLY HOOK -->
+  <div class="reply-hook" style="margin-top:20px;">
+    <div class="reply-hook-label">Your Turn</div>
+    <div class="reply-hook-text">Nine stores live. The race has begun — which COCO store do you think hits ₹1,00,000 first? 🤔💭🏆</div>
+  </div>
+
+  <!-- COMING NEXT -->
+  <div class="coming-section">
+    <div class="coming-box">
+      <div class="coming-label">Coming Next</div>
+      <ul style="margin:12px 0 0; padding-left:18px; list-style:disc;">
+        <li style="font-size:14px; color:#333; line-height:1.7; margin-bottom:10px;">Each COCO store will soon run its own promotions — independent pricing and store-level offers, so stores in a state can serve exactly what farmers need.</li>
+        <li style="font-size:14px; color:#333; line-height:1.7; margin-bottom:10px;">Creating location in WMS and NAV-BC automatically when a Store Profile gets created.</li>
+        <li style="font-size:14px; color:#333; line-height:1.7; margin-bottom:10px;">Capability to create Stock Transfers from Store back to FCs via POS.</li>
+        <li style="font-size:14px; color:#333; line-height:1.7;">Native telephony integration — store managers will be able to initiate and log farmer calls directly from POS.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- KUDOS -->
+  <div class="kudos-section">
+    <div class="kudos-label">The People Behind It</div>
+    <div class="kudos-text">A big thank you to the entire <strong>AgroStar Technology Team</strong> for making this a reality. This is what AgroStar's retail future is built on.</div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    For feedback please reach out to <strong style="color:#888;">Darpan Pathar, Shantanu Mahajan</strong><br>Tech &amp; Product, AgroStar
+  </div>
+
+</div>
+</body>
+</html>
