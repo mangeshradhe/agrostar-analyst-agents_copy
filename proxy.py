@@ -202,32 +202,50 @@ revenue AS (
     AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.unicommerce_status, '')), r'cancelled|mob_app_unverified|error|payment_pending|edited')
   GROUP BY 1
 ),
-partner_credit AS (
+all_debits AS (
+  -- All debit entries: exclude CL changes (reason_id=2) and cancelled
   SELECT
-    cf.farmer_id AS partner_id,
-    ROUND(
-      SUM(CASE WHEN cwt.transaction_type = 0 THEN cwt.amount ELSE 0 END) -
-      SUM(CASE WHEN cwt.transaction_type = 1 THEN cwt.amount ELSE 0 END), 0
-    ) AS total_outstanding,
-    ROUND(GREATEST(LEAST(
-      SUM(CASE WHEN cwt.transaction_type = 0 AND DATE(cwt.due_date) < CURRENT_DATE() THEN cwt.amount ELSE 0 END) -
-      SUM(CASE WHEN cwt.transaction_type = 1 THEN cwt.amount ELSE 0 END),
-      SUM(CASE WHEN cwt.transaction_type = 0 THEN cwt.amount ELSE 0 END) -
-      SUM(CASE WHEN cwt.transaction_type = 1 THEN cwt.amount ELSE 0 END)
-    ), 0), 0) AS ocp_raw,
-    CASE WHEN GREATEST(LEAST(
-      SUM(CASE WHEN cwt.transaction_type = 0 AND DATE(cwt.due_date) < CURRENT_DATE() THEN cwt.amount ELSE 0 END) -
-      SUM(CASE WHEN cwt.transaction_type = 1 THEN cwt.amount ELSE 0 END),
-      SUM(CASE WHEN cwt.transaction_type = 0 THEN cwt.amount ELSE 0 END) -
-      SUM(CASE WHEN cwt.transaction_type = 1 THEN cwt.amount ELSE 0 END)
-    ), 0) > 0
-    THEN MAX(CASE WHEN cwt.transaction_type = 0 AND DATE(cwt.due_date) < CURRENT_DATE()
-      THEN DATE_DIFF(CURRENT_DATE(), DATE(cwt.due_date), DAY) ELSE NULL END)
-    ELSE 0 END AS max_dpd
+    cwt.id,
+    cf.farmer_id,
+    cwt.amount,
+    cwt.due_date
   FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` cwt
   JOIN `agrostar-data.prod_db_views.csr_farmer` cf ON cf.user_id = cwt.wallet_user_id
-  WHERE cwt.cancelled = 0
+  WHERE cwt.transaction_type = 0
+    AND cwt.cancelled = 0
     AND cwt.reason_id != 2
+),
+reconciled AS (
+  -- How much of each debit has been settled (cancelled=0 only)
+  SELECT
+    r.reconciled_for_id,
+    SUM(r.amount) AS settled_amount
+  FROM `agrostar-data.prod_db_views.wallet_creditwallettransactionreconciliation` r
+  WHERE r.cancelled = 0
+  GROUP BY r.reconciled_for_id
+),
+outstanding_debits AS (
+  -- Debits not fully reconciled — remaining > 0
+  SELECT
+    d.farmer_id,
+    d.due_date,
+    d.amount - COALESCE(r.settled_amount, 0) AS remaining
+  FROM all_debits d
+  LEFT JOIN reconciled r ON r.reconciled_for_id = d.id
+  WHERE d.amount - COALESCE(r.settled_amount, 0) > 0
+),
+partner_credit AS (
+  SELECT
+    farmer_id AS partner_id,
+    ROUND(SUM(remaining), 0)                                                                     AS total_outstanding,
+    ROUND(SUM(CASE WHEN DATE(due_date) < CURRENT_DATE() THEN remaining ELSE 0 END), 0)          AS ocp_raw,
+    CASE
+      WHEN SUM(CASE WHEN DATE(due_date) < CURRENT_DATE() THEN remaining ELSE 0 END) > 0
+      THEN MAX(CASE WHEN DATE(due_date) < CURRENT_DATE()
+               THEN DATE_DIFF(CURRENT_DATE(), DATE(due_date), DAY) ELSE NULL END)
+      ELSE 0
+    END AS max_dpd
+  FROM outstanding_debits
   GROUP BY 1
 ),
 collections AS (
@@ -278,6 +296,268 @@ ORDER BY GREATEST(COALESCE(pc.ocp_raw, 0), 0) DESC
 
 FIELD_DASHBOARD_PATH = os.path.join(os.path.dirname(__file__), 'field_dashboard.html')
 UNDERWRITING_DASHBOARD_PATH = os.path.join(os.path.dirname(__file__), 'underwriting_dashboard.html')
+
+# ── Recommendations query ───────────────────────────────────────────────────
+# Parameters: input_cutoff, from_date, to_date, curr_month_start,
+#             prev_year_month_start, prev_year_month_end,
+#             curr_q_start, prev_q_start, prev_q_end
+
+FIELD_RECOMMENDATIONS_SQL = """
+WITH
+partners AS (
+  SELECT
+    farmer_id AS partner_id,
+    COALESCE(name,'Unknown') AS name,
+    COALESCE(territory,'Unknown') AS territory,
+    COALESCE(cluster,'Unknown') AS cluster,
+    COALESCE(revised_state,'Unknown') AS state,
+    LOWER(TRIM(COALESCE(sm,''))) AS sm,
+    LOWER(TRIM(COALESCE(tm,''))) AS tm,
+    first_order_date
+  FROM `agrostar-data.offline_team.okr_data_live`
+  WHERE status = 'ACTIVE'
+    AND sm IS NOT NULL AND TRIM(sm) != ''
+    AND NOT STARTS_WITH(UPPER(TRIM(sm)),'VACANT')
+),
+all_debits AS (
+  SELECT cwt.id, cf.farmer_id, cwt.amount, cwt.due_date
+  FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` cwt
+  JOIN `agrostar-data.prod_db_views.csr_farmer` cf ON cf.user_id = cwt.wallet_user_id
+  WHERE cwt.transaction_type = 0 AND cwt.cancelled = 0 AND cwt.reason_id != 2
+),
+reconciled AS (
+  SELECT r.reconciled_for_id, SUM(r.amount) AS settled_amount
+  FROM `agrostar-data.prod_db_views.wallet_creditwallettransactionreconciliation` r
+  WHERE r.cancelled = 0 AND DATE(r.created_on) <= '{input_cutoff}'
+  GROUP BY 1
+),
+outstanding_debits AS (
+  SELECT d.farmer_id, d.due_date,
+    d.amount - COALESCE(r.settled_amount, 0) AS remaining
+  FROM all_debits d
+  LEFT JOIN reconciled r ON r.reconciled_for_id = d.id
+  WHERE d.amount - COALESCE(r.settled_amount, 0) > 0
+),
+partner_ocp AS (
+  SELECT
+    farmer_id AS partner_id,
+    ROUND(SUM(CASE WHEN DATE(due_date) < DATE('{input_cutoff}') THEN remaining ELSE 0 END), 0) AS ocp,
+    CASE WHEN SUM(CASE WHEN DATE(due_date) < DATE('{input_cutoff}') THEN remaining ELSE 0 END) > 0
+      THEN MAX(CASE WHEN DATE(due_date) < DATE('{input_cutoff}')
+               THEN DATE_DIFF(DATE('{input_cutoff}'), DATE(due_date), DAY) ELSE NULL END)
+      ELSE 0 END AS max_dpd
+  FROM outstanding_debits
+  GROUP BY 1
+),
+revenue_data AS (
+  SELECT
+    o.owner_id AS partner_id,
+    ROUND(SUM(CASE WHEN DATE(inv.CreatedOn) BETWEEN '{curr_month_start}' AND '{input_cutoff}'            THEN inv.TotalPrice ELSE 0 END), 0) AS rev_curr,
+    ROUND(SUM(CASE WHEN DATE(inv.CreatedOn) BETWEEN '{prev_year_month_start}' AND '{prev_year_month_end}' THEN inv.TotalPrice ELSE 0 END), 0) AS rev_prev,
+    ROUND(SUM(CASE WHEN DATE(inv.CreatedOn) BETWEEN '{curr_q_start}' AND '{input_cutoff}'                THEN inv.TotalPrice ELSE 0 END), 0) AS rev_q_curr,
+    ROUND(SUM(CASE WHEN DATE(inv.CreatedOn) BETWEEN '{prev_q_start}' AND '{prev_q_end}'                  THEN inv.TotalPrice ELSE 0 END), 0) AS rev_q_prev,
+    ROUND(SUM(CASE WHEN DATE(inv.CreatedOn) >= DATE_SUB(DATE('{input_cutoff}'), INTERVAL 30 DAY)          THEN inv.TotalPrice ELSE 0 END), 0) AS rev_30d
+  FROM `agrostar-data.pristine_wms_views.invoiced_report` inv
+  JOIN `agrostar-data.prod_db_views.order_management_order` o
+    ON CAST(o.unicommerce_id AS STRING) = inv.DisplayOrderCode
+  WHERE DATE(inv.CreatedOn) BETWEEN '{prev_q_start}' AND '{input_cutoff}'
+    AND inv.line_status != 'CANCELLED' AND inv.is_return = 0
+    AND o.initiating_source LIKE 'B2B%'
+    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.status,'')),         r'cancelled|mob_app_unverified|error|payment_pending|edited')
+    AND NOT REGEXP_CONTAINS(LOWER(COALESCE(o.unicommerce_status,'')), r'cancelled|mob_app_unverified|error|payment_pending|edited')
+  GROUP BY 1
+),
+hist_visits_raw AS (
+  SELECT CAST(store_id AS STRING) AS store_id, date, date_time AS visit_ts
+  FROM `agrostar-data.offline_team.store_visits_v2`
+  WHERE visit_type = 'store_visit' AND date <= '{input_cutoff}'
+  UNION ALL
+  SELECT storeId AS store_id, DATE(date) AS date, updatedOn AS visit_ts
+  FROM `agrostar-data.prod_db_views.visit`
+  WHERE visitType = 'store_visit' AND DATE(date) <= '{input_cutoff}'
+),
+hist_visits AS (
+  SELECT * EXCEPT(rn) FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY store_id, date ORDER BY visit_ts DESC) AS rn
+    FROM hist_visits_raw
+  ) WHERE rn = 1
+),
+last_visit AS (
+  SELECT store_id, MAX(date) AS last_visit_date FROM hist_visits GROUP BY 1
+),
+visited_curr_month AS (
+  SELECT DISTINCT store_id FROM hist_visits WHERE date >= '{curr_month_start}'
+),
+visited_last_7d AS (
+  SELECT DISTINCT store_id FROM hist_visits
+  WHERE date >= DATE_SUB(DATE('{input_cutoff}'), INTERVAL 7 DAY)
+),
+p2p_raw AS (
+  SELECT CAST(store_id AS STRING) AS store_id, promise_to_pay_date__p2p_ AS p2p_date, amount_promised
+  FROM `agrostar-data.offline_team.store_visits_v2`
+  WHERE promise_to_pay_date__p2p_ IS NOT NULL AND amount_promised > 0
+  UNION ALL
+  SELECT storeId AS store_id, DATE(promiseToPayDate) AS p2p_date, promiseToPayAmount AS amount_promised
+  FROM `agrostar-data.prod_db_views.visit`
+  WHERE promiseToPayDate IS NOT NULL AND promiseToPayAmount > 0
+),
+p2p AS (
+  SELECT store_id, MAX(p2p_date) AS p2p_date, MAX(amount_promised) AS p2p_amount
+  FROM p2p_raw GROUP BY 1
+),
+cluster_cov AS (
+  SELECT
+    okr.cluster,
+    ROUND(COUNTIF(lv.store_id IS NOT NULL AND lv.last_visit_date >= '{curr_month_start}') * 100.0
+          / NULLIF(COUNT(*), 0), 1) AS cov_pct
+  FROM `agrostar-data.offline_team.okr_data_live` okr
+  LEFT JOIN last_visit lv ON lv.store_id = CAST(okr.farmer_id AS STRING)
+  WHERE okr.status = 'ACTIVE'
+  GROUP BY 1
+),
+actual_visits AS (
+  SELECT DISTINCT SAFE_CAST(store_id AS INT64) AS partner_id
+  FROM (
+    SELECT CAST(store_id AS STRING) AS store_id
+    FROM `agrostar-data.offline_team.store_visits_v2`
+    WHERE date BETWEEN '{from_date}' AND '{to_date}'
+    UNION ALL
+    SELECT storeId AS store_id
+    FROM `agrostar-data.prod_db_views.visit`
+    WHERE DATE(date) BETWEEN '{from_date}' AND '{to_date}'
+  )
+),
+scored AS (
+  SELECT
+    p.partner_id, p.name, p.sm, p.tm, p.cluster, p.state,
+    COALESCE(oc.ocp, 0)     AS ocp,
+    COALESCE(oc.max_dpd, 0) AS dpd,
+    CASE WHEN COALESCE(oc.ocp,0)>5000
+           OR (COALESCE(oc.ocp,0)>1000 AND COALESCE(oc.max_dpd,0)>30) THEN 1 ELSE 0 END AS is_hard_block,
+    COALESCE(rv.rev_curr, 0)   AS rev_curr,
+    COALESCE(rv.rev_prev, 0)   AS rev_prev,
+    COALESCE(rv.rev_q_curr, 0) AS rev_q_curr,
+    COALESCE(rv.rev_q_prev, 0) AS rev_q_prev,
+    COALESCE(rv.rev_30d, 0)    AS rev_30d,
+    lv.last_visit_date,
+    COALESCE(DATE_DIFF(DATE('{input_cutoff}'), lv.last_visit_date, DAY), 9999) AS days_gap,
+    CASE WHEN vm.store_id IS NOT NULL THEN 1 ELSE 0 END AS visited_curr_month,
+    CASE WHEN v7.store_id IS NOT NULL THEN 1 ELSE 0 END AS visited_7d,
+    p2p.p2p_date,
+    COALESCE(p2p.p2p_amount, 0) AS p2p_amount,
+    COALESCE(cc.cov_pct, 0)     AS cluster_cov_pct,
+    -- Signal A: Revenue Risk (0-100)
+    CASE
+      WHEN COALESCE(oc.ocp,0)>5000
+        OR (COALESCE(oc.ocp,0)>1000 AND COALESCE(oc.max_dpd,0)>30)                THEN 100
+      WHEN COALESCE(rv.rev_30d,0)=0 AND COALESCE(rv.rev_prev,0)>0                  THEN 70
+      WHEN p.first_order_date IS NOT NULL
+        AND DATE_DIFF(DATE('{input_cutoff}'), p.first_order_date, DAY) < 90         THEN 50
+      WHEN COALESCE(rv.rev_prev,0)>0
+        AND SAFE_DIVIDE(COALESCE(rv.rev_prev,0)-COALESCE(rv.rev_curr,0),
+                        COALESCE(rv.rev_prev,0)) > 0.40                             THEN 60
+      WHEN COALESCE(rv.rev_q_prev,0)>0
+        AND SAFE_DIVIDE(COALESCE(rv.rev_q_prev,0)-COALESCE(rv.rev_q_curr,0),
+                        COALESCE(rv.rev_q_prev,0)) BETWEEN 0.20 AND 0.50           THEN 40
+      WHEN COALESCE(rv.rev_curr,0)>0 AND vm.store_id IS NULL                        THEN 20
+      ELSE 0
+    END AS signal_a,
+    -- Signal B: Collection Urgency (0-100, capped)
+    LEAST(100,
+      CASE
+        WHEN COALESCE(oc.max_dpd,0)>90 THEN 100
+        WHEN COALESCE(oc.max_dpd,0)>60 THEN 80
+        WHEN COALESCE(oc.max_dpd,0)>30 THEN 60
+        WHEN COALESCE(oc.max_dpd,0)>0  THEN 40
+        ELSE 0
+      END +
+      CASE
+        WHEN p2p.p2p_date BETWEEN DATE('{input_cutoff}')
+          AND DATE_ADD(DATE('{input_cutoff}'), INTERVAL 7 DAY)                      THEN 30
+        WHEN p2p.p2p_date < DATE('{input_cutoff}')                                  THEN 20
+        ELSE 0
+      END
+    ) AS signal_b,
+    -- Signal C: Visit Gap (0-100)
+    CASE
+      WHEN lv.last_visit_date IS NULL                                                THEN 100
+      WHEN DATE_DIFF(DATE('{input_cutoff}'), lv.last_visit_date, DAY) > 60          THEN 80
+      WHEN DATE_DIFF(DATE('{input_cutoff}'), lv.last_visit_date, DAY) > 30          THEN 50
+      WHEN DATE_DIFF(DATE('{input_cutoff}'), lv.last_visit_date, DAY) > 14          THEN 20
+      ELSE 0
+    END AS signal_c,
+    -- Signal D: Territory Coverage (0-20)
+    CASE
+      WHEN COALESCE(cc.cov_pct,0) < 50 THEN 20
+      WHEN COALESCE(cc.cov_pct,0) < 80 THEN 10
+      ELSE 0
+    END AS signal_d
+  FROM partners p
+  LEFT JOIN partner_ocp       oc ON oc.partner_id = p.partner_id
+  LEFT JOIN revenue_data      rv ON rv.partner_id = p.partner_id
+  LEFT JOIN last_visit        lv ON lv.store_id = CAST(p.partner_id AS STRING)
+  LEFT JOIN visited_curr_month vm ON vm.store_id = CAST(p.partner_id AS STRING)
+  LEFT JOIN visited_last_7d   v7 ON v7.store_id = CAST(p.partner_id AS STRING)
+  LEFT JOIN p2p                  ON p2p.store_id = CAST(p.partner_id AS STRING)
+  LEFT JOIN cluster_cov       cc ON cc.cluster = p.cluster
+),
+with_final AS (
+  SELECT *,
+    ROUND(0.40*signal_a + 0.30*signal_b + 0.20*signal_c + 0.10*signal_d, 1) AS final_score,
+    ROUND(0.40*signal_a, 1) AS sa_c,
+    ROUND(0.30*signal_b, 1) AS sb_c,
+    ROUND(0.20*signal_c, 1) AS sc_c,
+    ROUND(0.10*signal_d, 1) AS sd_c,
+    CASE
+      WHEN 0.40*signal_a >= 0.30*signal_b AND 0.40*signal_a >= 0.20*signal_c THEN 'A'
+      WHEN 0.30*signal_b >= 0.20*signal_c                                     THEN 'B'
+      WHEN 0.20*signal_c > 0                                                  THEN 'C'
+      ELSE 'D'
+    END AS dom_signal
+  FROM scored
+  WHERE 0.40*signal_a + 0.30*signal_b + 0.20*signal_c + 0.10*signal_d > 0
+    AND (visited_7d = 0 OR dpd > 60)   -- suppression: skip if visited <7d unless DPD critical
+),
+ranked AS (
+  SELECT *,
+    ROW_NUMBER() OVER (PARTITION BY sm ORDER BY final_score DESC) AS sm_rank
+  FROM with_final
+)
+SELECT
+  CAST(r.partner_id AS STRING) AS partner_id,
+  r.name,
+  r.sm,
+  r.tm,
+  r.cluster,
+  r.state,
+  r.final_score,
+  r.signal_a,
+  r.signal_b,
+  r.signal_c,
+  r.signal_d,
+  r.sa_c,
+  r.sb_c,
+  r.sc_c,
+  r.sd_c,
+  r.dom_signal,
+  r.ocp,
+  r.dpd,
+  r.is_hard_block,
+  r.rev_curr,
+  r.rev_prev,
+  r.rev_q_curr,
+  r.rev_q_prev,
+  COALESCE(FORMAT_DATE('%Y-%m-%d', r.last_visit_date), '') AS last_visit_date,
+  CASE WHEN r.days_gap >= 9999 THEN 9999 ELSE r.days_gap END AS days_gap,
+  COALESCE(FORMAT_DATE('%Y-%m-%d', r.p2p_date), '')         AS p2p_date,
+  r.p2p_amount,
+  CASE WHEN av.partner_id IS NOT NULL THEN 1 ELSE 0 END AS was_visited,
+  r.sm_rank
+FROM ranked r
+LEFT JOIN actual_visits av ON av.partner_id = r.partner_id
+WHERE r.sm_rank <= 18
+ORDER BY r.sm, r.sm_rank
+"""
 
 # ── Visit Analysis queries ──────────────────────────────────────────────────
 
@@ -519,6 +799,7 @@ def dashboard():
 
 
 @app.route('/field_dashboard')
+@app.route('/field_dashboard.html')
 def field_dashboard():
     return send_file(FIELD_DASHBOARD_PATH)
 
@@ -571,6 +852,49 @@ def visit_analysis():
         return jsonify({'ok': True, 'volume': volume, 'coverage': coverage,
                         'outcomes': outcomes, 'anomalies': anomalies,
                         'from_date': from_date, 'to_date': to_date})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/field/recommendations')
+def field_recommendations():
+    today     = datetime.date.today()
+    from_date = request.args.get('from', today.isoformat())
+    to_date   = request.args.get('to',   today.isoformat())
+
+    from_dt   = datetime.date.fromisoformat(from_date)
+    cutoff_dt = from_dt - datetime.timedelta(days=1)
+    input_cutoff = cutoff_dt.isoformat()
+
+    curr_month_start = cutoff_dt.replace(day=1).isoformat()
+    # Same month last year
+    prev_year_month_start = cutoff_dt.replace(year=cutoff_dt.year - 1, day=1).isoformat()
+    prev_year_month_end   = cutoff_dt.replace(year=cutoff_dt.year - 1).isoformat()
+    # Quarter: Apr → cutoff (current year); Apr → same date (prev year)
+    q_month = 4 if cutoff_dt.month >= 4 else 1
+    curr_q_start = cutoff_dt.replace(month=q_month, day=1).isoformat()
+    prev_q_start = cutoff_dt.replace(year=cutoff_dt.year - 1, month=q_month, day=1).isoformat()
+    prev_q_end   = cutoff_dt.replace(year=cutoff_dt.year - 1).isoformat()
+
+    try:
+        rows = run_query(FIELD_RECOMMENDATIONS_SQL.format(
+            from_date=from_date,
+            to_date=to_date,
+            input_cutoff=input_cutoff,
+            curr_month_start=curr_month_start,
+            prev_year_month_start=prev_year_month_start,
+            prev_year_month_end=prev_year_month_end,
+            curr_q_start=curr_q_start,
+            prev_q_start=prev_q_start,
+            prev_q_end=prev_q_end,
+        ))
+        return jsonify({'ok': True, 'rows': rows, 'meta': {
+            'input_cutoff':       input_cutoff,
+            'from_date':          from_date,
+            'to_date':            to_date,
+            'curr_month_start':   curr_month_start,
+            'prev_year_month_end': prev_year_month_end,
+        }})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
