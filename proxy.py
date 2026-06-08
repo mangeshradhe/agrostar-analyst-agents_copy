@@ -856,6 +856,47 @@ def visit_analysis():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+FIELD_REP_STATS_SQL = """
+WITH
+visit_counts AS (
+  SELECT
+    LOWER(TRIM(email)) AS email,
+    COUNT(*) AS total_visits,
+    COUNT(DISTINCT store_id) AS unique_stores_visited
+  FROM (
+    SELECT LOWER(TRIM(email)) AS email, CAST(store_id AS STRING) AS store_id
+    FROM `agrostar-data.offline_team.store_visits_v2`
+    WHERE date BETWEEN '{from_date}' AND '{to_date}'
+    UNION ALL
+    SELECT LOWER(TRIM(email)) AS email, storeId AS store_id
+    FROM `agrostar-data.prod_db_views.visit`
+    WHERE DATE(date) BETWEEN '{from_date}' AND '{to_date}'
+  )
+  GROUP BY 1
+),
+sm_territory AS (
+  SELECT
+    LOWER(TRIM(sm))               AS sm_email,
+    LOWER(TRIM(COALESCE(tm,'')))  AS tm_email,
+    COUNT(DISTINCT farmer_id)     AS active_stores
+  FROM `agrostar-data.offline_team.okr_data_live`
+  WHERE status = 'ACTIVE'
+    AND sm IS NOT NULL AND TRIM(sm) != ''
+    AND NOT STARTS_WITH(UPPER(TRIM(sm)), 'VACANT')
+  GROUP BY 1, 2
+)
+SELECT
+  s.sm_email,
+  s.tm_email,
+  s.active_stores,
+  COALESCE(v.total_visits, 0)          AS total_visits,
+  COALESCE(v.unique_stores_visited, 0) AS unique_stores_visited
+FROM sm_territory s
+LEFT JOIN visit_counts v ON v.email = s.sm_email
+ORDER BY s.tm_email, s.sm_email
+"""
+
+
 @app.route('/api/field/recommendations')
 def field_recommendations():
     today     = datetime.date.today()
@@ -867,32 +908,29 @@ def field_recommendations():
     input_cutoff = cutoff_dt.isoformat()
 
     curr_month_start = cutoff_dt.replace(day=1).isoformat()
-    # Same month last year
     prev_year_month_start = cutoff_dt.replace(year=cutoff_dt.year - 1, day=1).isoformat()
     prev_year_month_end   = cutoff_dt.replace(year=cutoff_dt.year - 1).isoformat()
-    # Quarter: Apr → cutoff (current year); Apr → same date (prev year)
     q_month = 4 if cutoff_dt.month >= 4 else 1
     curr_q_start = cutoff_dt.replace(month=q_month, day=1).isoformat()
     prev_q_start = cutoff_dt.replace(year=cutoff_dt.year - 1, month=q_month, day=1).isoformat()
     prev_q_end   = cutoff_dt.replace(year=cutoff_dt.year - 1).isoformat()
 
     try:
-        rows = run_query(FIELD_RECOMMENDATIONS_SQL.format(
-            from_date=from_date,
-            to_date=to_date,
-            input_cutoff=input_cutoff,
+        rows     = run_query(FIELD_RECOMMENDATIONS_SQL.format(
+            from_date=from_date, to_date=to_date, input_cutoff=input_cutoff,
             curr_month_start=curr_month_start,
             prev_year_month_start=prev_year_month_start,
             prev_year_month_end=prev_year_month_end,
-            curr_q_start=curr_q_start,
-            prev_q_start=prev_q_start,
-            prev_q_end=prev_q_end,
+            curr_q_start=curr_q_start, prev_q_start=prev_q_start, prev_q_end=prev_q_end,
         ))
-        return jsonify({'ok': True, 'rows': rows, 'meta': {
-            'input_cutoff':       input_cutoff,
-            'from_date':          from_date,
-            'to_date':            to_date,
-            'curr_month_start':   curr_month_start,
+        sm_stats = run_query(FIELD_REP_STATS_SQL.format(
+            from_date=from_date, to_date=to_date,
+        ))
+        return jsonify({'ok': True, 'rows': rows, 'sm_stats': sm_stats, 'meta': {
+            'input_cutoff':        input_cutoff,
+            'from_date':           from_date,
+            'to_date':             to_date,
+            'curr_month_start':    curr_month_start,
             'prev_year_month_end': prev_year_month_end,
         }})
     except Exception as e:

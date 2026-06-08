@@ -420,6 +420,35 @@ tbody tr:hover td { background: #f8fafc; }
     </div>
   </div>
 
+  <!-- Rep Summary (TM Level) -->
+  <div class="table-wrap" style="margin-top:14px">
+    <div class="table-header">
+      <div>
+        <div class="table-title">Rep Summary — TM Level</div>
+        <div class="table-subtitle">TM rows (blue) = aggregate · SM sub-rows = individual · Visits = total store visits logged in period · Hit Rate = recommended stores actually visited</div>
+      </div>
+      <input type="text" id="reco-rep-search" class="search-input" placeholder="Filter rep…" oninput="filterRepTable()" style="width:170px;flex-shrink:0"/>
+    </div>
+    <div class="table-scroll h-med">
+      <table id="reco-rep-table" style="min-width:760px">
+        <thead>
+          <tr>
+            <th class="left" style="min-width:220px">Rep Name</th>
+            <th class="left" style="min-width:130px">Designation</th>
+            <th style="min-width:100px">Active Stores</th>
+            <th style="min-width:110px">Recommended</th>
+            <th style="min-width:110px">Visits Logged</th>
+            <th style="min-width:120px">Unique Stores</th>
+            <th style="min-width:90px">Hit Rate</th>
+          </tr>
+        </thead>
+        <tbody id="reco-rep-body">
+          <tr><td colspan="7" class="no-data">Load recommendations to see rep summary</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Signal distribution -->
   <div class="table-wrap last" style="margin-top:14px">
     <div class="table-header">
@@ -459,7 +488,7 @@ const R = {
 let rawData = [], sortCol = C.OCP, sortDir = -1;
 let qf = { block: '', visit: 'all' };
 let vaVolData = [], vaCovData = [], vaOutData = [], vaAnomalies = {};
-let recoDataFull = [], recoData = [];
+let recoDataFull = [], recoData = [], smStatsRaw = [];
 
 // ── Tab switching ──
 function switchTab(tab) {
@@ -891,6 +920,7 @@ async function loadReco() {
     if (!json.ok) throw new Error(json.error || 'Query failed');
 
     recoDataFull = json.rows || [];
+    smStatsRaw   = json.sm_stats || [];
     const meta = json.meta || {};
     document.getElementById('reco-cutoff').textContent = meta.input_cutoff || from;
 
@@ -921,6 +951,7 @@ function filterRecoTable() {
   recoData = smF ? recoDataFull.filter(r => r[R.SM] === smF) : recoDataFull;
   renderRecoKPIs(recoData);
   renderRecoTable(recoData);
+  renderRepSummary(smStatsRaw, recoData, smF);
   renderSignalDist(recoData);
   document.getElementById('reco-tbl-title').textContent =
     `Store Recommendations${smF ? ' — ' + fmtEmail(smF) : ''} (${recoData.length} partners)`;
@@ -1052,6 +1083,103 @@ function renderRecoTable(rows) {
     </tr>`;
   }
   document.getElementById('reco-tbl-body').innerHTML = html;
+}
+
+// ── Rep Summary (TM Level) ──
+let repSummaryData = []; // cached for search filtering
+
+function renderRepSummary(smStats, recoRows, smFilter) {
+  // smStats columns: [sm_email, tm_email, active_stores, total_visits, unique_stores_visited]
+  const ST = { SM:0, TM:1, ACTIVE:2, TOTAL_VIS:3, UNIQUE_VIS:4 };
+
+  // Reco stats per SM
+  const smReco = {};
+  for (const r of recoRows) {
+    const sm = r[R.SM]; if (!sm) continue;
+    if (!smReco[sm]) smReco[sm] = { reco:0, reco_vis:0 };
+    smReco[sm].reco++;
+    if (parseInt(r[R.VISITED])) smReco[sm].reco_vis++;
+  }
+
+  // Scope smStats to the SM filter if active
+  const stats = smFilter
+    ? smStats.filter(row => row[ST.TM] === smFilter || row[ST.SM] === smFilter)
+    : smStats;
+
+  // Group by TM
+  const tmMap = {};
+  for (const row of stats) {
+    const sm = row[ST.SM], tm = row[ST.TM] || '(No TM)';
+    const active   = parseInt(row[ST.ACTIVE]||0);
+    const totVis   = parseInt(row[ST.TOTAL_VIS]||0);
+    const uniqVis  = parseInt(row[ST.UNIQUE_VIS]||0);
+    const rc = smReco[sm] || { reco:0, reco_vis:0 };
+    if (!tmMap[tm]) tmMap[tm] = { tm, sms:[], totActive:0, totVis:0, uniqVis:0, totReco:0, recoVis:0 };
+    tmMap[tm].sms.push({ sm, active, totVis, uniqVis, reco:rc.reco, reco_vis:rc.reco_vis });
+    tmMap[tm].totActive += active;
+    tmMap[tm].totVis    += totVis;
+    tmMap[tm].uniqVis   += uniqVis;
+    tmMap[tm].totReco   += rc.reco;
+    tmMap[tm].recoVis   += rc.reco_vis;
+  }
+
+  repSummaryData = Object.values(tmMap).sort((a,b) => b.totReco - a.totReco);
+  renderRepTable(repSummaryData, '');
+}
+
+function filterRepTable() {
+  const q = (document.getElementById('reco-rep-search').value || '').toLowerCase();
+  renderRepTable(repSummaryData, q);
+}
+
+function renderRepTable(tmList, q) {
+  if (!tmList.length) {
+    document.getElementById('reco-rep-body').innerHTML =
+      '<tr><td colspan="7" class="no-data">No rep data available — load recommendations first</td></tr>';
+    return;
+  }
+  function hitCol(pct) { return pct >= 60 ? '#15803d' : pct >= 40 ? '#92400e' : '#991b1b'; }
+
+  let html = '';
+  for (const tm of tmList) {
+    // filter by search query
+    const smMatch = tm.sms.filter(s => !q || fmtEmail(s.sm).toLowerCase().includes(q));
+    const tmMatch = !q || fmtEmail(tm.tm).toLowerCase().includes(q) || smMatch.length > 0;
+    if (!tmMatch) continue;
+    const displaySms = q && smMatch.length ? smMatch : tm.sms.sort((a,b)=>b.reco-a.reco);
+
+    const hr = tm.totReco ? Math.round(tm.recoVis*100/tm.totReco) : 0;
+    // TM header row
+    html += `<tr style="background:#eff6ff;border-top:2px solid #bfdbfe">
+      <td class="left" style="padding-left:10px">
+        <strong style="font-size:12.5px;color:#1e40af">${fmtEmail(tm.tm)}</strong>
+        <span style="font-size:10px;color:#94a3b8;margin-left:6px">${tm.sms.length} SM${tm.sms.length!==1?'s':''}</span>
+      </td>
+      <td class="left"><span class="badge badge-blue">Territory Manager</span></td>
+      <td><strong>${fmtN(tm.totActive)}</strong></td>
+      <td><strong>${tm.totReco > 0 ? fmtN(tm.totReco) : '<span style="color:#cbd5e1">—</span>'}</strong></td>
+      <td><strong>${tm.totVis > 0 ? fmtN(tm.totVis) : '<span style="color:#cbd5e1">—</span>'}</strong></td>
+      <td><strong>${tm.uniqVis > 0 ? fmtN(tm.uniqVis) : '<span style="color:#cbd5e1">—</span>'}</strong></td>
+      <td>${tm.totReco>0 ? `<strong style="color:${hitCol(hr)}">${hr}%</strong>` : '<span style="color:#cbd5e1">—</span>'}</td>
+    </tr>`;
+    // SM sub-rows
+    for (const sm of displaySms) {
+      const smHR = sm.reco ? Math.round(sm.reco_vis*100/sm.reco) : 0;
+      html += `<tr>
+        <td class="left" style="padding-left:26px;color:#475569">
+          <span style="color:#cbd5e1;margin-right:5px">└</span>${fmtEmail(sm.sm)}
+        </td>
+        <td class="left"><span class="badge badge-gray">Sales Manager</span></td>
+        <td style="color:#64748b">${fmtN(sm.active)}</td>
+        <td>${sm.reco>0 ? fmtN(sm.reco) : '<span style="color:#cbd5e1">—</span>'}</td>
+        <td>${sm.totVis>0 ? `<strong style="color:${sm.totVis===0?'#dc2626':'#0f172a'}">${fmtN(sm.totVis)}</strong>` : '<span style="color:#dc2626;font-size:11px">0 visits</span>'}</td>
+        <td>${sm.uniqVis>0 ? fmtN(sm.uniqVis) : '<span style="color:#cbd5e1">—</span>'}</td>
+        <td>${sm.reco>0 ? `<span style="color:${hitCol(smHR)};font-weight:700">${smHR}%</span>` : '<span style="color:#cbd5e1">—</span>'}</td>
+      </tr>`;
+    }
+  }
+  document.getElementById('reco-rep-body').innerHTML = html ||
+    '<tr><td colspan="7" class="no-data">No reps match the search</td></tr>';
 }
 
 function renderSignalDist(rows) {
