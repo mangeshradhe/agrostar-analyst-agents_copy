@@ -641,4 +641,203 @@ AND sv.source = 'saathiapp'
 5. **So what?** — which TMs/SMs are underperforming, which stores are at risk, what P2P is overdue.
 6. One specific next drill-down.
 
+---
+
+## Store Visit Recommendation Algorithm
+
+When asked to recommend stores for a field rep to visit, use this algorithm exactly. Do not deviate.
+
+---
+
+### Scope
+**Active partners only** (`okr_data_live.status = 'ACTIVE'`). Never recommend INACTIVE partners.
+
+---
+
+### Capacity Baseline (from real data — not assumption)
+- **3 visits/day per rep** — verified from actual visit logs (38% of active days have exactly 3 visits; median = 3)
+- **15 visits/week** (3 × 5 working days)
+
+---
+
+### Step 1 — Suppression
+Remove these from scoring entirely before doing anything:
+- `status = 'INACTIVE'` → out
+- Visited in last 7 days → out, **unless** OCP DPD has crossed 60 since that visit
+- No credit wallet + no orders ever + never visited → expansion candidate, not a store visit recommendation
+
+---
+
+### Step 2 — Score Each Store on 4 Signals
+
+**Final Score = (0.40 × A) + (0.30 × B) + (0.20 × C) + (0.10 × D)**
+
+---
+
+#### Signal A — Revenue Risk (40%)
+
+| Condition | Points |
+|---|---|
+| HARD_BLOCK — partner cannot place orders | 100 |
+| No orders in last 30 days, was active before | 70 |
+| Revenue dropped > 40% vs **same month last year** (YoY) | 60 |
+| Revenue dropped 20–50% vs **Apr–Jun last year** (same quarter YoY) | 40 |
+| New partner < 90 days old, fewer than 2 visits so far | 50 |
+| High-value partner, stable revenue, not visited this month | 20 |
+
+**Revenue comparison rules:**
+- Single-month signal → compare current month vs same calendar month last year (e.g. June 2026 vs June 2025) — eliminates seasonality
+- Quarterly signal → compare Apr+May+Jun 2026 vs Apr+May+Jun 2025 (Q1 of FY27 vs Q1 of FY26)
+- Revenue = invoiced B2B from `pristine_wms_views.invoiced_report` joined via `order_management_order`
+
+---
+
+#### Signal B — Collection Urgency (30%)
+
+| Condition | Points |
+|---|---|
+| OCP > 0, DPD > 90 days | 100 |
+| OCP > 0, DPD 60–90 days | 80 |
+| OCP > 0, DPD 30–60 days | 60 |
+| OCP > 0, DPD 1–30 days | 40 |
+| P2P due this week (promise_to_pay_date within next 7 days) | +30 bonus |
+| P2P already missed (promise_to_pay_date passed, no payment recorded) | +20 bonus |
+
+**OCP definition (reconciliation-based — never use transaction netting):**
+- OCP = debit entries (`transaction_type=0`, `cancelled=0`, `reason_id!=2`) where `remaining > 0` AND `DATE(due_date) < CURRENT_DATE()`
+- `remaining = debit.amount − COALESCE(SUM(reconciliation.amount), 0)` where reconciliation `cancelled=0`
+- See [[outstanding-ocp-logic]] for canonical CTE
+
+---
+
+#### Signal C — Visit Gap (20%)
+
+| Condition | Points |
+|---|---|
+| Never visited | 100 |
+| Last visit > 60 days ago | 80 |
+| Last visit 30–60 days ago | 50 |
+| Last visit 14–30 days ago | 20 |
+| Last visit < 14 days ago | 0 |
+
+---
+
+#### Signal D — Territory Coverage (10%)
+
+| Condition | Points |
+|---|---|
+| Partner in a cluster with < 50% visit coverage this month | 20 |
+| Partner in a cluster with 50–80% coverage | 10 |
+| Partner in a cluster with > 80% coverage | 0 |
+
+---
+
+### Step 3 — Select Top 15 and Route
+
+1. Sort all active partners in rep's territory by Final Score descending
+2. Take **top 15**
+3. **Edge case — rep overloaded with OCP:** If > 15 partners have DPD > 30, sort those by `OCP × DPD` (biggest × oldest first) to front-load the most critical into early days
+4. **Geography routing:** Group top 15 by cluster/village → assign geographically proximate stores to the same day → 3 stores per day, each day a self-contained route
+
+---
+
+### Step 4 — Reason Tag Every Recommendation
+
+Every store gets a human-readable reason so the rep knows what to do when they walk in:
+
+| Store | Score | Reason |
+|---|---|---|
+| Ramesh Traders | 91 | OCP ₹82,000 · 67 days overdue |
+| Shiva Agro | 85 | P2P ₹50,000 due this week |
+| Kumar Seeds | 74 | Blocked · no orders since May 3 |
+| Patel Store | 61 | Revenue down 48% vs June last year |
+| Gupta Agri | 52 | Q1 revenue down 35% vs Q1 FY26 |
+
+---
+
+### Known Limitations (v1)
+- Does not account for partner reachability (owner availability)
+- Does not flag partners already in legal recovery (visit may be pointless)
+- Does not adjust for rep territory size variance (some reps have 3× more stores)
+
 **Efficiency rules:** No restating SQL. No explaining filters. If the user names a rep or store, look it up directly — don't ask for IDs. Always use the dedup CTE even for simple counts — raw tables overcount by ~2% within-table and up to ~5% in the Apr-May overlap period.
+
+---
+
+## Field Dashboard — Architecture & Build Status
+
+**File:** `field_dashboard.html` served by `proxy.py` (Flask) on `http://localhost:7891/field_dashboard.html`  
+**Run:** `cd "/Users/darpan/Documents/claude code/DVS Analysis" && python3 proxy.py`
+
+The dashboard has multiple tabs. **Tab 3 — Recommendations** implements the algorithm above end-to-end.
+
+---
+
+### Recommendations Query — CTE Chain Logic
+
+`FIELD_RECOMMENDATIONS_SQL` in `proxy.py`. Parameterised by: `{from_date}`, `{to_date}`, `{input_cutoff}`, `{curr_month_start}`, `{prev_year_month_start}`, `{prev_year_month_end}`, `{curr_q_start}`, `{prev_q_start}`, `{prev_q_end}`.
+
+**`input_cutoff` = from_date − 1 day.** All "as-of" data (OCP, revenue, visits) is measured as of this cutoff, not today. This lets past weeks be scored correctly even when loaded in a future session.
+
+CTE chain in order:
+1. `partners` — active partners from `okr_data_live` (status=ACTIVE, sm not VACANT), gets partner_id, name, sm, tm, cluster, state
+2. `all_debits` — credit wallet debits (reason_id=3, transaction_type=0, cancelled=0) with due_date
+3. `reconciled` — sum of reconciliation amounts per debit where `DATE(r.created_on) <= input_cutoff` and reconciliation cancelled=0
+4. `outstanding_debits` — debits where remaining (debit.amount − reconciled) > 0
+5. `partner_ocp` — per partner: total OCP amount and max DPD (DATE_DIFF from due_date to input_cutoff). Joins to `csr_farmer` to resolve wallet_user_id → farmer_id
+6. `revenue_data` — from `pristine_wms_views.invoiced_report` JOIN `order_management_order`: rev_curr (current month), rev_prev (same month LY), rev_q_curr (current quarter), rev_q_prev (same quarter LY), rev_30d (last 30 days before cutoff)
+7. `hist_visits_raw` / `hist_visits` — union of both visit apps, deduped by (store_id, date) — entire visit history
+8. `last_visit` — MAX(date) per store = last visit date; days_gap = DATE_DIFF(input_cutoff, last_visit_date)
+9. `visited_curr_month` — stores visited at least once since curr_month_start (used for coverage suppression)
+10. `visited_last_7d` — stores visited within 7 days before input_cutoff (suppression: skip unless DPD>60)
+11. `p2p` — latest P2P record per store (promise date + amount), from both visit apps
+12. `cluster_cov` — % of active partners in each cluster visited this month (for Signal D)
+13. `actual_visits` — stores actually visited in the recommendation period (from_date to to_date), used for `was_visited` column
+14. `scored` — all signal values computed per partner (signal_a through signal_d using the exact tier logic above)
+15. `with_final` — final_score = 0.4×A + 0.3×B + 0.2×C + 0.1×D; is_hard_block flag; dominant signal (A/B/C/D); sa_c/sb_c/sc_c/sd_c = each signal's weighted contribution to final score; suppressed rows excluded here
+16. `ranked` — ROW_NUMBER() OVER (PARTITION BY sm ORDER BY final_score DESC)
+17. Final SELECT: WHERE sm_rank <= 18 (top 18 per SM), LEFT JOIN actual_visits for was_visited
+
+**Output columns (29, 0-indexed):** partner_id[0], name[1], sm[2], tm[3], cluster[4], state[5], final_score[6], signal_a[7], signal_b[8], signal_c[9], signal_d[10], sa_c[11], sb_c[12], sc_c[13], sd_c[14], dom_signal[15], ocp[16], dpd[17], is_hard_block[18], rev_curr[19], rev_prev[20], rev_q_curr[21], rev_q_prev[22], last_visit_date[23], days_gap[24], p2p_date[25], p2p_amount[26], was_visited[27], sm_rank[28]
+
+---
+
+### Rep Summary Table Logic
+
+`FIELD_REP_STATS_SQL` returns per-SM: sm_email, tm_email, active_stores, total_visits, unique_stores_visited (for the from/to period). UI groups by TM (blue header row) with SMs as sub-rows (└ indent). Hit rate = unique stores visited that are in the recommended list / total recommended stores for that SM.
+
+---
+
+### Weekly Snapshot Persistence
+
+Recommendations are scored against a fixed `input_cutoff` and saved as JSON files in `snapshots/reco_{from_date}.json`. This lets any past week be reloaded without re-running BQ, and progress (actual visits vs the plan) can be tracked against a frozen recommendation list.
+
+**Backend routes:**
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/field/recommendations?from=&to=` | Run BQ, score all partners, return rows + sm_stats + meta |
+| `POST /api/field/reco/save` | Save snapshot JSON to disk |
+| `GET /api/field/reco/weeks` | List all saved snapshots (from_date, to_date, label, reco_count) |
+| `GET /api/field/reco/snapshot?week=YYYY-MM-DD` | Return saved snapshot (no BQ) |
+| `GET /api/field/reco/progress?week=YYYY-MM-DD` | Load snapshot store IDs, run visit queries for the period, return day-by-day progress + per-store visited status |
+
+**Progress query logic:** Store IDs from the saved snapshot are embedded as `UNNEST([id1, id2, ...])` in BQ — no temp table needed. Returns daily: total_stores_visited, reco_hit (how many recommended stores were visited), total_visits, cumulative_hit. Also returns per-store was_visited (0/1) to refresh the store table live.
+
+**Date math for scoring:**
+- `input_cutoff = from_date − 1 day` (Sunday before the week)
+- `curr_month_start = cutoff.replace(day=1)`
+- `prev_year_month_start/end` = same month last year (for YoY revenue signal)
+- `curr_q_start` = April 1 if month ≥ April, else January 1 (for QoQ signal)
+- `prev_q_start/end` = same quarter start/end last year
+
+---
+
+### Dashboard UI — Tab 3 Elements
+
+- **6 KPI cards:** Total Recs, Critical (score≥70), High (50–70), Hit Rate %, Hard Blocks, Avg Score
+- **Store table (12 cols):** Rank · Store · Score (colour-coded) · Signal bar (stacked CSS proportional to weighted contribution, purple/red/blue/gray) · Primary Reason (plain English) · OCP/DPD · Revenue trend · Last Visit · P2P · Confidence badge (🔴 OCP data, 🟡 revenue data, ⚪ gap only) · Visited status
+- **Rep Summary table:** TM grouped, SM sub-rows, with Rep Name / Designation / Recommended / Visits / Unique Stores / Hit Rate — searchable
+- **Signal Distribution panel:** 4 cards (one per signal) with store counts per tier + behavioural insight
+- **Week control bar:** dropdown of saved weeks → Load / Save / Refresh Progress buttons
+- **Progress panel:** day-by-day bar chart for the week (green=done, blue=today, gray=future) + cumulative bar

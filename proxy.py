@@ -856,6 +856,86 @@ def visit_analysis():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+import json as _json
+
+SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'snapshots')
+os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+
+# ── Daily progress query ────────────────────────────────────────────────────
+# {store_ids} = comma-separated INT64 list   {from_date} / {to_date} = ISO dates
+
+FIELD_RECO_PROGRESS_SQL = """
+WITH
+reco_ids AS (
+  SELECT partner_id FROM UNNEST([{store_ids}]) AS partner_id
+),
+visits_raw AS (
+  SELECT
+    date AS visit_date,
+    SAFE_CAST(store_id AS INT64) AS partner_id,
+    LOWER(TRIM(email)) AS email
+  FROM (
+    SELECT date, CAST(store_id AS STRING) AS store_id, email
+    FROM `agrostar-data.offline_team.store_visits_v2`
+    WHERE date BETWEEN '{from_date}' AND '{to_date}'
+    UNION ALL
+    SELECT DATE(date) AS date, storeId AS store_id, email
+    FROM `agrostar-data.prod_db_views.visit`
+    WHERE DATE(date) BETWEEN '{from_date}' AND '{to_date}'
+  )
+),
+visits_dedup AS (
+  SELECT * EXCEPT(rn) FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY visit_date, partner_id ORDER BY email) AS rn
+    FROM visits_raw
+  ) WHERE rn = 1
+),
+daily AS (
+  SELECT
+    v.visit_date,
+    COUNT(DISTINCT v.partner_id)                                                        AS total_stores,
+    COUNT(DISTINCT CASE WHEN r.partner_id IS NOT NULL THEN v.partner_id END)            AS reco_hit,
+    COUNT(*)                                                                            AS total_visits
+  FROM visits_dedup v
+  LEFT JOIN reco_ids r ON r.partner_id = v.partner_id
+  GROUP BY 1
+)
+SELECT
+  FORMAT_DATE('%Y-%m-%d', visit_date) AS visit_date,
+  total_stores,
+  reco_hit,
+  total_visits,
+  SUM(reco_hit) OVER (ORDER BY visit_date ROWS UNBOUNDED PRECEDING) AS cumulative_hit
+FROM daily
+ORDER BY visit_date
+"""
+
+# Returns current was_visited status for each recommended store
+FIELD_RECO_STORE_STATUS_SQL = """
+WITH
+reco_ids AS (
+  SELECT partner_id FROM UNNEST([{store_ids}]) AS partner_id
+),
+visited AS (
+  SELECT DISTINCT SAFE_CAST(store_id AS INT64) AS partner_id
+  FROM (
+    SELECT CAST(store_id AS STRING) AS store_id
+    FROM `agrostar-data.offline_team.store_visits_v2`
+    WHERE date BETWEEN '{from_date}' AND '{to_date}'
+    UNION ALL
+    SELECT storeId AS store_id
+    FROM `agrostar-data.prod_db_views.visit`
+    WHERE DATE(date) BETWEEN '{from_date}' AND '{to_date}'
+  )
+)
+SELECT
+  CAST(r.partner_id AS STRING) AS partner_id,
+  CASE WHEN v.partner_id IS NOT NULL THEN 1 ELSE 0 END AS was_visited
+FROM reco_ids r
+LEFT JOIN visited v ON v.partner_id = r.partner_id
+"""
+
+
 FIELD_REP_STATS_SQL = """
 WITH
 visit_counts AS (
@@ -933,6 +1013,101 @@ def field_recommendations():
             'curr_month_start':    curr_month_start,
             'prev_year_month_end': prev_year_month_end,
         }})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/field/reco/save', methods=['POST'])
+def reco_save():
+    """Save current recommendation snapshot to disk."""
+    body = request.get_json(force=True) or {}
+    from_date = body.get('from_date', '')
+    if not from_date:
+        return jsonify({'ok': False, 'error': 'from_date required'}), 400
+    snapshot = {
+        'from_date':    from_date,
+        'to_date':      body.get('to_date', ''),
+        'input_cutoff': body.get('input_cutoff', ''),
+        'label':        body.get('label', ''),
+        'saved_at':     datetime.datetime.now().isoformat(timespec='seconds'),
+        'rows':         body.get('rows', []),
+        'sm_stats':     body.get('sm_stats', []),
+        'meta':         body.get('meta', {}),
+    }
+    path = os.path.join(SNAPSHOTS_DIR, f'reco_{from_date}.json')
+    with open(path, 'w') as f:
+        _json.dump(snapshot, f)
+    return jsonify({'ok': True, 'saved': path, 'label': snapshot['label']})
+
+
+@app.route('/api/field/reco/weeks')
+def reco_weeks():
+    """List all saved recommendation snapshots."""
+    weeks = []
+    for fname in sorted(os.listdir(SNAPSHOTS_DIR), reverse=True):
+        if not (fname.startswith('reco_') and fname.endswith('.json')):
+            continue
+        try:
+            with open(os.path.join(SNAPSHOTS_DIR, fname)) as f:
+                snap = _json.load(f)
+            weeks.append({
+                'from_date':   snap.get('from_date', ''),
+                'to_date':     snap.get('to_date', ''),
+                'label':       snap.get('label', ''),
+                'reco_count':  len(snap.get('rows', [])),
+                'saved_at':    snap.get('saved_at', ''),
+                'input_cutoff': snap.get('input_cutoff', ''),
+            })
+        except Exception:
+            continue
+    return jsonify({'ok': True, 'weeks': weeks})
+
+
+@app.route('/api/field/reco/snapshot')
+def reco_snapshot():
+    """Return saved snapshot (no BQ query — instant)."""
+    week = request.args.get('week', '')
+    if not week:
+        return jsonify({'ok': False, 'error': 'week param required'}), 400
+    path = os.path.join(SNAPSHOTS_DIR, f'reco_{week}.json')
+    if not os.path.exists(path):
+        return jsonify({'ok': False, 'error': f'No snapshot for week {week}'}), 404
+    with open(path) as f:
+        snap = _json.load(f)
+    return jsonify({'ok': True, **snap})
+
+
+@app.route('/api/field/reco/progress')
+def reco_progress():
+    """Day-by-day progress + per-store visited status for a saved week."""
+    week = request.args.get('week', '')
+    if not week:
+        return jsonify({'ok': False, 'error': 'week param required'}), 400
+    path = os.path.join(SNAPSHOTS_DIR, f'reco_{week}.json')
+    if not os.path.exists(path):
+        return jsonify({'ok': False, 'error': f'No snapshot for week {week}'}), 404
+    with open(path) as f:
+        snap = _json.load(f)
+
+    rows      = snap.get('rows', [])
+    from_date = snap['from_date']
+    to_date   = snap['to_date']
+
+    if not rows:
+        return jsonify({'ok': True, 'daily': [], 'store_status': [],
+                        'from_date': from_date, 'to_date': to_date,
+                        'total_reco': 0})
+
+    # Extract integer partner IDs from column 0 of saved rows
+    store_ids = ', '.join(str(int(r[0])) for r in rows if r[0])
+    try:
+        daily        = run_query(FIELD_RECO_PROGRESS_SQL.format(
+            store_ids=store_ids, from_date=from_date, to_date=to_date))
+        store_status = run_query(FIELD_RECO_STORE_STATUS_SQL.format(
+            store_ids=store_ids, from_date=from_date, to_date=to_date))
+        return jsonify({'ok': True, 'daily': daily, 'store_status': store_status,
+                        'from_date': from_date, 'to_date': to_date,
+                        'total_reco': len(rows)})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 

@@ -116,6 +116,18 @@ tbody tr:hover td { background: #f8fafc; }
 .cov-pct { font-weight: 700; }
 
 /* Recommendations tab */
+.reco-week-bar { background:#fff;border-bottom:1px solid #e2e8f0;padding:8px 28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap; }
+.reco-week-bar .filter-label { font-size:10.5px; }
+.week-select { padding:5px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:11.5px;color:#1a1a2e;background:#fff;font-family:inherit;cursor:pointer;min-width:220px; }
+.week-select:focus { outline:none;border-color:#16a34a; }
+.week-action-btn { padding:5px 14px;border-radius:6px;border:1.5px solid;font-size:11.5px;font-weight:700;cursor:pointer;transition:all .12s;white-space:nowrap;background:#fff; }
+.week-action-btn.save  { color:#7c3aed;border-color:#7c3aed; }
+.week-action-btn.save:hover  { background:#7c3aed;color:#fff; }
+.week-action-btn.load  { color:#2563eb;border-color:#2563eb; }
+.week-action-btn.load:hover  { background:#2563eb;color:#fff; }
+.week-action-btn.progress { color:#16a34a;border-color:#16a34a; }
+.week-action-btn.progress:hover { background:#16a34a;color:#fff; }
+.week-status { font-size:11px;color:#94a3b8; }
 .reco-hint { background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;padding:10px 16px;margin:14px 28px 0;font-size:11.5px;color:#6b21a8;line-height:1.7; }
 .sig-legend { display:flex;gap:14px;align-items:center;padding:6px 16px;background:#f8fafc;border-bottom:1px solid #f1f5f9;font-size:10.5px;color:#64748b;flex-wrap:wrap; }
 .sig-dot { display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle; }
@@ -125,6 +137,25 @@ tbody tr:hover td { background: #f8fafc; }
 .dist-card-value { font-size:26px;font-weight:800;line-height:1.1; }
 .dist-card-sub { font-size:11px;color:#64748b;margin-top:4px; }
 .insight-card { background:#fafafa;border:1.5px solid #e2e8f0;border-radius:10px;padding:16px 20px;min-width:260px;flex:2;font-size:12px;line-height:1.8; }
+
+/* Weekly progress panel */
+.progress-panel { margin:14px 28px 0;background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden; }
+.progress-header { padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between; }
+.progress-body { padding:16px 20px; }
+.progress-summary { display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap; }
+.prog-kpi { text-align:center; }
+.prog-kpi-val { font-size:22px;font-weight:800;line-height:1.1; }
+.prog-kpi-lbl { font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-top:2px; }
+.day-row { display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:11.5px; }
+.day-label { width:96px;flex-shrink:0;color:#64748b;font-weight:600; }
+.day-bar-bg { flex:1;height:10px;background:#f1f5f9;border-radius:5px;overflow:hidden;position:relative; }
+.day-bar-fill { height:100%;border-radius:5px;background:#16a34a;transition:width .4s ease; }
+.day-bar-fill.today { background:#2563eb; }
+.day-bar-fill.future { background:#e2e8f0; }
+.day-count { width:90px;flex-shrink:0;font-weight:700;color:#0f172a; }
+.day-total { width:80px;flex-shrink:0;font-size:10.5px;color:#94a3b8; }
+.cumul-bar-bg { height:14px;background:#f1f5f9;border-radius:7px;overflow:hidden;margin-top:12px; }
+.cumul-bar-fill { height:100%;border-radius:7px;background:linear-gradient(90deg,#16a34a,#2563eb);transition:width .5s ease; }
 </style>
 </head>
 <body>
@@ -355,6 +386,20 @@ tbody tr:hover td { background: #f8fafc; }
 ══════════════════════════════════════════════════════════ -->
 <div id="tab-reco" class="tab-panel">
 
+  <!-- Week control bar -->
+  <div class="reco-week-bar">
+    <span class="filter-label">Saved Weeks</span>
+    <select id="reco-week-sel" class="week-select" onchange="onWeekSelect()">
+      <option value="">— select a saved week —</option>
+    </select>
+    <button class="week-action-btn load" id="reco-load-saved-btn" onclick="loadSavedWeek()" disabled>↓ Load Week</button>
+    <div class="divider"></div>
+    <button class="week-action-btn save" id="reco-save-btn" onclick="saveWeek()" disabled>↑ Save This Week</button>
+    <div class="divider"></div>
+    <button class="week-action-btn progress" id="reco-progress-btn" onclick="loadProgress()" disabled>⟳ Refresh Progress</button>
+    <span class="week-status" id="reco-week-status"></span>
+  </div>
+
   <div class="reco-hint">
     <strong>Algorithm</strong> — Scores every active partner:
     <span style="color:#7c3aed;font-weight:700">Revenue Risk 40%</span> +
@@ -374,6 +419,30 @@ tbody tr:hover td { background: #f8fafc; }
     <div class="kpi green"><div class="kpi-label">Hit Rate</div><div class="kpi-value" id="reco-k-hitrate">—</div><div class="kpi-sub" id="reco-k-hitrate-sub">visited in period</div></div>
     <div class="kpi red"><div class="kpi-label">Hard Blocks</div><div class="kpi-value" id="reco-k-blocks">—</div><div class="kpi-sub">in reco list</div></div>
     <div class="kpi purple"><div class="kpi-label">Avg Score</div><div class="kpi-value" id="reco-k-avgscore">—</div><div class="kpi-sub">across all recs</div></div>
+  </div>
+
+  <!-- Weekly Progress Panel -->
+  <div class="progress-panel" id="progress-panel" style="display:none">
+    <div class="progress-header">
+      <div>
+        <div class="table-title" id="prog-title">Weekly Progress</div>
+        <div class="table-subtitle" id="prog-subtitle">Day-by-day execution vs plan</div>
+      </div>
+      <div style="display:flex;gap:20px">
+        <div class="prog-kpi"><div class="prog-kpi-val" id="prog-target">—</div><div class="prog-kpi-lbl">Target</div></div>
+        <div class="prog-kpi"><div class="prog-kpi-val" style="color:#16a34a" id="prog-done">—</div><div class="prog-kpi-lbl">Done</div></div>
+        <div class="prog-kpi"><div class="prog-kpi-val" style="color:#2563eb" id="prog-pct">—</div><div class="prog-kpi-lbl">Complete</div></div>
+        <div class="prog-kpi"><div class="prog-kpi-val" style="color:#64748b" id="prog-remain">—</div><div class="prog-kpi-lbl">Remaining</div></div>
+      </div>
+    </div>
+    <div class="progress-body">
+      <div id="prog-days"></div>
+      <div id="prog-cumul-wrap" style="display:none">
+        <div style="font-size:10.5px;color:#64748b;font-weight:700;margin-top:12px;margin-bottom:4px">CUMULATIVE PROGRESS</div>
+        <div class="cumul-bar-bg"><div class="cumul-bar-fill" id="prog-cumul-bar" style="width:0%"></div></div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px" id="prog-cumul-label"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Store recommendation table -->
@@ -932,6 +1001,16 @@ async function loadReco() {
 
     filterRecoTable();
 
+    // Enable save + progress buttons
+    document.getElementById('reco-save-btn').disabled = false;
+    document.getElementById('reco-progress-btn').disabled = false;
+    // Store current week meta for save/progress
+    window._recoCurrentMeta = { from_date: from, to_date: to,
+      input_cutoff: meta.input_cutoff || '', label: fmtWeekLabel(from, to) };
+
+    // Auto-refresh weeks dropdown
+    loadWeeks();
+
     const now = new Date().toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' });
     document.getElementById('last-loaded').innerHTML =
       `Recommendations: ${now}<br>${recoDataFull.length.toLocaleString('en-IN')} recs · ${from} → ${to}`;
@@ -943,6 +1022,211 @@ async function loadReco() {
     hideOverlay();
     document.getElementById('reco-load-btn').disabled = false;
   }
+}
+
+// ── Week helpers ──────────────────────────────────────────────────────────
+function fmtWeekLabel(from, to) {
+  const f = new Date(from + 'T00:00:00');
+  const t = new Date(to   + 'T00:00:00');
+  const opts = { day:'numeric', month:'short' };
+  return `${f.toLocaleDateString('en-IN', opts)} – ${t.toLocaleDateString('en-IN', opts)}, ${t.getFullYear()}`;
+}
+
+async function loadWeeks() {
+  try {
+    const res  = await fetch('/api/field/reco/weeks');
+    const json = await res.json();
+    if (!json.ok) return;
+    const sel = document.getElementById('reco-week-sel');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— select a saved week —</option>'
+      + (json.weeks || []).map(w =>
+          `<option value="${w.from_date}">${w.label || fmtWeekLabel(w.from_date, w.to_date)} (${w.reco_count} recs)</option>`
+        ).join('');
+    if (cur) sel.value = cur;
+  } catch(e) { /* silent */ }
+}
+
+function onWeekSelect() {
+  const val = document.getElementById('reco-week-sel').value;
+  document.getElementById('reco-load-saved-btn').disabled = !val;
+}
+
+async function saveWeek() {
+  const meta = window._recoCurrentMeta;
+  if (!meta) { alert('Load recommendations first.'); return; }
+  if (!recoDataFull.length) { alert('No recommendations loaded — run Load Reco first.'); return; }
+  const statusEl = document.getElementById('reco-week-status');
+  statusEl.textContent = 'Saving…';
+  try {
+    const res  = await fetch('/api/field/reco/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from_date:    meta.from_date,
+        to_date:      meta.to_date,
+        input_cutoff: meta.input_cutoff,
+        label:        meta.label,
+        rows:         recoDataFull,
+        sm_stats:     smStatsRaw,
+        meta:         meta,
+      })
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    statusEl.textContent = `✓ Saved: ${json.label}`;
+    await loadWeeks();
+    // Pre-select the saved week
+    document.getElementById('reco-week-sel').value = meta.from_date;
+    document.getElementById('reco-load-saved-btn').disabled = false;
+    document.getElementById('reco-progress-btn').disabled = false;
+  } catch(e) {
+    statusEl.textContent = '❌ ' + e.message;
+  }
+}
+
+async function loadSavedWeek() {
+  const week = document.getElementById('reco-week-sel').value;
+  if (!week) { alert('Select a saved week first.'); return; }
+  showOverlay('Loading saved week…', 'Reading from disk — instant');
+  try {
+    const res  = await fetch(`/api/field/reco/snapshot?week=${week}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+
+    recoDataFull = json.rows || [];
+    smStatsRaw   = json.sm_stats || [];
+    window._recoCurrentMeta = {
+      from_date:    json.from_date,
+      to_date:      json.to_date,
+      input_cutoff: json.input_cutoff || '',
+      label:        json.label || fmtWeekLabel(json.from_date, json.to_date),
+    };
+    document.getElementById('reco-cutoff').textContent = json.input_cutoff || '';
+
+    const sms = [...new Set(recoDataFull.map(r => r[R.SM]).filter(Boolean))].sort();
+    const smSel = document.getElementById('reco-sel-sm');
+    smSel.innerHTML = `<option value="">All SMs (${sms.length})</option>`
+      + sms.map(s => `<option value="${s}">${fmtEmail(s)}</option>`).join('');
+
+    filterRecoTable();
+    document.getElementById('reco-save-btn').disabled = false;
+    document.getElementById('reco-progress-btn').disabled = false;
+    document.getElementById('reco-week-status').textContent =
+      `Loaded: ${json.label || fmtWeekLabel(json.from_date, json.to_date)}`;
+    document.getElementById('last-loaded').innerHTML =
+      `Saved week loaded<br>${recoDataFull.length.toLocaleString('en-IN')} recs · ${json.from_date} → ${json.to_date}`;
+    document.getElementById('query-status').textContent = `${recoDataFull.length} recs (saved)`;
+  } catch(e) {
+    alert('Error loading saved week: ' + e.message);
+  } finally {
+    hideOverlay();
+  }
+}
+
+async function loadProgress() {
+  const meta = window._recoCurrentMeta;
+  if (!meta) { alert('Load or select a saved week first.'); return; }
+  const week = meta.from_date;
+  // Progress requires saved snapshot — auto-save if not yet saved
+  const statusEl = document.getElementById('reco-week-status');
+  statusEl.textContent = 'Fetching progress…';
+  showOverlay('Fetching week progress…', 'Checking actual visits vs plan · ~5 s');
+  try {
+    // Ensure snapshot exists (save silently if needed)
+    const snapCheck = await fetch(`/api/field/reco/snapshot?week=${week}`);
+    if (!snapCheck.ok) {
+      // Auto-save first
+      await fetch('/api/field/reco/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from_date: meta.from_date, to_date: meta.to_date,
+          input_cutoff: meta.input_cutoff, label: meta.label,
+          rows: recoDataFull, sm_stats: smStatsRaw, meta,
+        })
+      });
+      await loadWeeks();
+    }
+    const res  = await fetch(`/api/field/reco/progress?week=${week}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+
+    // Update was_visited in recoDataFull from fresh store_status
+    const statusMap = {};
+    for (const s of (json.store_status || [])) statusMap[s[0]] = parseInt(s[1]||0);
+    recoDataFull = recoDataFull.map(r => {
+      const updated = [...r];
+      updated[R.VISITED] = String(statusMap[r[R.ID]] ?? parseInt(r[R.VISITED]||0));
+      return updated;
+    });
+    filterRecoTable();
+
+    renderProgressPanel(json, meta);
+    statusEl.textContent = `Progress loaded · ${new Date().toLocaleTimeString('en-IN')}`;
+  } catch(e) {
+    statusEl.textContent = '❌ ' + e.message;
+    alert('Error: ' + e.message);
+  } finally {
+    hideOverlay();
+  }
+}
+
+function renderProgressPanel(json, meta) {
+  const daily     = json.daily || [];       // [visit_date, total_stores, reco_hit, total_visits, cumulative_hit]
+  const totalReco = json.total_reco || 0;
+  const today     = new Date().toISOString().slice(0,10);
+
+  const totalDone = daily.length ? parseInt(daily[daily.length-1][4]||0) : 0;
+  const pct       = totalReco ? Math.round(totalDone*100/totalReco) : 0;
+
+  document.getElementById('prog-title').textContent =
+    `Weekly Progress — ${meta.label || fmtWeekLabel(meta.from_date, meta.to_date)}`;
+  document.getElementById('prog-subtitle').textContent =
+    `${meta.from_date} → ${meta.to_date} · Data as of ${today}`;
+  document.getElementById('prog-target').textContent  = totalReco.toLocaleString('en-IN');
+  document.getElementById('prog-done').textContent    = totalDone.toLocaleString('en-IN');
+  document.getElementById('prog-pct').textContent     = `${pct}%`;
+  document.getElementById('prog-remain').textContent  = Math.max(0, totalReco - totalDone).toLocaleString('en-IN');
+
+  // Build date spine for from_date → to_date
+  const spine = [];
+  let d = new Date(meta.from_date + 'T00:00:00');
+  const end = new Date(meta.to_date + 'T00:00:00');
+  while (d <= end) { spine.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+
+  const dailyMap = {};
+  for (const row of daily) dailyMap[row[0]] = row;
+  const maxHit = Math.max(1, ...daily.map(r => parseInt(r[2]||0)));
+
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = '';
+  for (const dateStr of spine) {
+    const row   = dailyMap[dateStr];
+    const hit   = row ? parseInt(row[2]||0) : 0;
+    const total = row ? parseInt(row[3]||0) : 0;
+    const isToday  = dateStr === today;
+    const isFuture = dateStr > today;
+    const barPct   = maxHit > 0 ? Math.round(hit*100/maxHit) : 0;
+    const barCls   = isFuture ? 'future' : isToday ? 'today' : '';
+    const dObj     = new Date(dateStr + 'T00:00:00');
+    const label    = `${dayNames[dObj.getDay()]} ${dObj.getDate()} ${dObj.toLocaleDateString('en-IN',{month:'short'})}`;
+    html += `<div class="day-row">
+      <span class="day-label">${label}${isToday?' <span style="background:#2563eb;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:700">TODAY</span>':''}</span>
+      <div class="day-bar-bg"><div class="day-bar-fill ${barCls}" style="width:${isFuture?0:barPct}%"></div></div>
+      <span class="day-count">${isFuture ? '<span style="color:#cbd5e1">—</span>' : `<strong>${hit}</strong> hit${hit!==1?'s':''}`}</span>
+      <span class="day-total">${total>0 ? `${total} visit${total!==1?'s':''}` : ''}</span>
+    </div>`;
+  }
+  document.getElementById('prog-days').innerHTML = html;
+
+  // Cumulative bar
+  document.getElementById('prog-cumul-wrap').style.display = '';
+  document.getElementById('prog-cumul-bar').style.width = `${pct}%`;
+  document.getElementById('prog-cumul-label').textContent =
+    `${totalDone} of ${totalReco} recommended stores visited (${pct}%) — ${Math.max(0,totalReco-totalDone)} remaining`;
+
+  document.getElementById('progress-panel').style.display = '';
 }
 
 function filterRecoTable() {

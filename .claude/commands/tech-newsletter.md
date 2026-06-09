@@ -225,6 +225,21 @@ For every JIRA ticket ID, call `mcp__claude_ai_Atlassian__getJiraIssue` (cloudId
 
 ## Step 5 — Create Gmail Draft with HTML
 
+⚠️ **CRITICAL — Gmail CSS Rules (MUST READ BEFORE WRITING ANY HTML)**
+
+Gmail STRIPS `<style>` tags from `<head>`. A newsletter that looks perfect in a browser will render as completely unstyled text/blocks in Gmail unless these rules are followed:
+
+1. **ALL CSS must be inline** — every `style="..."` attribute goes directly on each element. No exceptions. CSS classes in `<head>` are invisible to Gmail.
+2. **No flexbox, no CSS grid** — `display:flex` and `display:grid` are not supported. Use `<table>`-based layouts for every multi-column section (phones row, numbers grid, magic moment split, architecture row, store bar chart).
+3. **No CSS classes** — without the `<style>` block, class selectors do nothing. Every `color`, `font-size`, `padding`, `background`, `border-radius` must be a direct `style=` on the HTML tag.
+4. **`<table>` is the layout primitive** — use `<table width="620" cellpadding="0" cellspacing="0" border="0">` for all rows and columns.
+5. **Safe CSS properties** (work inline in Gmail): `background-color`, `color`, `font-family`, `font-size`, `font-weight`, `padding`, `margin`, `border`, `border-radius`, `text-align`, `line-height`, `width`, `max-width`.
+6. **Gradients work inline** — `background: linear-gradient(...)` as an inline style is fine.
+7. **SVG in body** works. `<img>` with external URLs works (Google Drive CDN: `https://drive.google.com/uc?export=view&id=FILE_ID`).
+8. **Test in Gmail, not browser** — always open the draft in Gmail after creating it to verify rendering before adding recipients.
+
+**The rule of thumb:** if you can't put it directly as `style="..."` on a tag, it won't render in Gmail.
+
 Use `mcp__claude_ai_Gmail__create_draft` with full HTML. Apply ALL UI/UX Design Standards above. Checklist before sending to draft:
 
 **Structure (in order):**

@@ -367,52 +367,88 @@ WHERE reason_id = 10
 
 ---
 
-### Overdue Amount
+### Outstanding vs OCP — Canonical Definitions
 
-Overdue = debits where `due_date < CURRENT_TIMESTAMP()` AND not fully settled.
+**CRITICAL — always use this approach. Never use transaction-level credit/debit netting.**
 
-**Settlement check:**
-- `SUM(r.amount)` for a debit = how much is settled
-- Remaining = `debit.amount - COALESCE(settled_sum, 0)`
-- Overdue only if remaining > 0
+| Term | Definition |
+|------|-----------|
+| **Outstanding** | All debit entries (excluding reason_id=2, cancelled=0) whose remaining unreconciled amount > 0. No due date filter. |
+| **OCP (Overdue Credit Position)** | Subset of Outstanding where `due_date < CURRENT_DATE()` — i.e. the due date has passed and it is still not fully settled. |
+
+**How to compute:**
+1. Take all debits from `wallet_creditwallettransaction` — `transaction_type=0`, `cancelled=0`, `reason_id!=2`
+2. For each debit, look up `wallet_creditwallettransactionreconciliation` (filter `cancelled=0`) and sum `amount` — this is how much of that debit has been settled
+3. `remaining = debit.amount - COALESCE(settled_sum, 0)`
+4. **Outstanding** = debits where `remaining > 0`
+5. **OCP** = Outstanding debits where `DATE(due_date) < CURRENT_DATE()`
+
+**Key rules:**
+- A debit can be partially settled — always check the reconciliation table, never assume
+- Reconciliation records can also be cancelled — always filter `r.cancelled = 0` on the reconciliation table
+- Do NOT net credits against debits in the main transaction table — that is wrong. Settlement tracking lives in the reconciliation table only
+- `reason_id = 2` (credit limit changes) is excluded from both sides always
+
+**Canonical CTE pattern (use this for every outstanding/OCP query):**
 
 ```sql
-WITH order_debits AS (
+WITH all_debits AS (
   SELECT
     t.id,
     t.wallet_user_id,
     t.amount,
     t.due_date,
-    DATE(t.created_on) AS order_date,
-    CASE
-      WHEN DATE(t.created_on) BETWEEN '2025-04-01' AND '2026-03-31' THEN 'FY26 (Apr25–Mar26)'
-      WHEN DATE(t.created_on) >= '2026-04-01'                        THEN 'FY27 (Apr26–Mar27)'
-      ELSE 'Earlier than FY26'
-    END AS order_fy
+    DATE(t.created_on) AS txn_date
   FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` t
-  WHERE t.reason_id = 3           -- Purchase/order debits
-    AND t.transaction_type = 0
+  WHERE t.transaction_type = 0
     AND t.cancelled = 0
-    AND t.due_date < CURRENT_TIMESTAMP()
+    AND t.reason_id != 2
 ),
-settled AS (
+reconciled AS (
   SELECT
     r.reconciled_for_id,
     SUM(r.amount) AS settled_amount
   FROM `agrostar-data.prod_db_views.wallet_creditwallettransactionreconciliation` r
   WHERE r.cancelled = 0
   GROUP BY r.reconciled_for_id
+),
+outstanding AS (
+  SELECT
+    d.id,
+    d.wallet_user_id,
+    d.due_date,
+    d.txn_date,
+    d.amount - COALESCE(r.settled_amount, 0) AS remaining
+  FROM all_debits d
+  LEFT JOIN reconciled r ON r.reconciled_for_id = d.id
+  WHERE d.amount - COALESCE(r.settled_amount, 0) > 0
 )
+-- Outstanding (all unreconciled debits):
 SELECT
-  od.order_fy,
-  ROUND(SUM(od.amount - COALESCE(s.settled_amount, 0)), 2) AS overdue_amount,
-  COUNT(DISTINCT od.id)              AS overdue_debit_count,
-  COUNT(DISTINCT od.wallet_user_id)  AS overdue_partner_count
-FROM order_debits od
-LEFT JOIN settled s ON s.reconciled_for_id = od.id
-WHERE od.amount - COALESCE(s.settled_amount, 0) > 0
-GROUP BY od.order_fy
-ORDER BY od.order_fy
+  COUNT(DISTINCT wallet_user_id)  AS partners_with_outstanding,
+  COUNT(*)                        AS debit_count,
+  ROUND(SUM(remaining), 2)        AS total_outstanding
+FROM outstanding
+-- OCP only (add this WHERE clause):
+-- WHERE DATE(due_date) < CURRENT_DATE()
+```
+
+**OCP by FY example:**
+```sql
+-- (use the outstanding CTE above, then:)
+SELECT
+  CASE
+    WHEN txn_date BETWEEN '2025-04-01' AND '2026-03-31' THEN 'FY26'
+    WHEN txn_date >= '2026-04-01'                        THEN 'FY27'
+    ELSE 'Pre-FY26'
+  END AS order_fy,
+  COUNT(DISTINCT wallet_user_id)  AS overdue_partners,
+  COUNT(*)                        AS overdue_debit_count,
+  ROUND(SUM(remaining), 2)        AS ocp_amount
+FROM outstanding
+WHERE DATE(due_date) < CURRENT_DATE()
+GROUP BY 1
+ORDER BY 1
 ```
 
 ---
