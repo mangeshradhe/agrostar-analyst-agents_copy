@@ -1055,6 +1055,227 @@ ORDER BY total_demand_gmv DESC
 
 ---
 
+---
+
+## Section 11: Farmer Serviceability Analysis
+
+**Business definition:** "Serviceable" = LMD logistics team has declared coverage for the farmer's delivery location. A farmer is serviceable if their shipping address matches at least one active coverage record — either village-level, taluka-level, or pincode-level. Serviceability is independent of DVS partner presence — a farmer can be serviceable (LMD can reach them) but still go to FC (no DVS store in their taluka).
+
+**Why it matters for DVS:**
+- Unserviceable farmers = 100% FC orders, no path to DVS even if a partner exists
+- Serviceability gaps by district/taluka = white space map for new LMD partner onboarding
+- DVS push rate = (serviceable demand that reaches a DVS partner) / (total serviceable demand)
+- Farmer orders where `dvsResolutionReason LIKE '%no_dehlivery%'` are serviceable by LMD definition but have no active DVS LMD — a more specific gap
+
+---
+
+### Table: Village Address Master — `static_tables_views.csr_villageaddress`
+
+Migrated from internal DB to LGD (Government of India) source. Old records had spelling errors, wrong taluka/district mappings, split districts, shifted villages. **Always use `static_tables_views` not `static_tables` — the views layer handles the union of active + archived records.**
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER | PK |
+| `village` | STRING | Village name |
+| `state` | STRING | Full state name — has typos, use normalization below |
+| `district` | STRING | District name |
+| `taluka` | STRING | Taluka name |
+| `pin_code` | STRING | Already STRING, no CAST needed |
+| `is_archived` | INTEGER | 0 = active/LGD canonical, 1 = old/retired |
+| `replaced_by_id` | INTEGER | Archived rows: points to canonical replacement row. **Can be NULL** — means truly retired with no equivalent |
+| `replaces_id` | INTEGER | Reverse pointer |
+| `lgd_village_code` | INTEGER | LGD govt code |
+| `data_source` | STRING | `'LGD'` for clean records |
+| `latitude` | FLOAT | Village centroid lat |
+| `longitude` | FLOAT | Village centroid lon |
+
+**Archived logic:**
+- `is_archived = 0` → active canonical LGD record — use directly
+- `is_archived = 1` + `replaced_by_id IS NOT NULL` → old record with known canonical equivalent → resolve to replacement before checking serviceability
+- `is_archived = 1` + `replaced_by_id IS NULL` → truly retired, no mapping possible → fall back to raw address
+
+**Use `static_tables.csr_villageaddress` (unfiltered) for lat/lon lookups** with `is_archived = 0` filter. Use `static_tables_views.csr_villageaddress` for full village master queries.
+
+---
+
+### State Name Normalization (CRITICAL)
+
+State column stores full names with typos. **Never filter by abbreviations.** Apply to both village master AND `assignment_deliveryarea.state`:
+
+```sql
+CASE
+  WHEN REGEXP_CONTAINS(LOWER(state), r'^gujarat')   THEN 'gujarat'
+  WHEN REGEXP_CONTAINS(LOWER(state), r'^maharash')  THEN 'maharashtra'
+  WHEN REGEXP_CONTAINS(LOWER(state), r'^rajas')     THEN 'rajasthan'
+  WHEN REGEXP_CONTAINS(LOWER(state), r'^madhya')    THEN 'madhya pradesh'
+  WHEN REGEXP_CONTAINS(LOWER(state), r'^uttar')     THEN 'uttar pradesh'
+END AS state_norm
+```
+
+Both `static_tables_views.csr_villageaddress.state` and `assignment_deliveryarea.state` have these typo variants (e.g. `'rajashtan'`, `'Maharasthra'`).
+
+---
+
+### Serviceability Join Chain (assignment tables)
+
+Logistics team marks LMD delivery coverage at village+pincode, taluka, or pincode level. Chain:
+
+```
+prod_db_views.assignment_deliverycoverage   (coverage record: coverage_type, village, pincode)
+  → prod_db_views.assignment_deliveryarea   (state, district, taluka)
+  → prod_db_views.assignment_pickuplocationfranchisemapping
+  → prod_db_views.assignment_franchise
+  → prod_db_views.delivery_franchise        (LMD franchisee entity)
+  → prod_db_views.assignment_pickuplocation (pickup hub)
+```
+
+**Active filters required at EVERY level:**
+```sql
+WHERE da.is_active = 1
+  AND dc.is_active = 1
+  AND apl.is_active = 1
+  AND asf.is_active = 1
+```
+
+**`coverage_type` values in `assignment_deliverycoverage`:**
+| Value | Row count | Match logic |
+|-------|-----------|-------------|
+| `'village'` | ~1,152,055 | Match on village name + pincode |
+| `'pincode'` | ~19,353 | Match on pincode only |
+| `'taluka'` | ~8,724 | Entire taluka covered — broadest brush |
+
+---
+
+### Serviceability Check Pattern (UNION to avoid duplicates)
+
+A single farmer location can match multiple coverage types. Use UNION not LEFT JOIN to deduplicate:
+
+```sql
+-- svc_village, svc_taluka, svc_pincode = pre-built CTEs from serviceability chain above
+-- vm = village master CTE with state_norm, village_norm, taluka_norm, pincode_norm
+
+serviceable_ids AS (
+  -- Village-level
+  SELECT DISTINCT vm.id
+  FROM vm
+  JOIN svc_village sv
+    ON sv.state_norm    = vm.state_norm
+    AND sv.village_norm = vm.village_norm
+    AND sv.pincode_norm = vm.pincode_norm
+
+  UNION DISTINCT
+
+  -- Taluka-level
+  SELECT DISTINCT vm.id
+  FROM vm
+  JOIN svc_taluka st
+    ON st.state_norm  = vm.state_norm
+    AND st.taluka_norm = vm.taluka_norm
+
+  UNION DISTINCT
+
+  -- Pincode-level
+  SELECT DISTINCT vm.id
+  FROM vm
+  JOIN svc_pincode sp
+    ON sp.state_norm  = vm.state_norm
+    AND sp.pincode_norm = vm.pincode_norm
+),
+vm_svc AS (
+  SELECT vm.*, (si.id IS NOT NULL) AS is_serviceable
+  FROM vm LEFT JOIN serviceable_ids si ON si.id = vm.id
+)
+```
+
+**Why UNION not LEFT JOIN:** One village often has both a village-level and taluka-level coverage row. LEFT JOINs inflate counts ~2–3×.
+
+---
+
+### Farmer Order → Serviceability Resolution Chain (8 buckets)
+
+**Tables involved:**
+- `prod_db_views.order_management_order` — `sales_order_id`, `owner_id` (farmer), `shipping_address_id`
+- `prod_db_views.csr_shippingaddress` — `id`, `state`, `district`, `taluka`, `village`, `pin_code` (free-text, no validation at entry)
+- `static_tables_views.csr_villageaddress` — canonical village master (LGD)
+- Assignment serviceability chain (above)
+
+**Step 1 — Concat-match shipping address → village master:**
+```sql
+LOWER(TRIM(sa.state))    = LOWER(TRIM(vm.state))
+AND LOWER(TRIM(sa.district)) = LOWER(TRIM(vm.district))
+AND LOWER(TRIM(sa.taluka))   = LOWER(TRIM(vm.taluka))
+AND LOWER(TRIM(sa.village))  = LOWER(TRIM(vm.village))
+AND LOWER(TRIM(sa.pin_code)) = LOWER(TRIM(vm.pin_code))
+```
+
+If Step 1 finds a match:
+- `is_archived = 0` → check serviceability on `vm.id` **[HIGH CONFIDENCE]**
+- `is_archived = 1` + `replaced_by_id IS NOT NULL` → resolve to canonical replacement → check serviceability **[HIGH CONFIDENCE]**
+- `is_archived = 1` + `replaced_by_id IS NULL` → no village master resolution → fall to Step 2
+
+If Step 1 finds no match → fall to Step 2
+
+**Step 2 — Raw address fallback:** Check serviceability directly on `csr_shippingaddress` fields (state + taluka + village + pincode) against serviceability tables **[BEST EFFORT — free-text noise means some false negatives possible]**
+
+**8 final buckets (every order gets a bucket):**
+
+| # | Path | Serviceable? | Confidence |
+|---|------|-------------|------------|
+| 1 | Matched → non-archived → serviceable | ✅ Covered | High |
+| 2 | Matched → non-archived → not serviceable | ❌ Not Covered | High |
+| 3 | Matched → archived → replacement serviceable | ✅ Covered | High |
+| 4 | Matched → archived → replacement not serviceable | ❌ Not Covered | High |
+| 5 | Matched → archived → no replaced_by_id → raw serviceable | ✅ Covered | Best effort |
+| 6 | Matched → archived → no replaced_by_id → raw not serviceable | ❌ Not Covered | Best effort |
+| 7 | No match in village master → raw serviceable | ✅ Covered | Best effort |
+| 8 | No match in village master → raw not serviceable | ❌ Not Covered | Best effort |
+
+No order is left unresolvable. **Match rate itself is a data quality signal** — the % falling to Step 2 vs Step 1 shows how cleanly historical addresses were entered.
+
+---
+
+### Coverage Reference Numbers (as of June 2026, 5 states)
+
+| State | Total Villages | Serviceable | Coverage % |
+|-------|---------------|-------------|------------|
+| Gujarat | 19,145 | 13,205 | 69.0% |
+| Uttar Pradesh | 1,10,630 | 71,252 | 64.4% |
+| Maharashtra | 44,845 | 24,540 | 54.7% |
+| Madhya Pradesh | 57,841 | 27,443 | 47.4% |
+| Rajasthan | 51,603 | 24,286 | 47.1% |
+| **5-state total** | **2,84,064** | **1,60,726** | **56.6%** |
+
+**Data debt flag (UP):** 68,031 archived UP villages have no `replaced_by_id` — if live farmer addresses still map to these IDs, no serviceability resolution is possible.
+
+---
+
+### Serviceability × DVS Demand — Combined Analysis
+
+To answer "how much of our unserviced demand can DVS capture if we expand coverage?":
+
+```sql
+-- Serviceability + DVS resolution overlap
+SELECT
+  CASE
+    WHEN is_serviceable AND dvs_resolved = 'yes' THEN 'Serviceable + DVS Fulfilled'
+    WHEN is_serviceable AND dvs_resolved = 'no'  THEN 'Serviceable + DVS Missed (FC)'
+    WHEN NOT is_serviceable                       THEN 'Not Serviceable (LMD gap)'
+    ELSE 'No TAT record'
+  END AS segment,
+  COUNT(DISTINCT sales_order_id) AS orders,
+  ROUND(SUM(order_gmv), 0) AS gmv
+FROM <farmer_orders_with_serviceability_and_tat>
+GROUP BY 1
+ORDER BY orders DESC
+```
+
+**Three actionable segments:**
+1. **Serviceable + DVS Missed** → review `dvsResolutionReason` — partner gap, license, distance, or OCP
+2. **Not Serviceable** → LMD expansion opportunity — present to logistics/Central Ops
+3. **No TAT record** → routing engine bypass (~37% of B2C) — product/engineering issue
+
+---
+
 ## Known Data Caveats
 
 These were discovered through live testing — not in any schema documentation:
