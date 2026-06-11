@@ -810,6 +810,12 @@ def underwriting_dashboard():
     return send_file(UNDERWRITING_DASHBOARD_PATH)
 
 
+@app.route('/saathi_plan_mockup')
+@app.route('/saathi_plan_mockup.html')
+def saathi_plan_mockup():
+    return send_file(os.path.join(os.path.dirname(__file__), 'saathi_plan_mockup.html'))
+
+
 @app.route('/health')
 def health():
     return jsonify({'ok': True})

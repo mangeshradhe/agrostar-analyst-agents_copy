@@ -156,6 +156,136 @@ tbody tr:hover td { background: #f8fafc; }
 .day-total { width:80px;flex-shrink:0;font-size:10.5px;color:#94a3b8; }
 .cumul-bar-bg { height:14px;background:#f1f5f9;border-radius:7px;overflow:hidden;margin-top:12px; }
 .cumul-bar-fill { height:100%;border-radius:7px;background:linear-gradient(90deg,#16a34a,#2563eb);transition:width .5s ease; }
+
+/* ══ Visit Planner Mockup ══════════════════════════════════ */
+.planner-subnav { background:#fff; border-bottom:1px solid #e2e8f0; padding:8px 28px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.planner-subnav-left { display:flex; gap:6px; align-items:center; }
+.pv-btn { padding:6px 14px; border-radius:6px; border:1.5px solid #e2e8f0; background:#fff; font-size:12px; font-weight:700; color:#64748b; cursor:pointer; transition:all .15s; }
+.pv-btn:hover { border-color:#16a34a; color:#16a34a; }
+.pv-btn.active { background:#16a34a; color:#fff; border-color:#16a34a; }
+.pv-panel { display:none; }
+.pv-panel.active { display:block; }
+.mockup-note { background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:7px 16px; font-size:11.5px; color:#92400e; margin:8px 28px 0; }
+.planner-layout { display:flex; gap:14px; padding:10px 28px 28px; height:calc(100vh - 245px); }
+.planner-left { flex:0 0 57%; display:flex; flex-direction:column; overflow:hidden; }
+.planner-right { flex:1; display:flex; flex-direction:column; gap:10px; overflow-y:auto; min-width:0; }
+.pl-search-row { background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 12px 8px; margin-bottom:8px; flex-shrink:0; }
+.pl-search-wrap { display:flex; align-items:center; gap:6px; }
+.pl-search { flex:1; border:none; outline:none; font-size:12.5px; color:#1a1a2e; font-family:inherit; background:transparent; }
+.pl-chips-row { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
+.plan-chip { padding:2px 9px; border-radius:12px; border:1.5px solid #e2e8f0; background:#fff; font-size:10.5px; font-weight:600; color:#475569; cursor:pointer; white-space:nowrap; transition:all .12s; }
+.plan-chip.active { background:#0f172a; color:#fff; border-color:#0f172a; }
+.pl-count-bar { font-size:11.5px; color:#64748b; padding:0 2px 8px; flex-shrink:0; }
+.pl-cards-scroll { overflow-y:auto; flex:1; padding-right:4px; }
+.pc-mock { background:#fff; border-radius:10px; border:1.5px solid #e8ecf0; margin-bottom:9px; padding:12px 14px 10px; transition:border-color .15s,box-shadow .15s; }
+.pc-mock:hover { box-shadow:0 2px 10px rgba(0,0,0,.08); }
+.pc-mock.in-plan { border-color:#16a34a; border-left-width:4px; background:#f0fdf4; }
+.pc-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.pc-top-left { flex:1; min-width:0; }
+.pc-name-row { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
+.pc-score { width:24px; height:24px; border-radius:50%; font-size:9.5px; font-weight:800; color:#fff; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+.pc-score-red { background:#dc2626; } .pc-score-amber { background:#d97706; } .pc-score-blue { background:#2563eb; }
+.pc-star { color:#f59e0b; font-size:11px; }
+.pc-name { font-weight:800; font-size:12.5px; color:#0f172a; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:210px; }
+.pc-loc { font-size:11px; color:#64748b; }
+.pc-phone { font-size:11px; color:#0f172a; margin-top:3px; }
+.pc-top-right { text-align:right; flex-shrink:0; }
+.pc-ocp-badge { display:flex; align-items:center; gap:4px; font-size:10px; font-weight:700; color:#dc2626; justify-content:flex-end; margin-bottom:4px; }
+.pc-ocp-dot { width:6px; height:6px; border-radius:50%; background:#dc2626; }
+.pc-amt-label { font-size:9.5px; color:#94a3b8; font-weight:600; }
+.pc-amt { font-size:13px; font-weight:800; color:#0f172a; white-space:nowrap; }
+.pc-ocp-amt { font-size:11px; color:#dc2626; font-weight:700; white-space:nowrap; }
+.pc-avail { font-size:10px; color:#64748b; margin-top:2px; white-space:nowrap; }
+.pc-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+.pc-chip { padding:2px 7px; background:#f1f5f9; border-radius:8px; font-size:9.5px; color:#475569; font-weight:600; white-space:nowrap; }
+.pc-chip-red { background:#fee2e2; color:#991b1b; } .pc-chip-amber { background:#fef3c7; color:#92400e; }
+.pc-action-row { display:flex; align-items:center; justify-content:space-between; margin-top:9px; padding-top:8px; border-top:1px solid #f1f5f9; }
+.pc-reason-lbl { font-size:10.5px; color:#94a3b8; } .pc-reason-val { font-size:10.5px; color:#0f172a; font-weight:700; }
+.pc-add-btn { padding:4px 11px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; border:1.5px solid; transition:all .15s; white-space:nowrap; }
+.pc-add-btn-add { border-color:#16a34a; color:#16a34a; background:#fff; }
+.pc-add-btn-add:hover { background:#16a34a; color:#fff; }
+.pc-add-btn-remove { border-color:#16a34a; color:#16a34a; background:#dcfce7; }
+.pc-add-btn-remove:hover { background:#fee2e2; color:#dc2626; border-color:#dc2626; }
+.plan-date-bar { background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; padding:11px 14px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.plan-date-title { font-size:10px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+.plan-date-val { font-size:14px; font-weight:800; color:#0f172a; margin-top:2px; }
+.submit-plan-btn { padding:8px 16px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer; transition:all .15s; }
+.submit-plan-btn:hover { background:#15803d; }
+.submit-plan-btn.done { background:#0f172a; cursor:default; }
+.submit-plan-btn:disabled { background:#94a3b8; cursor:not-allowed; }
+.plan-section-hdr { display:flex; align-items:center; justify-content:space-between; font-size:10.5px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; flex-shrink:0; }
+.plan-item { background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 12px; display:flex; align-items:flex-start; gap:8px; margin-bottom:8px; }
+.plan-item-num { width:20px; height:20px; border-radius:50%; background:#0f172a; color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+.plan-item-body { flex:1; min-width:0; }
+.plan-item-name { font-weight:800; font-size:12px; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.plan-item-meta { font-size:10.5px; color:#64748b; margin-top:2px; }
+.plan-item-ctrl { display:flex; gap:6px; margin-top:7px; align-items:center; }
+.plan-item-sel { padding:3px 7px; border:1.5px solid #e2e8f0; border-radius:5px; font-size:10.5px; color:#1a1a2e; background:#fff; font-family:inherit; cursor:pointer; }
+.plan-item-notes { flex:1; padding:3px 7px; border:1.5px solid #e2e8f0; border-radius:5px; font-size:10.5px; color:#1a1a2e; font-family:inherit; background:#fff; }
+.plan-item-notes:focus { outline:none; border-color:#16a34a; }
+.plan-item-x { font-size:13px; color:#94a3b8; background:none; border:none; cursor:pointer; flex-shrink:0; padding:0; margin-top:1px; }
+.plan-item-x:hover { color:#dc2626; }
+.reco-sidebar-box { background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; overflow:hidden; flex-shrink:0; }
+.reco-sidebar-hdr { padding:9px 14px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; font-size:11.5px; font-weight:800; color:#0f172a; }
+.reco-mini { padding:9px 14px; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; gap:8px; }
+.reco-mini:last-child { border-bottom:none; }
+.reco-mini-score { width:22px; height:22px; border-radius:50%; font-size:9px; font-weight:800; color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.reco-mini-body { flex:1; min-width:0; }
+.reco-mini-name { font-weight:700; font-size:11px; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.reco-mini-sub { font-size:10px; color:#64748b; margin-top:1px; }
+.reco-mini-add { padding:3px 9px; border-radius:5px; font-size:10.5px; font-weight:700; border:1.5px solid #16a34a; color:#16a34a; background:#fff; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+.reco-mini-add:hover { background:#16a34a; color:#fff; }
+.tm-view-hdr { padding:14px 28px 4px; display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.tm-sm-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; padding:12px 28px 28px; }
+.sm-plan-card { background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; overflow:hidden; }
+.sm-plan-card.submitted { border-top:3px solid #16a34a; }
+.sm-plan-card.pending   { border-top:3px solid #d97706; }
+.sm-plan-card.flagged   { border-top:3px solid #dc2626; }
+.sm-card-hdr { padding:11px 14px 10px; display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.sm-card-name { font-weight:800; font-size:13px; color:#0f172a; }
+.sm-card-terr { font-size:10.5px; color:#64748b; margin-top:2px; }
+.sm-card-status { padding:3px 9px; border-radius:10px; font-size:10px; font-weight:700; white-space:nowrap; flex-shrink:0; margin-top:1px; }
+.scs-ok { background:#dcfce7; color:#15803d; } .scs-pend { background:#fef3c7; color:#92400e; }
+.sm-card-body { padding:0 14px 10px; border-top:1px solid #f1f5f9; }
+.sm-partner-list { margin-top:8px; display:flex; flex-direction:column; gap:5px; }
+.sm-partner-row { display:flex; align-items:center; gap:7px; font-size:11px; flex-wrap:wrap; }
+.sm-p-dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.sm-p-name { font-weight:600; color:#0f172a; }
+.sm-p-meta { color:#94a3b8; font-size:10px; }
+.sm-card-footer { padding:9px 14px; border-top:1px solid #f1f5f9; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.thumb-grp { display:flex; gap:5px; }
+.thumb-btn { padding:4px 12px; border-radius:6px; font-size:11px; font-weight:700; border:1.5px solid; cursor:pointer; transition:all .12s; }
+.th-up { border-color:#16a34a; color:#16a34a; background:#fff; }
+.th-up.on,.th-up:hover { background:#16a34a; color:#fff; }
+.th-down { border-color:#dc2626; color:#dc2626; background:#fff; }
+.th-down.on { background:#dc2626; color:#fff; }
+.th-down:hover { background:#fee2e2; }
+.thumb-note { font-size:10px; color:#94a3b8; font-style:italic; }
+.cm-tm-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; padding:12px 28px 28px; }
+.tm-agg-card { background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; padding:14px 16px; }
+.tm-agg-name { font-weight:800; font-size:13px; color:#0f172a; }
+.tm-agg-terr { font-size:11px; color:#64748b; margin-top:2px; }
+.tm-agg-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
+.tm-stat { background:#f8fafc; border-radius:8px; padding:8px; text-align:center; }
+.tm-stat-val { font-size:20px; font-weight:800; color:#0f172a; line-height:1.1; }
+.tm-stat-lbl { font-size:9.5px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin-top:3px; }
+.sm-sub-dots { display:flex; gap:3px; margin-top:10px; align-items:center; }
+.sub-dot { flex:1; height:5px; border-radius:3px; }
+.sub-dot-ok { background:#16a34a; } .sub-dot-pend { background:#d97706; }
+.sub-dots-lbl { font-size:10px; color:#64748b; margin-top:4px; }
+.outcomes-week-card { background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; margin-bottom:12px; overflow:hidden; }
+.outcomes-week-hdr { padding:11px 16px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; }
+.outcomes-week-title { font-weight:800; font-size:12.5px; color:#0f172a; }
+.outcomes-kpi-row { display:flex; gap:24px; padding:10px 16px; border-bottom:1px solid #f1f5f9; flex-wrap:wrap; }
+.out-kpi-val { font-size:17px; font-weight:800; color:#0f172a; }
+.out-kpi-lbl { font-size:10px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+.outcomes-table-wrap table { min-width:unset !important; width:100%; }
+.outcomes-table-wrap td { padding:7px 14px !important; }
+.oc { padding:2px 7px; border-radius:8px; font-size:10.5px; font-weight:700; white-space:nowrap; }
+.oc-green { background:#dcfce7; color:#15803d; }
+.oc-red   { background:#fee2e2; color:#991b1b; }
+.oc-gray  { background:#f1f5f9; color:#475569; }
+.oc-amber { background:#fef3c7; color:#92400e; }
 </style>
 </head>
 <body>
@@ -214,6 +344,7 @@ tbody tr:hover td { background: #f8fafc; }
   <button class="tab-btn active" onclick="switchTab('partner')">Partner Overview</button>
   <button class="tab-btn" onclick="switchTab('visit')">Visit Analysis</button>
   <button class="tab-btn" onclick="switchTab('reco')">Recommendations</button>
+  <button class="tab-btn" onclick="switchTab('planner')" style="color:#7c3aed">🗓 Visit Planner</button>
 </div>
 
 <div class="overlay" id="overlay">
@@ -533,6 +664,130 @@ tbody tr:hover td { background: #f8fafc; }
 
 </div><!-- /tab-reco -->
 
+
+<!-- ══════════════════════════════════════════════════════════
+     TAB 4: Visit Planner (Mockup)
+══════════════════════════════════════════════════════════ -->
+<div id="tab-planner" class="tab-panel">
+
+  <!-- Sub-nav -->
+  <div class="planner-subnav">
+    <div class="planner-subnav-left">
+      <button class="pv-btn active" id="pvb-sm"       onclick="switchPV('sm',this)">📋 My Plan <span style="font-size:10px;font-weight:500;opacity:.7">(SM)</span></button>
+      <button class="pv-btn"        id="pvb-tm"       onclick="switchPV('tm',this)">👥 Team Plans <span style="font-size:10px;font-weight:500;opacity:.7">(TM)</span></button>
+      <button class="pv-btn"        id="pvb-cm"       onclick="switchPV('cm',this)">🏢 All Teams <span style="font-size:10px;font-weight:500;opacity:.7">(CM)</span></button>
+      <button class="pv-btn"        id="pvb-outcomes" onclick="switchPV('outcomes',this)">📊 Outcomes</button>
+    </div>
+    <span style="font-size:11px;color:#94a3b8">🎨 Design prototype · to be built natively in Saathi APP (Android)</span>
+  </div>
+
+  <div class="mockup-note">
+    <strong>Mockup only</strong> — all data is simulated. Interactions (add/remove, submit, thumbs) are live. Actual feature will be built in Saathi APP.
+  </div>
+
+  <!-- ─── SM: My Plan ─────────────────────────────────── -->
+  <div id="pv-sm" class="pv-panel active">
+    <div class="planner-layout">
+
+      <!-- LEFT: Partner list -->
+      <div class="planner-left">
+        <div class="pl-search-row">
+          <div class="pl-search-wrap">
+            <span style="font-size:14px;color:#94a3b8">🔍</span>
+            <input id="pl-search" class="pl-search" placeholder="Search partners…" oninput="plFilterCards()"/>
+          </div>
+          <div class="pl-chips-row">
+            <span class="plan-chip active" data-filter="ocp"  onclick="plToggleChip(this)">OCP Blocked ×</span>
+            <span class="plan-chip active" data-filter="state" onclick="plToggleChip(this)">State: RJ ×</span>
+            <span class="plan-chip"        data-filter="reco"  onclick="plToggleChip(this)">⭐ Recommended Only</span>
+          </div>
+        </div>
+        <div class="pl-count-bar">
+          <span id="pl-total-count">6 partners</span>
+          &nbsp;·&nbsp;
+          <span style="color:#f59e0b;font-weight:700">3 ⭐ recommended</span>
+          &nbsp;·&nbsp;
+          <span style="color:#7c3aed;font-weight:700" id="pl-in-plan-count">2 in today's plan</span>
+        </div>
+        <div class="pl-cards-scroll" id="pl-cards"></div>
+      </div>
+
+      <!-- RIGHT: Plan panel -->
+      <div class="planner-right">
+
+        <!-- Date + submit -->
+        <div class="plan-date-bar">
+          <div>
+            <div class="plan-date-title">Planning For</div>
+            <div class="plan-date-val">Tue, Jun 10, 2026</div>
+          </div>
+          <button class="submit-plan-btn" id="plan-submit-btn" onclick="plSubmitPlan()">Submit Plan →</button>
+        </div>
+
+        <!-- Plan items -->
+        <div class="plan-section-hdr">
+          <span>Today's Visits</span>
+          <span class="badge badge-green" id="plan-count-badge">2 selected</span>
+        </div>
+        <div id="plan-items-list"></div>
+        <div id="plan-empty-msg" style="display:none;padding:24px;text-align:center;color:#94a3b8;font-size:12px;background:#fff;border:1.5px dashed #e2e8f0;border-radius:10px">
+          No partners added yet.<br>Pick from your list on the left.
+        </div>
+
+        <!-- Recommendations sidebar -->
+        <div class="reco-sidebar-box">
+          <div class="reco-sidebar-hdr">
+            <span>💡 Algorithm Top Picks</span>
+            <span style="font-size:10px;color:#94a3b8;font-weight:500">not yet in plan</span>
+          </div>
+          <div id="reco-sidebar-list"></div>
+        </div>
+
+      </div>
+    </div>
+  </div><!-- /pv-sm -->
+
+  <!-- ─── TM: Team Plans ─────────────────────────────── -->
+  <div id="pv-tm" class="pv-panel">
+    <div class="tm-view-hdr">
+      <div>
+        <div style="font-size:14px;font-weight:800;color:#0f172a">Team Plans — Tue, Jun 10, 2026</div>
+        <div style="font-size:11px;color:#64748b;margin-top:3px">Rajasthan Cluster · 3 of 4 SMs submitted · 10 total visits planned</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <span class="plan-chip active">All</span>
+        <span class="plan-chip">Submitted</span>
+        <span class="plan-chip">Pending</span>
+      </div>
+    </div>
+    <div class="tm-sm-grid" id="tm-sm-grid"></div>
+  </div>
+
+  <!-- ─── CM: All Teams ──────────────────────────────── -->
+  <div id="pv-cm" class="pv-panel">
+    <div class="tm-view-hdr">
+      <div>
+        <div style="font-size:14px;font-weight:800;color:#0f172a">All Team Plans — Tue, Jun 10, 2026</div>
+        <div style="font-size:11px;color:#64748b;margin-top:3px">Rajasthan · 2 TMs · 8 SMs · 29 total visits planned</div>
+      </div>
+    </div>
+    <div class="cm-tm-grid" id="cm-tm-grid"></div>
+  </div>
+
+  <!-- ─── Outcomes ──────────────────────────────────── -->
+  <div id="pv-outcomes" class="pv-panel">
+    <div class="tm-view-hdr">
+      <div>
+        <div style="font-size:14px;font-weight:800;color:#0f172a">Plan Outcomes — Last 3 Weeks</div>
+        <div style="font-size:11px;color:#64748b;margin-top:3px">Revenue &amp; collections attributed to planned partners (7-day post-visit window)</div>
+      </div>
+    </div>
+    <div style="padding:0 28px 28px" id="outcomes-container"></div>
+  </div>
+
+</div><!-- /tab-planner -->
+
+
 <div class="footer">Field Team Dashboard · Agrostar · Data via BigQuery ADC · <a href="/dvs_dashboard" style="color:#16a34a">DVS Dashboard</a></div>
 
 <script>
@@ -561,11 +816,11 @@ let recoDataFull = [], recoData = [], smStatsRaw = [];
 
 // ── Tab switching ──
 function switchTab(tab) {
+  const tabs = ['partner','visit','reco','planner'];
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    b.classList.toggle('active',
-      (i===0 && tab==='partner') || (i===1 && tab==='visit') || (i===2 && tab==='reco'));
+    b.classList.toggle('active', tabs[i] === tab);
   });
-  ['partner','visit','reco'].forEach(t =>
+  tabs.forEach(t =>
     document.getElementById('tab-'+t).classList.toggle('active', t === tab));
 
   const partnerFilters = document.getElementById('partner-filters');
@@ -579,6 +834,8 @@ function switchTab(tab) {
   vaLoadBtn.style.display      = tab === 'visit'   ? '' : 'none';
   recoLoadBtn.style.display    = tab === 'reco'    ? '' : 'none';
   exportBtn.style.display      = tab === 'partner' ? '' : 'none';
+
+  if (tab === 'planner') initPlanner();
 }
 
 // ── Date presets ──
@@ -1528,6 +1785,352 @@ function renderSignalDist(rows) {
   }
 
   document.getElementById('reco-dist').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════
+// VISIT PLANNER MOCKUP
+// ══════════════════════════════════════════════════════════
+
+const INRf = v => v ? '₹' + Math.round(v).toLocaleString('en-IN') : '₹0';
+const scoreClr = s => s >= 80 ? 'pc-score-red' : s >= 60 ? 'pc-score-amber' : 'pc-score-blue';
+const recoClr  = s => s >= 80 ? '#dc2626' : s >= 60 ? '#d97706' : '#2563eb';
+
+const MOCK_PARTNERS = [
+  { id:1001, name:'SATGURU BEEJ BHANDAR',      tal:'Rawatsar',    dist:'Hanumangarh', phone:'9729948848', outstanding:937063,  ocp:937063,  avail:0,      score:91, dpd:47, blocked:true,  chips:['Paid: 0-30d','Ordered: 180+d','SM: Never Visited','DPD: 45+d'],   cc:['','pc-chip-amber','pc-chip-red','pc-chip-red'],  reco:true,  reason:'Collection',    inPlan:true  },
+  { id:1002, name:'MA BRAHMANI NEW AGRI CLINIC',tal:'Bikaner',   dist:'Bikaner',      phone:'7597809004', outstanding:1202389, ocp:834522,  avail:507611, score:87, dpd:62, blocked:true,  chips:['Paid: 0-30d','Ordered: 61-90d','SM: Never Visited','P2P: Jun 17'], cc:['','pc-chip-amber','pc-chip-red','pc-chip-amber'], reco:true,  reason:'Collection',    inPlan:false },
+  { id:1003, name:'VINAYAK PESTICIDES',          tal:'Rawatsar',  dist:'Hanumangarh', phone:'9950489819', outstanding:794314,  ocp:794314,  avail:0,      score:74, dpd:38, blocked:true,  chips:['Paid: 0-30d','Ordered: 180+d','SM: Never Visited','DPD: 35+d'],   cc:['','pc-chip-amber','pc-chip-red','pc-chip-red'],  reco:true,  reason:'Collection',    inPlan:true  },
+  { id:1004, name:'KRISHNA AGRO CENTRE',         tal:'Bikaner',   dist:'Bikaner',      phone:'9414789023', outstanding:215000,  ocp:0,       avail:485000, score:62, dpd:0,  blocked:false, chips:['Paid: 31-60d','Ordered: 31-60d','SM: 45d Ago'],                    cc:['','',''],                                        reco:false, reason:'Revenue Gen',   inPlan:false },
+  { id:1005, name:'RAJESH FERTILIZERS & SEEDS',  tal:'Hanumangarh',dist:'Hanumangarh',phone:'9784512345', outstanding:185000,  ocp:0,       avail:315000, score:55, dpd:0,  blocked:false, chips:['Paid: 61-90d','Ordered: 61-90d','SM: 60d Ago'],                    cc:['pc-chip-amber','pc-chip-amber',''],               reco:false, reason:'Revenue Gen',   inPlan:false },
+  { id:1006, name:'SHIVAM KRISHI KENDRA',        tal:'Rawatsar',  dist:'Hanumangarh', phone:'9887456321', outstanding:90000,   ocp:0,       avail:210000, score:48, dpd:0,  blocked:false, chips:['Paid: 31-60d','Ordered: 31-60d','SM: 21d Ago'],                    cc:['','',''],                                        reco:false, reason:'General Visit', inPlan:false },
+];
+
+const MOCK_SMs = [
+  { id:'sm1', name:'Rajesh Kumar',  terr:'Hanumangarh-North', submitted:true,  thumbUp:true,  thumbDown:false,
+    partners:[{ name:'SATGURU BEEJ BHANDAR',       reason:'Collection',  ocp:937063, score:91 },
+              { name:'VINAYAK PESTICIDES',           reason:'Collection',  ocp:794314, score:74 },
+              { name:'KRISHNA AGRO CENTRE',          reason:'Revenue Gen', ocp:0,      score:62 }] },
+  { id:'sm2', name:'Amit Singh',    terr:'Bikaner-West',      submitted:true,  thumbUp:false, thumbDown:false,
+    partners:[{ name:'MA BRAHMANI AGRI CLINIC',     reason:'Collection',  ocp:834522, score:87 },
+              { name:'PATEL BEEJ BHANDAR',           reason:'Revenue Gen', ocp:0,      score:52 },
+              { name:'GUPTA AGRI DEPOT',             reason:'Relationship',ocp:0,      score:38 },
+              { name:'MEHTA SEEDS',                  reason:'Revenue Gen', ocp:0,      score:44 }] },
+  { id:'sm3', name:'Suresh Patel',  terr:'Hanumangarh-South', submitted:false, thumbUp:false, thumbDown:false, partners:[] },
+  { id:'sm4', name:'Priya Sharma',  terr:'Bikaner-East',      submitted:true,  thumbUp:false, thumbDown:true,
+    partners:[{ name:'RAJESH FERTILIZERS',           reason:'Revenue Gen', ocp:0,      score:55 },
+              { name:'SHIVAM KRISHI KENDRA',         reason:'General',     ocp:0,      score:48 },
+              { name:'ANAND AGRO',                   reason:'Relationship',ocp:0,      score:30 }] },
+];
+
+const MOCK_TMs = [
+  { name:'Vikram Mehta',   terr:'Rajasthan-North', sms:['Rajesh Kumar','Suresh Patel','Kavita Rao','Ravi Shankar'], subCount:3, total_visits:16 },
+  { name:'Deepak Sharma',  terr:'Rajasthan-South', sms:['Amit Singh','Priya Sharma','Mohan Lal','Sunita Patel'],   subCount:4, total_visits:13 },
+];
+
+const MOCK_OUTCOMES = [
+  { week:'Jun 2–6, 2026', sm:'Rajesh Kumar', planned:6, visited:4, revenue:497000, coll:176000,
+    partners:[
+      { name:'SATGURU BEEJ BHANDAR',   visited:true,  revenue:0,      coll:94000  },
+      { name:'VINAYAK PESTICIDES',      visited:true,  revenue:0,      coll:82000  },
+      { name:'KRISHNA AGRO CENTRE',     visited:true,  revenue:312000, coll:0      },
+      { name:'MA BRAHMANI AGRI CLINIC', visited:false, revenue:0,      coll:0      },
+      { name:'RAJESH FERTILIZERS',      visited:true,  revenue:185000, coll:0      },
+      { name:'SHIVAM KRISHI KENDRA',    visited:false, revenue:0,      coll:0      },
+    ]},
+  { week:'May 26–30, 2026', sm:'Rajesh Kumar', planned:5, visited:5, revenue:804000, coll:242000,
+    partners:[
+      { name:'PATEL SEEDS & AGRO',      visited:true, revenue:425000, coll:0      },
+      { name:'GUPTA AGROCHEMICALS',      visited:true, revenue:0,      coll:148000 },
+      { name:'VINAYAK PESTICIDES',       visited:true, revenue:0,      coll:94000  },
+      { name:'KRISHNA AGRO CENTRE',      visited:true, revenue:287000, coll:0      },
+      { name:'BHARAT AGRI KENDRA',       visited:true, revenue:92000,  coll:0      },
+    ]},
+  { week:'May 19–23, 2026', sm:'Rajesh Kumar', planned:4, visited:3, revenue:312000, coll:82000,
+    partners:[
+      { name:'SATGURU BEEJ BHANDAR',    visited:true,  revenue:0,      coll:82000  },
+      { name:'KRISHNA AGRO CENTRE',     visited:true,  revenue:198000, coll:0      },
+      { name:'PATEL SEEDS & AGRO',      visited:false, revenue:0,      coll:0      },
+      { name:'SHIVAM KRISHI KENDRA',    visited:true,  revenue:114000, coll:0      },
+    ]},
+];
+
+let plPlanSubmitted = false;
+let plannerInited = false;
+
+function initPlanner() {
+  if (plannerInited) return;
+  plannerInited = true;
+  plRenderCards();
+}
+
+function switchPV(view, btn) {
+  document.querySelectorAll('.pv-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.pv-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('pv-' + view).classList.add('active');
+  if (view === 'tm') renderTMView();
+  if (view === 'cm') renderCMView();
+  if (view === 'outcomes') renderOutcomes();
+}
+
+function plRenderCards() {
+  const q = (document.getElementById('pl-search')?.value || '').toLowerCase();
+  const recoOnly = document.querySelector('[data-filter="reco"]')?.classList.contains('active');
+  const container = document.getElementById('pl-cards');
+  if (!container) return;
+
+  const visible = MOCK_PARTNERS.filter(p => {
+    if (recoOnly && !p.reco) return false;
+    if (q && !p.name.toLowerCase().includes(q) && !p.tal.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  container.innerHTML = visible.map(p => `
+    <div class="pc-mock${p.inPlan ? ' in-plan' : ''}">
+      <div class="pc-top">
+        <div class="pc-top-left">
+          <div class="pc-name-row">
+            <span class="pc-score ${scoreClr(p.score)}">${p.score}</span>
+            ${p.reco ? '<span class="pc-star">⭐</span>' : ''}
+            <span class="pc-name" title="${p.name}">${p.name}</span>
+          </div>
+          <div class="pc-loc">Tal. - ${p.tal} &nbsp;·&nbsp; Dist. - ${p.dist}</div>
+          <div class="pc-phone">📞 ${p.phone}</div>
+        </div>
+        <div class="pc-top-right">
+          ${p.blocked ? `<div class="pc-ocp-badge"><span class="pc-ocp-dot"></span>OCP Blocked</div>` : ''}
+          <div class="pc-amt-label">Total Outstanding</div>
+          <div class="pc-amt">${INRf(p.outstanding)}</div>
+          ${p.blocked ? `<div class="pc-ocp-amt">OCP: ${INRf(p.ocp)}</div>` : ''}
+          <div class="pc-avail">Avail Limit: ${INRf(p.avail)}</div>
+        </div>
+      </div>
+      <div class="pc-chips">
+        ${p.chips.map((c, i) => `<span class="pc-chip ${p.cc[i]||''}">${c}</span>`).join('')}
+        ${p.dpd > 0 ? `<span class="pc-chip pc-chip-red">DPD: ${p.dpd}d</span>` : ''}
+      </div>
+      <div class="pc-action-row">
+        <div>
+          <span class="pc-reason-lbl">Suggested reason: </span>
+          <span class="pc-reason-val">${p.reason}</span>
+        </div>
+        ${p.inPlan
+          ? `<button class="pc-add-btn pc-add-btn-remove" onclick="plTogglePlan(${p.id})">✓ In Plan &nbsp;×</button>`
+          : `<button class="pc-add-btn pc-add-btn-add" onclick="plTogglePlan(${p.id})">+ Add to Plan</button>`
+        }
+      </div>
+    </div>`).join('');
+
+  plUpdatePlanPanel();
+}
+
+function plTogglePlan(id) {
+  if (plPlanSubmitted) return;
+  const p = MOCK_PARTNERS.find(x => x.id === id);
+  if (p) p.inPlan = !p.inPlan;
+  plRenderCards();
+}
+
+function plFilterCards() { plRenderCards(); }
+function plToggleChip(el) { el.classList.toggle('active'); plRenderCards(); }
+
+function plUpdatePlanPanel() {
+  const inPlan  = MOCK_PARTNERS.filter(p => p.inPlan);
+  const notReco = MOCK_PARTNERS.filter(p => p.reco && !p.inPlan);
+
+  const badge      = document.getElementById('plan-count-badge');
+  const countSpan  = document.getElementById('pl-in-plan-count');
+  const list       = document.getElementById('plan-items-list');
+  const empty      = document.getElementById('plan-empty-msg');
+  const submitBtn  = document.getElementById('plan-submit-btn');
+  const recoList   = document.getElementById('reco-sidebar-list');
+
+  if (badge)     badge.textContent     = inPlan.length + ' selected';
+  if (countSpan) countSpan.textContent = inPlan.length + " in today's plan";
+
+  if (!plPlanSubmitted && submitBtn) submitBtn.disabled = inPlan.length === 0;
+
+  if (inPlan.length === 0) {
+    if (list)  list.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+  } else {
+    if (empty) empty.style.display = 'none';
+    if (list)  list.innerHTML = inPlan.map((p, i) => `
+      <div class="plan-item">
+        <div class="plan-item-num">${i + 1}</div>
+        <div class="plan-item-body">
+          <div class="plan-item-name" title="${p.name}">${p.name}</div>
+          <div class="plan-item-meta">${p.tal} · ${p.blocked ? 'OCP ' + INRf(p.ocp) : INRf(p.outstanding) + ' outstanding'} · Score ${p.score}</div>
+          <div class="plan-item-ctrl">
+            <select class="plan-item-sel">
+              <option${p.reason==='Collection'   ?' selected':''}>Collection</option>
+              <option${p.reason==='Revenue Gen'  ?' selected':''}>Revenue Gen</option>
+              <option${p.reason==='General Visit'?' selected':''}>General Visit</option>
+              <option>Relationship</option>
+              <option>Document Collection</option>
+            </select>
+            <input class="plan-item-notes" placeholder="Add visit note…"/>
+          </div>
+        </div>
+        ${!plPlanSubmitted ? `<button class="plan-item-x" onclick="plTogglePlan(${p.id})" title="Remove">✕</button>` : ''}
+      </div>`).join('');
+  }
+
+  if (recoList) {
+    if (notReco.length === 0) {
+      recoList.innerHTML = '<div style="padding:12px 14px;font-size:11px;color:#94a3b8">All top recommendations are in your plan 🎯</div>';
+    } else {
+      recoList.innerHTML = notReco.map(p => `
+        <div class="reco-mini">
+          <div class="reco-mini-score" style="background:${recoClr(p.score)}">${p.score}</div>
+          <div class="reco-mini-body">
+            <div class="reco-mini-name" title="${p.name}">${p.name}</div>
+            <div class="reco-mini-sub">${p.reason} · ${p.blocked ? 'OCP ' + INRf(p.ocp) : INRf(p.outstanding) + ' outstanding'}</div>
+          </div>
+          <button class="reco-mini-add" onclick="plTogglePlan(${p.id})">+ Add</button>
+        </div>`).join('');
+    }
+  }
+}
+
+function plSubmitPlan() {
+  if (!MOCK_PARTNERS.some(p => p.inPlan)) return;
+  plPlanSubmitted = true;
+  const btn = document.getElementById('plan-submit-btn');
+  if (btn) { btn.textContent = '✓ Plan Submitted'; btn.classList.add('done'); btn.disabled = true; }
+  plRenderCards();
+}
+
+// ── TM View ────────────────────────────────────────────────
+function renderTMView() {
+  const grid = document.getElementById('tm-sm-grid');
+  if (!grid) return;
+  grid.innerHTML = MOCK_SMs.map(sm => {
+    const cls = sm.submitted ? (sm.thumbDown ? 'flagged' : 'submitted') : 'pending';
+    const statusCls = sm.submitted ? 'scs-ok' : 'scs-pend';
+    const statusTxt = sm.submitted ? 'Submitted ✓' : 'Not Submitted';
+    const pRows = sm.partners.length
+      ? sm.partners.map(p => {
+          const dotCol = p.ocp > 0 ? '#dc2626' : p.score >= 60 ? '#d97706' : '#94a3b8';
+          const meta   = p.ocp > 0 ? 'OCP ' + INRf(p.ocp) : 'Score ' + p.score;
+          return `<div class="sm-partner-row">
+            <span class="sm-p-dot" style="background:${dotCol}"></span>
+            <span class="sm-p-name">${p.name}</span>
+            <span class="sm-p-meta">· ${p.reason} · ${meta}</span>
+          </div>`;
+        }).join('')
+      : '<div style="font-size:11px;color:#94a3b8;padding-top:8px;font-style:italic">Plan not submitted yet</div>';
+    const noteText = sm.thumbUp ? 'Approved by TM' : sm.thumbDown ? 'Flagged — needs discussion' : 'No reaction yet';
+    return `
+    <div class="sm-plan-card ${cls}">
+      <div class="sm-card-hdr">
+        <div>
+          <div class="sm-card-name">${sm.name}</div>
+          <div class="sm-card-terr">📍 ${sm.terr} · ${sm.partners.length} visit${sm.partners.length!==1?'s':''} planned</div>
+        </div>
+        <span class="sm-card-status ${statusCls}">${statusTxt}</span>
+      </div>
+      <div class="sm-card-body">
+        <div class="sm-partner-list">${pRows}</div>
+      </div>
+      <div class="sm-card-footer">
+        <div class="thumb-grp">
+          <button class="thumb-btn th-up${sm.thumbUp?' on':''}"   onclick="tmThumb('${sm.id}','up')">👍 Approve</button>
+          <button class="thumb-btn th-down${sm.thumbDown?' on':''}" onclick="tmThumb('${sm.id}','down')">👎 Flag</button>
+        </div>
+        <span class="thumb-note">${noteText}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function tmThumb(smId, action) {
+  const sm = MOCK_SMs.find(x => x.id === smId);
+  if (!sm) return;
+  if (action === 'up')   { sm.thumbUp = !sm.thumbUp;   sm.thumbDown = false; }
+  else                   { sm.thumbDown = !sm.thumbDown; sm.thumbUp = false;  }
+  renderTMView();
+}
+
+// ── CM View ────────────────────────────────────────────────
+function renderCMView() {
+  const grid = document.getElementById('cm-tm-grid');
+  if (!grid) return;
+  grid.innerHTML = MOCK_TMs.map(tm => {
+    const dots = tm.sms.map((s, i) => {
+      const cl = i < tm.subCount ? 'sub-dot-ok' : 'sub-dot-pend';
+      return `<span class="sub-dot ${cl}" title="${s}"></span>`;
+    }).join('');
+    const pct = Math.round(tm.subCount / tm.sms.length * 100);
+    return `
+    <div class="tm-agg-card">
+      <div class="tm-agg-name">${tm.name}</div>
+      <div class="tm-agg-terr">📍 ${tm.terr}</div>
+      <div class="tm-agg-stats">
+        <div class="tm-stat">
+          <div class="tm-stat-val">${tm.subCount}/${tm.sms.length}</div>
+          <div class="tm-stat-lbl">SMs Submitted</div>
+        </div>
+        <div class="tm-stat">
+          <div class="tm-stat-val">${tm.total_visits}</div>
+          <div class="tm-stat-lbl">Visits Planned</div>
+        </div>
+        <div class="tm-stat">
+          <div class="tm-stat-val" style="color:${pct===100?'#16a34a':pct>=75?'#d97706':'#dc2626'}">${pct}%</div>
+          <div class="tm-stat-lbl">Coverage</div>
+        </div>
+      </div>
+      <div class="sm-sub-dots">${dots}</div>
+      <div class="sub-dots-lbl">Each dot = one SM &nbsp;·&nbsp; green = submitted</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Outcomes View ──────────────────────────────────────────
+function renderOutcomes() {
+  const container = document.getElementById('outcomes-container');
+  if (!container) return;
+  container.innerHTML = MOCK_OUTCOMES.map(week => {
+    const hitPct  = Math.round(week.visited / week.planned * 100);
+    const hitCls  = hitPct >= 80 ? 'oc-green' : hitPct >= 50 ? 'oc-amber' : 'oc-red';
+    const rows    = week.partners.map(p => {
+      const revChip  = p.revenue > 0 ? `<span class="oc oc-green">${INRf(p.revenue)}</span>` : `<span class="oc oc-gray">—</span>`;
+      const collChip = p.coll    > 0 ? `<span class="oc oc-green">${INRf(p.coll)}</span>`    : `<span class="oc oc-gray">—</span>`;
+      const visitChip= p.visited     ? `<span class="oc oc-green">Visited ✓</span>`          : `<span class="oc oc-amber">Missed</span>`;
+      return `<tr>
+        <td class="left" style="font-weight:600">${p.name}</td>
+        <td>${visitChip}</td>
+        <td>${revChip}</td>
+        <td>${collChip}</td>
+      </tr>`;
+    }).join('');
+    return `
+    <div class="outcomes-week-card">
+      <div class="outcomes-week-hdr">
+        <div>
+          <span class="outcomes-week-title">${week.week}</span>
+          <span style="margin-left:12px;font-size:11px;color:#64748b">SM: ${week.sm}</span>
+        </div>
+        <span class="oc ${hitCls}">${hitPct}% Visit Hit Rate</span>
+      </div>
+      <div class="outcomes-kpi-row">
+        <div><div class="out-kpi-val">${week.planned}</div><div class="out-kpi-lbl">Planned</div></div>
+        <div><div class="out-kpi-val" style="color:#16a34a">${week.visited}</div><div class="out-kpi-lbl">Actually Visited</div></div>
+        <div><div class="out-kpi-val" style="color:#7c3aed">${INRf(week.revenue)}</div><div class="out-kpi-lbl">Revenue (7d)</div></div>
+        <div><div class="out-kpi-val" style="color:#2563eb">${INRf(week.coll)}</div><div class="out-kpi-lbl">Collected (7d)</div></div>
+      </div>
+      <div class="outcomes-table-wrap table-scroll">
+        <table>
+          <thead><tr>
+            <th class="left">Partner</th>
+            <th>Visit Status</th>
+            <th>Revenue (post-visit 7d)</th>
+            <th>Collection (post-visit 7d)</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── Export CSV (Partner Overview) ──
