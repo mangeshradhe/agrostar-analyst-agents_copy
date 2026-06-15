@@ -38,7 +38,7 @@ COCO store data lives across four systems. Always anchor on `galaxy_views.instit
 COCO stores are listed under ancestor institution names like **`Agrostar EBO GJ`** (Gujarat), **`Agrostar EBO MH`** (Maharashtra), etc. ("EBO" = Exclusive Brand Outlet.)
 
 ```sql
--- Get all COCO stores
+-- Canonical coco_stores CTE — use this as the base in every query
 WITH coco_stores AS (
   SELECT
     reference_customer_id AS store_id,
@@ -46,15 +46,20 @@ WITH coco_stores AS (
     address_state,
     address_district,
     address_taluka,
-    ancestor_institutions_name,
-    status,
-    ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
-  FROM `agrostar-data.galaxy_views.institution`
-  WHERE UPPER(ancestor_institutions_name) LIKE '%AGROSTAR EBO%'
-    AND archive = FALSE
+    status                AS store_status
+  FROM (
+    SELECT *,
+      ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
+    FROM `agrostar-data.galaxy_views.institution`
+    WHERE UPPER(ancestor_institutions_name) LIKE '%AGROSTAR EBO%'
+      AND archive = FALSE
+  )
+  WHERE rn = 1
 )
-SELECT * FROM coco_stores WHERE rn = 1
+SELECT * FROM coco_stores
 ```
+
+Always pull `address_state`, `address_district`, `address_taluka`, `store_status` from the CTE — stakeholders always want to filter or group by these.
 
 **Key field:** `reference_customer_id` — this is the canonical store identifier. It appears in:
 - `order_management_order.owner_id` → to pull all orders at that store
@@ -157,10 +162,13 @@ GROUP BY 1, 2, 3, 4
 
 Every COCO order placed in Agroex has a corresponding shipping package object for logistics tracking.
 
-**Critical join — NOT `sales_order_id`:**
+**Critical join — NOT `sales_order_id`, and MUST be LEFT JOIN:**
 ```sql
-delivery_shippingpackage.order_id = CAST(order_management_order.unicommerce_id AS STRING)
+LEFT JOIN `agrostar-data.prod_db_views.delivery_shippingpackage` sp
+  ON sp.order_id = CAST(o.unicommerce_id AS STRING)
 ```
+
+**Why LEFT JOIN:** COCO is a walk-in POS sale. Not every order generates a `delivery_shippingpackage` record (no physical dispatch is needed for in-store pickup). An INNER JOIN silently drops all orders that have no package — returning 0 rows. Always use LEFT JOIN and handle NULLs in downstream columns.
 
 **`delivery_shippingpackage` key columns:**
 | Column | Notes |
@@ -168,8 +176,7 @@ delivery_shippingpackage.order_id = CAST(order_management_order.unicommerce_id A
 | `code` | Package identifier (= `package_id` in history table) |
 | `order_id` | = `CAST(unicommerce_id AS STRING)` |
 | `delivery_status` | Current package status |
-| `reconciliation_done` | **TRUE = store manager has paid dues; FALSE/NULL = dues outstanding** |
-| `reconciliation_status` | Alternative reconciliation field — check both |
+| `reconciliation_status` | **Reconciliation state — use this field, it is a STRING** |
 | `order_placed_date` | When order was placed |
 | `scheduled_date` | Scheduled delivery date |
 | `attempt` | Delivery attempt count |
@@ -196,7 +203,40 @@ JOIN `agrostar-data.prod_db_views.order_management_orderitem` oi
   ON oi.order_id = o.sales_order_id
 ```
 
-One order has multiple rows (one per SKU). `SUM(oi.total_price)` = invoiced GMV per order.
+One order has multiple rows (one per SKU). Key columns:
+
+| Column | Notes |
+|--------|-------|
+| `order_id` | FK → `order_management_order.sales_order_id` |
+| `item_sku` | SKU code |
+| `item_name` | Product name |
+| `quantity` | Units |
+| `selling_price` | Per-unit price |
+| `discount` | Per-unit line discount |
+| `adj_discount` | Per-unit adjusted/promo discount — **correct column name is `adj_discount`** |
+| `total_price` | Line total (pre-computed) |
+| `status_code` | Item status |
+
+**Net payable amount formula (verified June 2026):**
+```sql
+SUM((selling_price * quantity) - (discount * quantity) - (adj_discount * quantity))
+```
+
+Pre-aggregate in a CTE before joining to avoid fan-out:
+```sql
+order_net_amount AS (
+  SELECT
+    order_id,
+    SUM(selling_price * quantity)                                     AS gross_amount,
+    SUM(discount * quantity)                                          AS total_line_discount,
+    SUM(adj_discount * quantity)                                      AS total_adjusted_discount,
+    SUM((selling_price * quantity)
+        - (discount * quantity)
+        - (adj_discount * quantity))                                  AS net_payable_amount
+  FROM `agrostar-data.prod_db_views.order_management_orderitem`
+  GROUP BY order_id
+)
+```
 
 ---
 
@@ -359,46 +399,124 @@ ORDER BY store_name, qty_onhand DESC
 
 ---
 
-### 6. Reconciliation / Dues — Which Stores Have Unpaid Dues?
+### 6. Order-Level Net Payable Amount + Reconciliation Status
 
-After a sale is made at the store, the store manager is expected to settle/pay for the inventory. `reconciliation_done = FALSE` (or NULL) means dues are outstanding.
+For each order: what is owed and whether it has been reconciled. This is the canonical reconciliation query for COCO.
 
 ```sql
--- Unreconciled orders by store — store manager owes money
+WITH coco_stores AS (
+  SELECT
+    reference_customer_id AS store_id,
+    name                  AS store_name,
+    address_state,
+    address_district,
+    address_taluka,
+    status                AS store_status
+  FROM (
+    SELECT *,
+      ROW_NUMBER() OVER (PARTITION BY reference_customer_id ORDER BY created_on DESC) AS rn
+    FROM `agrostar-data.galaxy_views.institution`
+    WHERE UPPER(ancestor_institutions_name) LIKE '%AGROSTAR EBO%'
+      AND archive = FALSE
+  )
+  WHERE rn = 1
+),
+
+order_net_amount AS (
+  SELECT
+    order_id,
+    SUM(selling_price * quantity)                                     AS gross_amount,
+    SUM(discount * quantity)                                          AS total_line_discount,
+    SUM(adj_discount * quantity)                                      AS total_adjusted_discount,
+    SUM((selling_price * quantity)
+        - (discount * quantity)
+        - (adj_discount * quantity))                                  AS net_payable_amount
+  FROM `agrostar-data.prod_db_views.order_management_orderitem`
+  GROUP BY order_id
+)
+
+SELECT
+  o.sales_order_id,
+  o.unicommerce_id,
+  s.store_id,
+  s.store_name,
+  s.address_state,
+  s.address_district,
+  s.address_taluka,
+  s.store_status,
+  DATE(o.created_on)            AS order_date,
+  oa.gross_amount,
+  oa.total_line_discount,
+  oa.total_adjusted_discount,
+  oa.net_payable_amount,
+  sp.reconciliation_status,
+  sp.delivery_status
+FROM `agrostar-data.prod_db_views.order_management_order` o
+JOIN coco_stores s
+  ON s.store_id = o.owner_id
+JOIN order_net_amount oa
+  ON oa.order_id = o.sales_order_id
+LEFT JOIN `agrostar-data.prod_db_views.delivery_shippingpackage` sp
+  ON sp.order_id = CAST(o.unicommerce_id AS STRING)
+WHERE o.order_type = 'COCO'
+  AND DATE(o.created_on) > '2026-05-14'
+  AND o.status NOT IN ('CANCELLED')
+  AND LOWER(COALESCE(o.unicommerce_status, '')) NOT IN ('cancelled', 'future order', 'disputed_address', 'error')
+ORDER BY o.sales_order_id
+```
+
+**Key design decisions (validated June 2026):**
+- `delivery_shippingpackage` is LEFT JOIN — not all COCO orders have a package record
+- Reconciliation field is `reconciliation_status` (STRING) — not `reconciliation_done` (BOOLEAN)
+- `adj_discount` is the correct column name in `order_management_orderitem`
+- Store details (state/district/taluka) always included for stakeholder filtering
+
+---
+
+### 7. Reconciliation Summary — Dues by Store
+
+```sql
+-- Aggregate unreconciled dues by store
 SELECT
   s.store_name,
-  COUNT(DISTINCT sp.code)                                         AS total_packages,
-  COUNTIF(sp.reconciliation_done IS FALSE OR sp.reconciliation_done IS NULL) AS unreconciled_packages,
-  ROUND(100.0 * COUNTIF(sp.reconciliation_done IS FALSE OR sp.reconciliation_done IS NULL)
-        / NULLIF(COUNT(DISTINCT sp.code), 0), 1)                 AS unreconciled_pct,
-  ROUND(SUM(CASE WHEN (sp.reconciliation_done IS FALSE OR sp.reconciliation_done IS NULL)
-                 THEN o.grand_total ELSE 0 END), 2)              AS unreconciled_gmv
+  s.address_state,
+  s.address_district,
+  COUNT(DISTINCT o.sales_order_id)                                  AS total_orders,
+  COUNT(DISTINCT CASE WHEN sp.reconciliation_status IS NULL
+                      OR sp.reconciliation_status != 'RECONCILED'
+                      THEN o.sales_order_id END)                    AS unreconciled_orders,
+  ROUND(SUM(CASE WHEN sp.reconciliation_status IS NULL
+                 OR sp.reconciliation_status != 'RECONCILED'
+                 THEN oa.net_payable_amount ELSE 0 END), 2)         AS unreconciled_amount
 FROM `agrostar-data.prod_db_views.order_management_order` o
 JOIN coco_stores s ON s.store_id = o.owner_id
-JOIN `agrostar-data.prod_db_views.delivery_shippingpackage` sp
+JOIN order_net_amount oa ON oa.order_id = o.sales_order_id
+LEFT JOIN `agrostar-data.prod_db_views.delivery_shippingpackage` sp
   ON sp.order_id = CAST(o.unicommerce_id AS STRING)
 WHERE o.order_type = 'COCO'
   AND DATE(o.created_on) BETWEEN @start_date AND @end_date
   AND o.status NOT IN ('CANCELLED')
   AND LOWER(COALESCE(o.unicommerce_status, '')) NOT IN ('cancelled', 'future order', 'disputed_address', 'error')
-GROUP BY 1
-ORDER BY unreconciled_gmv DESC
+GROUP BY 1, 2, 3
+ORDER BY unreconciled_amount DESC
 ```
+
+**Note:** Check the actual values in `reconciliation_status` before hardcoding `'RECONCILED'`. Run `SELECT DISTINCT reconciliation_status FROM delivery_shippingpackage LIMIT 20` to confirm the exact string values in use.
 
 ---
 
-### 7. Order Fulfillment Status — Where Are Orders Right Now?
+### 8. Order Fulfillment Status — Where Are Orders Right Now?
 
 ```sql
 -- Current status of all orders in the period
 SELECT
   s.store_name,
-  sp.delivery_status,
-  COUNT(DISTINCT o.sales_order_id) AS orders,
-  ROUND(SUM(o.grand_total), 2)     AS gmv
+  COALESCE(sp.delivery_status, 'NO_PACKAGE') AS delivery_status,
+  COUNT(DISTINCT o.sales_order_id)            AS orders,
+  ROUND(SUM(o.grand_total), 2)               AS gmv
 FROM `agrostar-data.prod_db_views.order_management_order` o
 JOIN coco_stores s ON s.store_id = o.owner_id
-JOIN `agrostar-data.prod_db_views.delivery_shippingpackage` sp
+LEFT JOIN `agrostar-data.prod_db_views.delivery_shippingpackage` sp
   ON sp.order_id = CAST(o.unicommerce_id AS STRING)
 WHERE o.order_type = 'COCO'
   AND DATE(o.created_on) BETWEEN @start_date AND @end_date
@@ -407,9 +525,11 @@ GROUP BY 1, 2
 ORDER BY 1, orders DESC
 ```
 
+`NO_PACKAGE` = walk-in POS sale with no dispatch record (expected for COCO).
+
 ---
 
-### 8. Fulfillment Timeline — Status History per Order
+### 9. Fulfillment Timeline — Status History per Order
 
 When you need to understand how an order moved through statuses:
 
@@ -430,7 +550,7 @@ ORDER BY sh.created_on ASC
 
 ---
 
-### 9. Payment Mode Breakdown
+### 10. Payment Mode Breakdown
 
 ```sql
 SELECT
@@ -493,20 +613,29 @@ ORDER BY 1, gmv DESC
 
 1. **`order_type = 'COCO'` is the ONLY reliable filter.** Do not use `LIKE '%offline%'` — it catches Saathi franchise orders (1,400+ partners).
 
-2. **Join to `delivery_shippingpackage` uses `unicommerce_id`, NOT `sales_order_id`:**
+2. **`delivery_shippingpackage` MUST be LEFT JOIN, never INNER JOIN.** COCO is a walk-in POS sale — not every order generates a shipping package record. An INNER JOIN returns 0 rows. Confirmed via debugging June 2026.
+
+3. **Join to `delivery_shippingpackage` uses `unicommerce_id`, NOT `sales_order_id`:**
    ```sql
-   sp.order_id = CAST(o.unicommerce_id AS STRING)
+   LEFT JOIN delivery_shippingpackage sp ON sp.order_id = CAST(o.unicommerce_id AS STRING)
    ```
 
-3. **`delivery_shippingpackagestatushistory` has duplicate rows** — always `DISTINCT` when counting status events per order.
+4. **Reconciliation field is `reconciliation_status` (STRING), not `reconciliation_done` (BOOLEAN).** Use `reconciliation_status` and check its distinct values before filtering — the exact string for reconciled state needs to be confirmed from live data.
 
-4. **Store master deduplication:** `galaxy_views.institution` can have multiple rows per `reference_customer_id`. Always take `rn = 1` ordered by `created_on DESC`.
+5. **`adj_discount` is the correct column name** in `order_management_orderitem` for the adjusted/promo discount. `adjusted_discount` does not exist.
 
-5. **GMV = `grand_total`, not MRP × quantity.** MRP-based would be higher; `grand_total` = what the farmer actually paid after discounts.
+6. **Net payable formula (validated June 2026):**
+   ```sql
+   SUM((selling_price * quantity) - (discount * quantity) - (adj_discount * quantity))
+   ```
 
-6. **WMS `location_mst` join key:** The column linking to `institution.reference_customer_id` may be named differently (`reference_customer_id` on `location_mst`). Verify with `get_table_info` if the first query returns no rows.
+7. **`delivery_shippingpackagestatushistory` has duplicate rows** — always `DISTINCT` when counting status events per order.
 
-7. **`reconciliation_done` can be FALSE or NULL** for unreconciled orders — check both: `(reconciliation_done IS FALSE OR reconciliation_done IS NULL)`.
+8. **Store master deduplication:** `galaxy_views.institution` can have multiple rows per `reference_customer_id`. Always take `rn = 1` ordered by `created_on DESC`.
+
+9. **GMV = `grand_total`, not MRP × quantity.** MRP-based would be higher; `grand_total` = what the farmer actually paid after discounts.
+
+10. **WMS `location_mst` join key:** The column linking to `institution.reference_customer_id` may be named differently on `location_mst`. Verify with `get_table_info` if the inventory query returns no rows.
 
 ---
 
