@@ -1508,6 +1508,342 @@ Then a one-line "So what?" — is this expected behavior or worth escalating?
 
 ---
 
+## Section 12: Lifetime Farmer Serviceability × Revenue Analysis
+
+**Purpose:** Measure what % of lifetime B2C revenue falls within serviceable LMD areas — proving (or disproving) that LMD coverage is well-placed relative to where revenue actually comes from.
+
+**Core hypothesis:** Farmer serviceability % (headcount) can look low, but if the serviceable farmers are the high-value transacting ones, revenue serviceability % will be significantly higher — confirming the LMD footprint is commercially well-placed.
+
+**Validated finding (June 2026):** Revenue serviceability (63.1%) consistently outpaces farmer serviceability (54.2%) across all years. Gap widens to +5–7pp in recent years. Your hypothesis is confirmed.
+
+---
+
+### Two Independent Tables
+
+#### Table 1 — Transacting Farmers
+
+**Universe:** Farmers with at least 1 B2C order (non-offline, non-B2B)
+**Year:** Calendar year of each order's `created_on` (same farmer can appear in multiple years)
+**Revenue:** `grand_total` from `order_management_order` for that year's orders
+**Serviceability:** Farmer-level flag — if ANY shipping address across ALL their orders is serviceable → farmer is Serviceable (lifetime flag, applies to all years and all revenue)
+**GMV source:** `order_management_order.grand_total` (NOT `order_management_orderitem` — this is a farmer-level analysis, not DVS store analysis)
+
+**B2C filter (mandatory):**
+```sql
+LOWER(initiating_source) NOT LIKE 'b2b%'
+AND unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+AND status NOT IN ('MOB_APP_UNVERIFIED')
+AND status NOT LIKE 'edited%'
+AND unicommerce_status NOT LIKE 'edited%'
+AND LOWER(COALESCE(order_type, '')) NOT LIKE '%offline%'
+AND grand_total < 100000000  -- CRITICAL: exclude corrupt orders (12 orders in 2019 had ~₹10,606 Cr each due to data error)
+```
+
+**Output columns:** `year | transacting_farmers | serviceable | non_serviceable | address_problem | transacting_revenue | serviceable_revenue | non_serviceable_revenue | address_problem_revenue | farmer_serviceability_pct | revenue_serviceability_pct`
+
+**Serviceability rule:** `MAX(any address serviceable) = 1 → Serviceable` else if `MAX(any address clean) = 1 → Non Serviceable` else `Address Problem`
+
+---
+
+#### Table 2 — Non-Transacting Farmers
+
+**Universe:** Farmers in `dwh_views.farmer_profile_master` (is_archived = 0) with no B2C orders
+**Year:** `EXTRACT(YEAR FROM profile_created_date)`
+**Serviceability:** Based on profile address (`state`, `district`, `taluka`, `pin_code`) — **no village column exists in farmer_profile_master**
+**No revenue columns** — these farmers never purchased
+
+**Key finding:** 60.6% of non-transacting farmers have NULL/missing address fields (state/district/taluka/pincode) — these are farmers who registered with just a phone number. This is genuine data quality, not a query bug. Only 39.4% pass the address quality check.
+
+**Output columns:** `year | non_transacting_farmers | serviceable | non_serviceable | address_problem | farmer_serviceability_pct`
+
+---
+
+### Serviceability Flag Logic (Farmer Level)
+
+Priority order — highest wins:
+1. **Serviceable** — at least 1 address matches any active coverage record (village, taluka, or pincode)
+2. **Non Serviceable** — no serviceable address, but at least 1 address is clean (valid state/district/taluka/pincode)
+3. **Address Problem** — no clean address found anywhere
+
+**Critical rule for transacting farmers:** Serviceability is computed ONCE across ALL shipping addresses a farmer has ever used. If any address is serviceable → the farmer is Serviceable, and ALL their revenue across ALL years is Serviceable Revenue. Do not re-evaluate per year.
+
+---
+
+### Core Query — Table 1 (Transacting Farmers)
+
+```sql
+WITH
+b2c_orders AS (
+  SELECT 
+    owner_id AS farmer_id,
+    sales_order_id,
+    shipping_address_id,
+    COALESCE(grand_total, 0) AS grand_total,
+    EXTRACT(YEAR FROM created_on) AS order_year
+  FROM `agrostar-data.prod_db_views.order_management_order`
+  WHERE LOWER(initiating_source) NOT LIKE 'b2b%'
+    AND unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+    AND status NOT IN ('MOB_APP_UNVERIFIED')
+    AND status NOT LIKE 'edited%'
+    AND unicommerce_status NOT LIKE 'edited%'
+    AND LOWER(COALESCE(order_type, '')) NOT LIKE '%offline%'
+    AND owner_id IS NOT NULL
+    AND shipping_address_id IS NOT NULL
+    AND grand_total < 100000000
+),
+farmer_addresses AS (
+  SELECT DISTINCT
+    o.farmer_id,
+    LOWER(TRIM(sa.village)) AS village_norm,
+    LOWER(TRIM(sa.taluka)) AS taluka_norm,
+    LOWER(TRIM(sa.district)) AS district_norm,
+    LOWER(TRIM(sa.pin_code)) AS pincode_norm,
+    CASE 
+      WHEN LOWER(TRIM(sa.state)) LIKE 'gujarat%'   THEN 'gujarat'
+      WHEN LOWER(TRIM(sa.state)) LIKE 'maharash%'  THEN 'maharashtra'
+      WHEN LOWER(TRIM(sa.state)) LIKE 'rajas%'     THEN 'rajasthan'
+      WHEN LOWER(TRIM(sa.state)) LIKE 'madhya%'    THEN 'madhya pradesh'
+      WHEN LOWER(TRIM(sa.state)) LIKE 'uttar%'     THEN 'uttar pradesh'
+      ELSE LOWER(TRIM(sa.state))
+    END AS state_norm,
+    CASE
+      WHEN sa.village IS NULL OR LOWER(TRIM(sa.village)) IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(sa.village)) < 2 THEN FALSE
+      WHEN sa.taluka IS NULL OR LOWER(TRIM(sa.taluka)) IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(sa.taluka)) < 2 THEN FALSE
+      WHEN sa.district IS NULL OR LOWER(TRIM(sa.district)) IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(sa.district)) < 2 THEN FALSE
+      WHEN sa.state IS NULL OR LOWER(TRIM(sa.state)) IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(sa.state)) < 2 THEN FALSE
+      WHEN sa.pin_code IS NULL OR NOT REGEXP_CONTAINS(TRIM(sa.pin_code), r'^\d{6}$') THEN FALSE
+      ELSE TRUE
+    END AS is_address_clean
+  FROM b2c_orders o
+  JOIN `agrostar-data.prod_db_views.csr_shippingaddress` sa ON sa.id = o.shipping_address_id
+),
+svc_coverage AS (
+  SELECT DISTINCT
+    dc.coverage_type,
+    LOWER(TRIM(dc.village)) AS village_norm,
+    LOWER(TRIM(dc.pincode)) AS pincode_norm,
+    CASE 
+      WHEN LOWER(TRIM(da.state)) LIKE 'gujarat%'   THEN 'gujarat'
+      WHEN LOWER(TRIM(da.state)) LIKE 'maharash%'  THEN 'maharashtra'
+      WHEN LOWER(TRIM(da.state)) LIKE 'rajas%'     THEN 'rajasthan'
+      WHEN LOWER(TRIM(da.state)) LIKE 'madhya%'    THEN 'madhya pradesh'
+      WHEN LOWER(TRIM(da.state)) LIKE 'uttar%'     THEN 'uttar pradesh'
+      ELSE LOWER(TRIM(da.state))
+    END AS state_norm,
+    LOWER(TRIM(da.district)) AS district_norm,
+    LOWER(TRIM(da.taluka)) AS taluka_norm
+  FROM `agrostar-data.prod_agroex_db_views.assignment_deliverycoverage` dc
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_deliveryarea` da ON da.id = dc.delivery_area_id
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_pickuplocationfranchisemapping` apl ON apl.id = da.pickuplocation_franchise_mapping_id
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_franchise` asf ON asf.id = apl.franchise_id
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_pickuplocation` pl ON pl.id = apl.pickuplocation_id
+  WHERE da.is_active = 1 AND dc.is_active = 1 AND asf.is_active = 1 AND pl.is_active = 1
+),
+serviceable_farmers AS (
+  SELECT DISTINCT fa.farmer_id FROM farmer_addresses fa
+  JOIN svc_coverage sv ON sv.coverage_type = 'village' AND sv.village_norm = fa.village_norm AND sv.pincode_norm = fa.pincode_norm
+  UNION DISTINCT
+  SELECT DISTINCT fa.farmer_id FROM farmer_addresses fa
+  JOIN svc_coverage sv ON sv.coverage_type = 'taluka' AND sv.state_norm = fa.state_norm AND sv.district_norm = fa.district_norm AND sv.taluka_norm = fa.taluka_norm
+  UNION DISTINCT
+  SELECT DISTINCT fa.farmer_id FROM farmer_addresses fa
+  JOIN svc_coverage sv ON sv.coverage_type = 'pincode' AND sv.state_norm = fa.state_norm AND sv.pincode_norm = fa.pincode_norm
+),
+farmer_bucket AS (
+  SELECT
+    fa.farmer_id,
+    CASE
+      WHEN MAX(CASE WHEN sf.farmer_id IS NOT NULL THEN 1 ELSE 0 END) = 1 THEN 'Serviceable'
+      WHEN MAX(CASE WHEN fa.is_address_clean THEN 1 ELSE 0 END) = 1     THEN 'Non Serviceable'
+      ELSE 'Address Problem'
+    END AS serviceability_bucket
+  FROM farmer_addresses fa
+  LEFT JOIN serviceable_farmers sf ON sf.farmer_id = fa.farmer_id
+  GROUP BY fa.farmer_id
+),
+yearly_gmv AS (
+  SELECT farmer_id, order_year, SUM(grand_total) AS year_gmv
+  FROM b2c_orders GROUP BY farmer_id, order_year
+),
+yearly_data AS (
+  SELECT yg.order_year AS year, yg.farmer_id, fb.serviceability_bucket, yg.year_gmv
+  FROM yearly_gmv yg JOIN farmer_bucket fb ON fb.farmer_id = yg.farmer_id
+)
+SELECT
+  CAST(year AS STRING) AS year,
+  COUNT(DISTINCT farmer_id) AS transacting_farmers,
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Serviceable'     THEN farmer_id END) AS serviceable,
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Non Serviceable' THEN farmer_id END) AS non_serviceable,
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Address Problem' THEN farmer_id END) AS address_problem,
+  ROUND(SUM(year_gmv), 0) AS transacting_revenue,
+  ROUND(SUM(CASE WHEN serviceability_bucket = 'Serviceable'     THEN year_gmv END), 0) AS serviceable_revenue,
+  ROUND(SUM(CASE WHEN serviceability_bucket = 'Non Serviceable' THEN year_gmv END), 0) AS non_serviceable_revenue,
+  ROUND(SUM(CASE WHEN serviceability_bucket = 'Address Problem' THEN year_gmv END), 0) AS address_problem_revenue,
+  ROUND(100.0 * COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Serviceable' THEN farmer_id END) / COUNT(DISTINCT farmer_id), 1) AS farmer_serviceability_pct,
+  ROUND(100.0 * SUM(CASE WHEN serviceability_bucket = 'Serviceable' THEN year_gmv END) / NULLIF(SUM(year_gmv), 0), 1) AS revenue_serviceability_pct
+FROM yearly_data GROUP BY year
+UNION ALL
+SELECT 'Total',
+  COUNT(DISTINCT farmer_id),
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Serviceable'     THEN farmer_id END),
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Non Serviceable' THEN farmer_id END),
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Address Problem' THEN farmer_id END),
+  ROUND(SUM(year_gmv), 0),
+  ROUND(SUM(CASE WHEN serviceability_bucket = 'Serviceable'     THEN year_gmv END), 0),
+  ROUND(SUM(CASE WHEN serviceability_bucket = 'Non Serviceable' THEN year_gmv END), 0),
+  ROUND(SUM(CASE WHEN serviceability_bucket = 'Address Problem' THEN year_gmv END), 0),
+  ROUND(100.0 * COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Serviceable' THEN farmer_id END) / COUNT(DISTINCT farmer_id), 1),
+  ROUND(100.0 * SUM(CASE WHEN serviceability_bucket = 'Serviceable' THEN year_gmv END) / NULLIF(SUM(year_gmv), 0), 1)
+FROM yearly_data
+ORDER BY CASE WHEN year = 'Total' THEN '9999' ELSE year END
+```
+
+**Scan cost:** ~2.08 GB
+
+---
+
+### Core Query — Table 2 (Non-Transacting Farmers)
+
+```sql
+WITH
+transacting_farmers AS (
+  SELECT DISTINCT owner_id AS farmer_id
+  FROM `agrostar-data.prod_db_views.order_management_order`
+  WHERE LOWER(initiating_source) NOT LIKE 'b2b%'
+    AND unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+    AND status NOT IN ('MOB_APP_UNVERIFIED')
+    AND status NOT LIKE 'edited%'
+    AND unicommerce_status NOT LIKE 'edited%'
+    AND LOWER(COALESCE(order_type, '')) NOT LIKE '%offline%'
+    AND owner_id IS NOT NULL
+),
+non_transacting AS (
+  SELECT
+    fp.farmer_id,
+    EXTRACT(YEAR FROM fp.profile_created_date) AS creation_year,
+    CASE 
+      WHEN LOWER(TRIM(fp.state)) LIKE 'gujarat%'   THEN 'gujarat'
+      WHEN LOWER(TRIM(fp.state)) LIKE 'maharash%'  THEN 'maharashtra'
+      WHEN LOWER(TRIM(fp.state)) LIKE 'rajas%'     THEN 'rajasthan'
+      WHEN LOWER(TRIM(fp.state)) LIKE 'madhya%'    THEN 'madhya pradesh'
+      WHEN LOWER(TRIM(fp.state)) LIKE 'uttar%'     THEN 'uttar pradesh'
+      ELSE LOWER(TRIM(fp.state))
+    END AS state_norm,
+    LOWER(TRIM(fp.district)) AS district_norm,
+    LOWER(TRIM(fp.taluka)) AS taluka_norm,
+    LOWER(TRIM(fp.pin_code)) AS pincode_norm,
+    CASE
+      WHEN fp.taluka IS NULL OR LOWER(TRIM(fp.taluka)) IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(fp.taluka)) < 2 THEN FALSE
+      WHEN fp.district IS NULL OR LOWER(TRIM(fp.district)) IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(fp.district)) < 2 THEN FALSE
+      WHEN fp.state IS NULL OR LOWER(TRIM(fp.state)) IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(fp.state)) < 2 THEN FALSE
+      WHEN fp.pin_code IS NULL OR NOT REGEXP_CONTAINS(TRIM(fp.pin_code), r'^\d{6}$') THEN FALSE
+      ELSE TRUE
+    END AS is_address_clean
+  FROM `agrostar-data.dwh_views.farmer_profile_master` fp
+  LEFT JOIN transacting_farmers txn ON txn.farmer_id = fp.farmer_id
+  WHERE txn.farmer_id IS NULL
+    AND fp.profile_created_date IS NOT NULL
+    AND fp.is_archived = 0
+),
+svc_coverage AS (
+  SELECT DISTINCT dc.coverage_type,
+    LOWER(TRIM(dc.pincode)) AS pincode_norm,
+    CASE 
+      WHEN LOWER(TRIM(da.state)) LIKE 'gujarat%'   THEN 'gujarat'
+      WHEN LOWER(TRIM(da.state)) LIKE 'maharash%'  THEN 'maharashtra'
+      WHEN LOWER(TRIM(da.state)) LIKE 'rajas%'     THEN 'rajasthan'
+      WHEN LOWER(TRIM(da.state)) LIKE 'madhya%'    THEN 'madhya pradesh'
+      WHEN LOWER(TRIM(da.state)) LIKE 'uttar%'     THEN 'uttar pradesh'
+      ELSE LOWER(TRIM(da.state))
+    END AS state_norm,
+    LOWER(TRIM(da.district)) AS district_norm,
+    LOWER(TRIM(da.taluka)) AS taluka_norm
+  FROM `agrostar-data.prod_agroex_db_views.assignment_deliverycoverage` dc
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_deliveryarea` da ON da.id = dc.delivery_area_id
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_pickuplocationfranchisemapping` apl ON apl.id = da.pickuplocation_franchise_mapping_id
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_franchise` asf ON asf.id = apl.franchise_id
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_pickuplocation` pl ON pl.id = apl.pickuplocation_id
+  WHERE da.is_active = 1 AND dc.is_active = 1 AND asf.is_active = 1 AND pl.is_active = 1
+),
+serviceable_farmers AS (
+  SELECT DISTINCT nt.farmer_id FROM non_transacting nt
+  JOIN svc_coverage sv ON sv.coverage_type = 'taluka' AND sv.state_norm = nt.state_norm AND sv.district_norm = nt.district_norm AND sv.taluka_norm = nt.taluka_norm
+  UNION DISTINCT
+  SELECT DISTINCT nt.farmer_id FROM non_transacting nt
+  JOIN svc_coverage sv ON sv.coverage_type = 'pincode' AND sv.state_norm = nt.state_norm AND sv.pincode_norm = nt.pincode_norm
+),
+farmer_bucket AS (
+  SELECT nt.farmer_id, nt.creation_year,
+    CASE
+      WHEN MAX(CASE WHEN sf.farmer_id IS NOT NULL THEN 1 ELSE 0 END) = 1 THEN 'Serviceable'
+      WHEN MAX(CASE WHEN nt.is_address_clean THEN 1 ELSE 0 END) = 1     THEN 'Non Serviceable'
+      ELSE 'Address Problem'
+    END AS serviceability_bucket
+  FROM non_transacting nt
+  LEFT JOIN serviceable_farmers sf ON sf.farmer_id = nt.farmer_id
+  GROUP BY nt.farmer_id, nt.creation_year
+)
+SELECT
+  CAST(creation_year AS STRING) AS year,
+  COUNT(DISTINCT farmer_id) AS non_transacting_farmers,
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Serviceable'     THEN farmer_id END) AS serviceable,
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Non Serviceable' THEN farmer_id END) AS non_serviceable,
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Address Problem' THEN farmer_id END) AS address_problem,
+  ROUND(100.0 * COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Serviceable' THEN farmer_id END) / COUNT(DISTINCT farmer_id), 1) AS farmer_serviceability_pct
+FROM farmer_bucket GROUP BY creation_year
+UNION ALL
+SELECT 'Total',
+  COUNT(DISTINCT farmer_id),
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Serviceable'     THEN farmer_id END),
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Non Serviceable' THEN farmer_id END),
+  COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Address Problem' THEN farmer_id END),
+  ROUND(100.0 * COUNT(DISTINCT CASE WHEN serviceability_bucket = 'Serviceable' THEN farmer_id END) / COUNT(DISTINCT farmer_id), 1)
+FROM farmer_bucket
+ORDER BY CASE WHEN year = 'Total' THEN '9999' ELSE year END
+```
+
+**Scan cost:** ~1.30 GB
+
+---
+
+### Known Data Caveats (Serviceability Revenue Analysis)
+
+| Issue | Detail |
+|---|---|
+| `farmer_profile_master` has no village column | Non-transacting farmers can only be serviceability-checked at taluka + pincode level. Village-level matching is not possible. This understates serviceability for non-transacting farmers. |
+| `farmer_profile_master` creation date field | Use `profile_created_date` (TIMESTAMP) — NOT `created_on`. Field confirmed June 2026. |
+| 60.6% of non-transacting farmers have NULL addresses | `state`, `district`, `taluka`, `pincode` are all missing for majority of non-transacting farmers — they registered with phone only. This is genuine data quality, not a query bug. |
+| 2019 grand_total corruption | 12 orders in 2019 have `grand_total` ~₹10,606 Cr each (data error, `order_type = ''`). Always add `AND grand_total < 100000000` to exclude. Without this filter, 2019 revenue = ₹1,18,223 Cr (inflated from ₹1,556 Cr real). |
+| Serviceability is a lifetime flag on transacting farmers | Do NOT re-evaluate per year. Run serviceability once across all shipping_address_ids ever used by the farmer, then apply that flag to all year rows. |
+| `grand_total` used for revenue (not `order_management_orderitem`) | This analysis is farmer-level, not store-level. Use `order_management_order.grand_total`. The `order_management_orderitem.total_price` is for DVS store invoiced GMV analysis only. |
+| Non-transacting check uses LEFT JOIN not NOT IN | `LEFT JOIN transacting_farmers ... WHERE txn.farmer_id IS NULL` is more efficient than `NOT IN` for large tables. |
+
+---
+
+### Validated Results (June 2026)
+
+**Table 1 — Transacting Farmers:**
+| Metric | Value |
+|---|---|
+| Total unique transacting farmers | 20,98,436 |
+| Serviceable farmers (lifetime) | 11,36,554 (54.2%) |
+| Non Serviceable | 9,52,846 (45.4%) |
+| Address Problem | 9,036 (0.4%) |
+| Lifetime B2C Revenue | ₹17,600 Cr |
+| Serviceable Revenue | ₹11,106 Cr (63.1%) |
+| Non Serviceable Revenue | ₹6,471 Cr (36.7%) |
+| **Revenue serviceability > Farmer serviceability** | **+8.9 pp gap** |
+
+**Table 2 — Non-Transacting Farmers:**
+| Metric | Value |
+|---|---|
+| Total non-transacting farmers | 1,03,58,516 |
+| Serviceable | 48,045 (0.5%) |
+| Non Serviceable (clean address, no coverage) | 39,97,332 (38.6%) — **LMD expansion white space** |
+| Address Problem (no usable address) | 63,13,139 (61.0%) |
+
+---
+
 ## Response Format
 
 **Be concise. Every word should earn its place.**
