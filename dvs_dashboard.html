@@ -292,9 +292,9 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
   <div class="divider"></div>
   <div class="filter-group">
     <span class="filter-label">From</span>
-    <input type="date" id="date-from" class="date-input"/>
+    <input type="date" id="date-from" class="date-input" onchange="loadDashboard()"/>
     <span class="filter-label">To</span>
-    <input type="date" id="date-to" class="date-input"/>
+    <input type="date" id="date-to" class="date-input" onchange="loadDashboard()"/>
   </div>
   <div class="divider"></div>
   <div class="filter-group">
@@ -303,7 +303,7 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
     <span class="pill" onclick="setDatePreset('7d',this)" id="preset-7d">Last 7d</span>
   </div>
   <div class="divider"></div>
-  <button class="load-btn" id="load-btn" onclick="loadDashboard()" disabled>⟳ Refresh Live</button>
+  <button class="load-btn" id="load-btn" onclick="loadDashboard()">⟳ Refresh Live</button>
   <span id="query-status"></span>
 </div>
 
@@ -434,7 +434,7 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
     <!-- Leak 2 -->
     <div class="card">
       <div class="card-title" style="color:#d97706;border-bottom:2px solid #fef3c7;padding-bottom:10px;margin-bottom:12px">
-        🟡 Leak 2 — Routing System Failure
+        🟡 Leak 2 — Not Routed to DVS Store
         <span style="color:#d97706;font-weight:800;font-size:13px" id="l2-count"></span>
       </div>
       <div class="info-box amber" style="margin-bottom:14px;font-size:11px">
@@ -566,11 +566,11 @@ tr:hover:not(:last-child) td { background: #f8fafc; }
   <!-- Re-route + Order Status -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 28px 0">
     <div class="card">
-      <div class="card-header">Re-route Root Causes — Leak 3 (10,475 orders lost to FC)</div>
+      <div class="card-header" id="ops-reroute-header">Re-route Root Causes — Leak 3</div>
       <div id="ops-reroute"></div>
     </div>
     <div class="card">
-      <div class="card-header">Order End-Status Breakdown (DVS Fulfilled: 22,970)</div>
+      <div class="card-header" id="ops-status-header">Order End-Status Breakdown</div>
       <div id="ops-status"></div>
     </div>
   </div>
@@ -4802,20 +4802,34 @@ function renderOpsTab() {
   const d     = STATIC_DATA;
   const state = filters.state;
 
-  // Derive fulfilled & rerouted from summary when state filter is active
+  // Derive fulfilled & rerouted from summary — state-filtered or all-India
   // summary cols: [state(0), b2c(1), dvs_fulfilled(2), dvs_rerouted(3), gmv(4), delivered(5), stores(6)]
-  let totFulfilled, totRerouted;
-  if (state === 'ALL') {
-    totFulfilled = 22970;
-    totRerouted  = d.leak3Reasons.reduce((a,r)=>a+r.count, 0);
-  } else {
-    const sRow   = d.summary.find(r => r[0].toLowerCase() === state.toLowerCase()) || [state,0,0,0,0,0,0];
-    totFulfilled = sRow[2];
-    totRerouted  = sRow[3];
-  }
+  const summaryRows = state === 'ALL' ? d.summary
+    : d.summary.filter(r => r[0].toLowerCase() === state.toLowerCase());
+  const totFulfilled = summaryRows.reduce((a,r)=>a+n(r[2]), 0);
+
+  // Use per-state leak3 breakdown when available
+  const l3State = state !== 'ALL' ? d.leak3ByState[state.toLowerCase()] : null;
+  const activeL3Reasons = l3State
+    ? [
+        { label:'SLA Miss (>24hr no action)', count: l3State.sla,        color:'#dc2626' },
+        { label:'OCP Block (credit hold)',    count: l3State.ocp,        color:'#d97706' },
+        { label:'Shop Closed / Strike',       count: l3State.shopClosed, color:'#f59e0b' },
+        { label:'Backfill Failure',           count: l3State.backfill,   color:'#94a3b8' },
+        { label:'Mapping Issue',              count: l3State.mapping,    color:'#cbd5e1' }
+      ].filter(r => r.count > 0)
+    : d.leak3Reasons;
+  const totRerouted = activeL3Reasons.reduce((a,r)=>a+r.count, 0);
+
   const onHold       = d.opsOrderStatus.find(r=>r.label==='On Hold (Restock)').count;
   const slaBreaches  = d.opsSlaStages[0][4];
   const slaBreachPct = d.opsSlaStages[0][3];
+
+  // Update card headers with live counts
+  const rrHeader = document.getElementById('ops-reroute-header');
+  const osHeader = document.getElementById('ops-status-header');
+  if (rrHeader) rrHeader.textContent = `Re-route Root Causes — Leak 3 (${fmt(totRerouted)} orders lost to FC)`;
+  if (osHeader) osHeader.textContent = `Order End-Status Breakdown (DVS Fulfilled: ${fmt(totFulfilled)})`;
 
   // ── KPI cards ──
   function kpi(id, label, val, sub, color) {
@@ -4829,17 +4843,14 @@ function renderOpsTab() {
   kpi('ops-kpi-sla',       'First Action SLA Breach', `${slaBreachPct}%`,       `${fmt(slaBreaches)} orders > 1hr to pack/hold`, '#d97706');
   kpi('ops-kpi-onhold',    'On Hold (Restock)',      fmt(onHold),                'store marked no-inventory at first action',  '#7c3aed');
 
-  // ── Re-route root causes ──
-  const opsAggNote = state !== 'ALL'
-    ? `<div style="padding:5px 10px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;font-size:10.5px;color:#1e40af;margin-bottom:10px">
-        📊 <strong>All-India aggregate</strong> — re-route reasons, order status &amp; SLA data below are not split by state in this snapshot.
-       </div>`
-    : '';
-  const maxR = Math.max(...d.leak3Reasons.map(r=>r.count));
-  let rr = opsAggNote + '<div style="display:flex;flex-direction:column;gap:10px">';
-  d.leak3Reasons.forEach(r => {
+  // ── Re-route root causes (state-filtered) ──
+  const slaMiss = activeL3Reasons.find(r=>r.label.includes('SLA'))?.count || 0;
+  const ocpBlk  = activeL3Reasons.find(r=>r.label.includes('OCP'))?.count  || 0;
+  const maxR = Math.max(...activeL3Reasons.map(r=>r.count));
+  let rr = '<div style="display:flex;flex-direction:column;gap:10px">';
+  activeL3Reasons.forEach(r => {
     const bw  = (r.count/maxR*100).toFixed(1);
-    const pct = (r.count/totRerouted*100).toFixed(1);
+    const pct = totRerouted > 0 ? (r.count/totRerouted*100).toFixed(1) : '0.0';
     rr += `<div>
       <div style="display:flex;justify-content:space-between;margin-bottom:3px">
         <span style="font-size:11.5px;font-weight:600;color:#1a1a2e">${r.label}</span>
@@ -4854,8 +4865,8 @@ function renderOpsTab() {
   });
   rr += `</div>
   <div style="margin-top:10px;padding:7px 10px;background:#fef2f2;border-radius:6px;border-left:3px solid #dc2626;font-size:10.5px;color:#7f1d1d;line-height:1.6">
-    ⚠️ SLA Miss accounts for <strong>${(7738/totRerouted*100).toFixed(0)}%</strong> of re-routes.
-    OCP credit block adds another <strong>${(2629/totRerouted*100).toFixed(0)}%</strong> — these are actionable with partner credit reviews.
+    ⚠️ SLA Miss accounts for <strong>${totRerouted>0?(slaMiss/totRerouted*100).toFixed(0):0}%</strong> of re-routes.
+    OCP credit block adds another <strong>${totRerouted>0?(ocpBlk/totRerouted*100).toFixed(0):0}%</strong> — these are actionable with partner credit reviews.
   </div>`;
   document.getElementById('ops-reroute').innerHTML = rr;
 
