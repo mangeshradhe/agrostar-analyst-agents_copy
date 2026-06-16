@@ -1291,6 +1291,272 @@ If Step 1 finds no match → fall to Step 2
 
 No order is left unresolvable. **Match rate itself is a data quality signal** — the % falling to Step 2 vs Step 1 shows how cleanly historical addresses were entered.
 
+> **⚠️ The 2-step algorithm above is now superseded by the 3-Tier algorithm below.** Use the 3-Tier version for all new serviceability work. The 8-bucket logic above is preserved for context only.
+
+---
+
+### 3-Tier VM Resolution Algorithm (Validated June 2026)
+
+**Problem with 5-field VM join:** `csr_shippingaddress.pin_code` is frequently empty or wrong vs. the LGD-canonical pincode in `csr_villageaddress`. A strict 5-field match (village+taluka+district+pincode+state) silently drops these addresses — marking farmers as non-serviceable when they genuinely are. In UP alone, this affected 10,112 farmers.
+
+**3-Tier fallback logic:**
+
+| Tier | Match Fields | When Used | Confidence |
+|------|-------------|-----------|------------|
+| **Tier 1** | village + taluka + district + **pincode** + state | Always (first attempt) | High — exact canonical match |
+| **Tier 2** | village + taluka + district + state (**no pincode**) | Tier 1 failed (empty/wrong pincode) | High — VM provides canonical pincode |
+| **Tier 3** | Raw address as-is (village_raw + pincode_raw) | Tiers 1 & 2 failed (no VM entry) | Best effort — free-text noise |
+
+**Key rules:**
+- Tier 2 keeps **ALL** VM matches per address (not just top 1) — if any match hits coverage, farmer = Serviceable
+- Tier 2 only matches active records (`is_archived=0`) or archived-with-replacement (`is_archived=1 AND replaced_by_id IS NOT NULL`)
+- Archived-no-replacement falls through to Tier 3
+- Serviceability check: if **any** canonical address from **any** tier hits **any** coverage type → farmer is Serviceable
+- Address pool for serviceability: use **ALL orders** (no B2C filter) — use B2C filter only when computing revenue
+
+**3 output buckets:**
+| Bucket | Condition | Action |
+|--------|-----------|--------|
+| `Serviceable` | Any address hits coverage in Tier 1, 2, or 3 | Push DVS |
+| `Non Serviceable` | No coverage hit but Tier 1 or 2 resolved address (data is clean, genuine gap) | LMD expansion opportunity |
+| `Address Problem` | Only Tier 3 raw fallback — address too dirty for VM resolution | Fix registration data |
+
+**Validated results — UP farmer base (June 2026):**
+
+| Bucket | Farmers | % |
+|--------|---------|---|
+| Serviceable | 1,24,979 | 53.8% |
+| Non Serviceable | 37,394 | 16.1% |
+| Address Problem | 70,121 | 30.2% |
+| **Total** | **2,32,494** | **100%** |
+
+**Tier contribution among serviceable UP farmers:**
+| Tier | Farmers | % of Serviceable |
+|------|---------|-----------------|
+| Tier 1 (5-field full match) | 1,02,215 | 81.8% |
+| Tier 2 (no-pincode — NEW) | 10,112 | 8.1% |
+| Tier 3 (raw fallback) | 12,652 | 10.1% |
+
+---
+
+### 3-Tier BQ Query — Farmer Serviceability (3-Column Output)
+
+Generic query: `farmer_id`, `is_serviceable`, `lmd_partner_name`. Adjust `state_filter` CTE to change state.
+
+```sql
+WITH
+state_filter AS (SELECT 'uttar pradesh' AS state_name),
+
+all_addresses AS (
+  SELECT DISTINCT
+    o.owner_id AS farmer_id,
+    LOWER(TRIM(sa.village))  AS village_raw,
+    LOWER(TRIM(sa.taluka))   AS taluka_raw,
+    LOWER(TRIM(sa.district)) AS district_raw,
+    LOWER(TRIM(sa.pin_code)) AS pincode_raw,
+    CASE
+      WHEN LOWER(TRIM(sa.state)) LIKE 'gujarat%'  THEN 'gujarat'
+      WHEN LOWER(TRIM(sa.state)) LIKE 'maharash%' THEN 'maharashtra'
+      WHEN LOWER(TRIM(sa.state)) LIKE 'rajas%'    THEN 'rajasthan'
+      WHEN LOWER(TRIM(sa.state)) LIKE 'madhya%'   THEN 'madhya pradesh'
+      WHEN LOWER(TRIM(sa.state)) LIKE 'uttar%'    THEN 'uttar pradesh'
+      ELSE LOWER(TRIM(sa.state))
+    END AS state_norm
+  FROM `agrostar-data.prod_db_views.order_management_order` o
+  JOIN `agrostar-data.prod_db_views.csr_shippingaddress` sa ON sa.id = o.shipping_address_id
+  CROSS JOIN state_filter sf
+  WHERE o.owner_id IS NOT NULL AND o.shipping_address_id IS NOT NULL
+    AND CASE WHEN LOWER(TRIM(sa.state)) LIKE 'gujarat%'  THEN 'gujarat'
+             WHEN LOWER(TRIM(sa.state)) LIKE 'maharash%' THEN 'maharashtra'
+             WHEN LOWER(TRIM(sa.state)) LIKE 'rajas%'    THEN 'rajasthan'
+             WHEN LOWER(TRIM(sa.state)) LIKE 'madhya%'   THEN 'madhya pradesh'
+             WHEN LOWER(TRIM(sa.state)) LIKE 'uttar%'    THEN 'uttar pradesh'
+             ELSE LOWER(TRIM(sa.state)) END = sf.state_name
+),
+
+vm AS (
+  SELECT id,
+    LOWER(TRIM(village)) AS village_norm, LOWER(TRIM(taluka)) AS taluka_norm,
+    LOWER(TRIM(district)) AS district_norm, LOWER(TRIM(pin_code)) AS pincode_norm,
+    CASE WHEN LOWER(TRIM(state)) LIKE 'gujarat%'  THEN 'gujarat'
+         WHEN LOWER(TRIM(state)) LIKE 'maharash%' THEN 'maharashtra'
+         WHEN LOWER(TRIM(state)) LIKE 'rajas%'    THEN 'rajasthan'
+         WHEN LOWER(TRIM(state)) LIKE 'madhya%'   THEN 'madhya pradesh'
+         WHEN LOWER(TRIM(state)) LIKE 'uttar%'    THEN 'uttar pradesh'
+         ELSE LOWER(TRIM(state)) END AS state_norm,
+    is_archived, replaced_by_id
+  FROM `agrostar-data.static_tables_views.csr_villageaddress`
+),
+
+-- Tier 1: 5-field match, ROW_NUMBER picks best archived status
+tier1_match AS (
+  SELECT * FROM (
+    SELECT a.farmer_id, a.village_raw, a.taluka_raw, a.district_raw, a.pincode_raw, a.state_norm,
+      v.id AS vm_id, v.is_archived, v.replaced_by_id,
+      ROW_NUMBER() OVER (
+        PARTITION BY a.farmer_id, a.village_raw, a.taluka_raw, a.district_raw, a.pincode_raw, a.state_norm
+        ORDER BY CASE WHEN v.is_archived=0 THEN 1 WHEN v.is_archived=1 AND v.replaced_by_id IS NOT NULL THEN 2 ELSE 3 END, v.id NULLS LAST
+      ) AS rn
+    FROM all_addresses a
+    LEFT JOIN vm v ON v.village_norm=a.village_raw AND v.taluka_norm=a.taluka_raw
+      AND v.district_norm=a.district_raw AND v.pincode_norm=a.pincode_raw AND v.state_norm=a.state_norm
+  ) WHERE rn=1
+),
+tier1_resolved AS (
+  SELECT t1.farmer_id, t1.village_raw, t1.taluka_raw, t1.district_raw, t1.pincode_raw, t1.state_norm, 1 AS tier,
+    CASE WHEN t1.vm_id IS NULL THEN FALSE WHEN t1.is_archived=0 THEN TRUE
+         WHEN t1.is_archived=1 AND t1.replaced_by_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_resolved,
+    CASE WHEN t1.vm_id IS NULL THEN NULL WHEN t1.is_archived=0 THEN vm1.village_norm
+         WHEN t1.is_archived=1 AND t1.replaced_by_id IS NOT NULL THEN vm2.village_norm ELSE NULL END AS canonical_village,
+    CASE WHEN t1.vm_id IS NULL THEN NULL WHEN t1.is_archived=0 THEN vm1.pincode_norm
+         WHEN t1.is_archived=1 AND t1.replaced_by_id IS NOT NULL THEN vm2.pincode_norm ELSE NULL END AS canonical_pincode
+  FROM tier1_match t1
+  LEFT JOIN vm vm1 ON vm1.id=t1.vm_id AND t1.is_archived=0
+  LEFT JOIN vm vm2 ON vm2.id=t1.replaced_by_id
+),
+
+-- Tier 2: 4-field match (no pincode), ALL VM matches kept — VM provides canonical pincode
+tier2_candidates AS (
+  SELECT DISTINCT farmer_id, village_raw, taluka_raw, district_raw, pincode_raw, state_norm
+  FROM tier1_resolved WHERE is_resolved=FALSE
+),
+tier2_match AS (
+  SELECT a.farmer_id, a.village_raw, a.taluka_raw, a.district_raw, a.pincode_raw, a.state_norm,
+    v.id AS vm_id, v.is_archived, v.replaced_by_id
+  FROM tier2_candidates a
+  JOIN vm v ON v.village_norm=a.village_raw AND v.taluka_norm=a.taluka_raw
+    AND v.district_norm=a.district_raw AND v.state_norm=a.state_norm
+  WHERE (v.is_archived=0 OR (v.is_archived=1 AND v.replaced_by_id IS NOT NULL))
+),
+tier2_resolved AS (
+  SELECT t2.farmer_id, t2.village_raw, t2.taluka_raw, t2.district_raw, t2.pincode_raw, t2.state_norm,
+    2 AS tier, TRUE AS is_resolved,
+    CASE WHEN t2.is_archived=0 THEN vm1.village_norm ELSE vm2.village_norm END AS canonical_village,
+    CASE WHEN t2.is_archived=0 THEN vm1.pincode_norm ELSE vm2.pincode_norm END AS canonical_pincode
+  FROM tier2_match t2
+  LEFT JOIN vm vm1 ON vm1.id=t2.vm_id AND t2.is_archived=0
+  LEFT JOIN vm vm2 ON vm2.id=t2.replaced_by_id AND t2.is_archived=1
+),
+
+-- Tier 3: raw address fallback
+tier3_candidates AS (
+  SELECT DISTINCT tc.farmer_id, tc.village_raw, tc.taluka_raw, tc.district_raw, tc.pincode_raw, tc.state_norm
+  FROM tier2_candidates tc
+  LEFT JOIN tier2_resolved t2r
+    ON t2r.farmer_id=tc.farmer_id AND t2r.village_raw=tc.village_raw
+    AND t2r.taluka_raw=tc.taluka_raw AND t2r.district_raw=tc.district_raw AND t2r.pincode_raw=tc.pincode_raw
+  WHERE t2r.farmer_id IS NULL
+),
+tier3_resolved AS (
+  SELECT farmer_id, village_raw, taluka_raw, district_raw, pincode_raw, state_norm,
+    3 AS tier, FALSE AS is_resolved, village_raw AS canonical_village, pincode_raw AS canonical_pincode
+  FROM tier3_candidates
+),
+
+all_resolved AS (
+  SELECT farmer_id, village_raw, taluka_raw, district_raw, pincode_raw, state_norm, tier, canonical_village, canonical_pincode
+  FROM tier1_resolved WHERE is_resolved=TRUE
+  UNION ALL
+  SELECT farmer_id, village_raw, taluka_raw, district_raw, pincode_raw, state_norm, tier, canonical_village, canonical_pincode
+  FROM tier2_resolved
+  UNION ALL
+  SELECT farmer_id, village_raw, taluka_raw, district_raw, pincode_raw, state_norm, tier, canonical_village, canonical_pincode
+  FROM tier3_resolved
+),
+
+svc_coverage AS (
+  SELECT DISTINCT dc.coverage_type,
+    LOWER(TRIM(dc.village)) AS village_norm, LOWER(TRIM(dc.pincode)) AS pincode_norm,
+    CASE WHEN LOWER(TRIM(da.state)) LIKE 'gujarat%'  THEN 'gujarat'
+         WHEN LOWER(TRIM(da.state)) LIKE 'maharash%' THEN 'maharashtra'
+         WHEN LOWER(TRIM(da.state)) LIKE 'rajas%'    THEN 'rajasthan'
+         WHEN LOWER(TRIM(da.state)) LIKE 'madhya%'   THEN 'madhya pradesh'
+         WHEN LOWER(TRIM(da.state)) LIKE 'uttar%'    THEN 'uttar pradesh'
+         ELSE LOWER(TRIM(da.state)) END AS state_norm,
+    LOWER(TRIM(da.district)) AS district_norm, LOWER(TRIM(da.taluka)) AS taluka_norm,
+    CONCAT(TRIM(ui.first_name),' ',TRIM(ui.last_name)) AS lmd_partner_name
+  FROM `agrostar-data.prod_agroex_db_views.assignment_deliverycoverage` dc
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_deliveryarea` da ON da.id=dc.delivery_area_id
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_pickuplocationfranchisemapping` apl ON apl.id=da.pickuplocation_franchise_mapping_id
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_franchise` asf ON asf.id=apl.franchise_id
+  JOIN `agrostar-data.prod_agroex_db_views.assignment_pickuplocation` pl ON pl.id=apl.pickuplocation_id
+  JOIN `agrostar-data.prod_db_views.delivery_franchise` df ON df.id=asf.franchise_id
+  JOIN `agrostar-data.prod_db_views.delivery_userinformation` ui ON ui.username=df.user_info_id
+  WHERE da.is_active=1 AND dc.is_active=1 AND asf.is_active=1 AND pl.is_active=1
+),
+
+coverage_hits AS (
+  SELECT ar.farmer_id, sv.lmd_partner_name, 1 AS cov_priority, ar.tier
+  FROM all_resolved ar JOIN svc_coverage sv
+    ON sv.coverage_type='village' AND sv.village_norm=ar.canonical_village AND sv.pincode_norm=ar.canonical_pincode
+  WHERE ar.canonical_village IS NOT NULL
+    AND ar.canonical_village NOT IN ('','na','n/a','nil','none','unknown','not available')
+    AND LENGTH(ar.canonical_village)>=2
+  UNION ALL
+  SELECT ar.farmer_id, sv.lmd_partner_name, 2, ar.tier FROM all_resolved ar JOIN svc_coverage sv
+    ON sv.coverage_type='taluka' AND sv.district_norm=ar.district_raw AND sv.taluka_norm=ar.taluka_raw
+  UNION ALL
+  SELECT ar.farmer_id, sv.lmd_partner_name, 3, ar.tier FROM all_resolved ar JOIN svc_coverage sv
+    ON sv.coverage_type='pincode' AND sv.state_norm=ar.state_norm AND sv.pincode_norm=ar.canonical_pincode
+),
+
+best_lmd AS (
+  SELECT farmer_id, lmd_partner_name FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY farmer_id ORDER BY cov_priority ASC, tier ASC, lmd_partner_name ASC) AS rn
+    FROM coverage_hits
+  ) WHERE rn=1
+),
+
+farmer_bucket AS (
+  SELECT ar.farmer_id,
+    CASE WHEN MAX(CASE WHEN ch.farmer_id IS NOT NULL THEN 1 ELSE 0 END)=1 THEN 'Serviceable'
+         WHEN MAX(CASE WHEN ar.tier IN (1,2) THEN 1 ELSE 0 END)=1 THEN 'Non Serviceable'
+         ELSE 'Address Problem' END AS serviceability_bucket
+  FROM all_resolved ar
+  LEFT JOIN coverage_hits ch ON ch.farmer_id=ar.farmer_id
+  GROUP BY ar.farmer_id
+)
+
+SELECT
+  fb.farmer_id,
+  CASE WHEN fb.serviceability_bucket='Serviceable' THEN 1 ELSE 0 END AS is_serviceable,
+  lmd.lmd_partner_name
+FROM farmer_bucket fb
+LEFT JOIN best_lmd lmd ON lmd.farmer_id=fb.farmer_id
+ORDER BY fb.farmer_id
+```
+
+**Adjust the `state_filter` CTE value** to switch states. To run for multiple states at once, replace the `state_filter` CTE join with an `IN (...)` filter on `state_norm` and add `state_norm` to all GROUP BY and PARTITION BY clauses.
+
+---
+
+### File-Based Serviceability Check (Local Python — No BQ Write Needed)
+
+When given a file (Excel/CSV) with village, taluka, district, pincode columns, perform serviceability checks **entirely locally** — no BigQuery ingestion required.
+
+**Approach:**
+1. **Pull 2 reference tables from BQ** (read-only, pre-approved):
+   - **VM table (state-filtered):** `SELECT id, village, taluka, district, pin_code, is_archived, replaced_by_id FROM static_tables_views.csr_villageaddress WHERE LOWER(state) LIKE 'uttar%'` (~412K rows for UP)
+   - **Coverage table (flattened, state-filtered):** The full serviceability join chain as a single SELECT returning `coverage_type, village, pincode, district, taluka, lmd_partner_name` — filter to target state at source
+2. **Python/pandas 3-tier matching:**
+   - Normalize all fields: `LOWER(TRIM(...))`, pincode → `str(int(float(x))).zfill(6)` (handles float like `277216.0`)
+   - Tier 1: pandas merge on (village+taluka+district+pincode) → resolve archived/replacement chain
+   - Tier 2: pandas merge on (village+taluka+district, no pincode) on unresolved rows, keep ALL matches
+   - Tier 3: raw village+pincode used directly against coverage
+   - Coverage join: canonical (village+pincode) against coverage DataFrame
+3. **Output:** New Excel with columns appended: `is_serviceable`, `lmd_partner_name`, `matched_via` (village/taluka/pincode), `vm_tier_used`, `canonical_village`, `canonical_pincode`
+
+**Pincode normalization (CRITICAL for Excel inputs):**
+```python
+df['Pincode'] = df['Pincode'].apply(
+    lambda x: str(int(float(x))).zfill(6) if pd.notna(x) and str(x).strip() not in ('', 'nan') else ''
+)
+```
+
+**Null handling:**
+- 1 null village row → goes to Tier 3 (raw fallback), likely non-serviceable
+- Null pincode rows → Tier 1 will fail (no pincode to match), Tier 2 resolves if village+taluka+district exist
+
 ---
 
 ### Coverage Reference Numbers (as of June 2026, 5 states)
@@ -1374,6 +1640,8 @@ These were discovered through live testing — not in any schema documentation:
 | Profile state can be blank for transacting farmers | `farmer_profile_master.profile_state` can be NULL/empty even when the farmer has valid shipping addresses in `csr_shippingaddress`. For display/grouping, fall back to the shipping address state: `COALESCE(NULLIF(INITCAP(TRIM(profile_state)), ''), INITCAP(MAX(a.state_norm)))`. |
 | Address quality — bad values beyond NULL | Addresses can be bad without being NULL: `'na'`, `'n/a'`, `'nil'`, `'none'`, `'unknown'`, single characters, or pincodes that aren't 6 digits. Always check `LENGTH(TRIM(field)) < 2` and `IN ('', 'na', 'n/a', 'nil', 'none', 'unknown')` in addition to `IS NULL`. Non-serviceable farmers with dirty addresses are "Address Problem" not "Genuine Coverage Gap". |
 | Bulk farmer serviceability from a file — use UNNEST of farmer_id + village_id | When checking serviceability for a list of farmers from an Excel file that has LGD village IDs (from `static_tables_views.csr_villageaddress`), use `UNNEST([STRUCT(farmer_id, village_id), ...])` + join to village master for canonical addresses. This is more accurate than pulling raw addresses from `csr_shippingaddress`. Keep UNNEST payload under ~700KB (BQ query limit is 1MB). |
+| `csr_shippingaddress.pin_code` is often empty or wrong | `pin_code` in `csr_shippingaddress` is free-text typed by CSR/farmer — frequently empty or has the wrong pincode vs. the LGD-canonical pincode in `csr_villageaddress`. A strict 5-field VM join silently drops these addresses. **Always use the 3-Tier algorithm** (Tier 2 drops pincode from VM join, letting VM supply the correct canonical pincode). In UP, 10,112 farmers were incorrectly non-serviceable with 5-field join; Tier 2 recovered them all. |
+| File-based serviceability — do NOT ingest to BQ | For Excel/CSV inputs (village, taluka, district, pincode), pull the VM and coverage tables from BQ locally and process in Python/pandas. Do NOT attempt to upload files to BQ — use the local Python approach documented in the "File-Based Serviceability Check" section. |
 
 ---
 
