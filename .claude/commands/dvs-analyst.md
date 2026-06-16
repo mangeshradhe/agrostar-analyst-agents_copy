@@ -1806,6 +1806,76 @@ ORDER BY CASE WHEN year = 'Total' THEN '9999' ELSE year END
 
 ---
 
+### Address Problem Drill-Down — Non-Transacting Farmers
+
+When Table 2 shows a large "Address Problem" bucket, run this to understand what exactly is missing. The breakdown reveals three fixable tiers.
+
+```sql
+WITH
+transacting_farmers AS (
+  SELECT DISTINCT owner_id AS farmer_id
+  FROM `agrostar-data.prod_db_views.order_management_order`
+  WHERE LOWER(initiating_source) NOT LIKE 'b2b%'
+    AND unicommerce_status NOT IN ('FUTURE ORDER', 'CANCELLED', 'DISPUTED_ADDRESS')
+    AND status NOT IN ('MOB_APP_UNVERIFIED')
+    AND status NOT LIKE 'edited%'
+    AND unicommerce_status NOT LIKE 'edited%'
+    AND LOWER(COALESCE(order_type, '')) NOT LIKE '%offline%'
+    AND owner_id IS NOT NULL
+),
+non_transacting AS (
+  SELECT fp.farmer_id, fp.state, fp.district, fp.taluka, fp.pin_code
+  FROM `agrostar-data.dwh_views.farmer_profile_master` fp
+  LEFT JOIN transacting_farmers txn ON txn.farmer_id = fp.farmer_id
+  WHERE txn.farmer_id IS NULL
+    AND fp.profile_created_date IS NOT NULL
+    AND fp.is_archived = 0
+),
+address_problem AS (
+  SELECT * FROM non_transacting
+  WHERE NOT (
+    taluka IS NOT NULL AND LOWER(TRIM(taluka)) NOT IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') AND LENGTH(TRIM(taluka)) >= 2
+    AND district IS NOT NULL AND LOWER(TRIM(district)) NOT IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') AND LENGTH(TRIM(district)) >= 2
+    AND state IS NOT NULL AND LOWER(TRIM(state)) NOT IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') AND LENGTH(TRIM(state)) >= 2
+    AND pin_code IS NOT NULL AND REGEXP_CONTAINS(TRIM(pin_code), r'^\d{6}$')
+  )
+)
+SELECT
+  CASE
+    WHEN (state IS NULL OR TRIM(state) = '') AND (district IS NULL OR TRIM(district) = '') AND (taluka IS NULL OR TRIM(taluka) = '') AND (pin_code IS NULL OR TRIM(pin_code) = '') THEN 'All fields blank'
+    WHEN (state IS NULL OR TRIM(state) = '') AND (district IS NULL OR TRIM(district) = '') AND (taluka IS NULL OR TRIM(taluka) = '') THEN 'State + District + Taluka blank (pincode only)'
+    WHEN (district IS NULL OR TRIM(district) = '') AND (taluka IS NULL OR TRIM(taluka) = '') THEN 'District + Taluka blank (has state)'
+    WHEN (taluka IS NULL OR TRIM(taluka) = '') AND (pin_code IS NULL OR NOT REGEXP_CONTAINS(TRIM(COALESCE(pin_code,'')), r'^\d{6}$')) THEN 'Taluka + Pincode missing'
+    WHEN (taluka IS NULL OR TRIM(taluka) = '') THEN 'Only Taluka missing'
+    WHEN (pin_code IS NULL OR NOT REGEXP_CONTAINS(TRIM(COALESCE(pin_code,'')), r'^\d{6}$')) THEN 'Only Pincode missing/invalid'
+    ELSE 'Other bad field combo'
+  END AS missing_pattern,
+  COUNT(*) AS farmer_count,
+  ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 1) AS pct_of_address_problems
+FROM address_problem
+GROUP BY 1
+ORDER BY farmer_count DESC
+```
+
+**Validated pattern (June 2026 — 63 lakh address problem farmers):**
+
+| Pattern | Farmers | % | Fix Strategy |
+|---|---|---|---|
+| All fields blank | 40,98,185 | 64.9% | No fix without re-engagement — registered with phone only |
+| District + Taluka blank (has state) | 11,79,349 | 18.7% | App prompt / call center nudge to complete address |
+| Only Pincode missing/invalid | 4,34,005 | 6.9% | **Automated fix** — derive pincode from state+district+taluka lookup |
+| Other bad field combo | 3,46,483 | 5.5% | Case-by-case |
+| Only Taluka missing | 2,26,450 | 3.6% | App prompt |
+| Taluka + Pincode missing | 27,053 | 0.4% | App prompt |
+| Pincode only (state/district/taluka blank) | 4,877 | 0.1% | No fix |
+
+**Actionable priority:**
+1. **4.3 lakh pincode-only-missing** → automated fix (taluka → pincode lookup), no outreach needed
+2. **11.8 lakh state-only farmers** → app prompt or call center re-engagement
+3. **41 lakh all-blank** → low priority unless re-activation campaign is running
+
+---
+
 ### Known Data Caveats (Serviceability Revenue Analysis)
 
 | Issue | Detail |
