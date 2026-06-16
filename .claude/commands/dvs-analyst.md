@@ -1104,15 +1104,18 @@ State column stores full names with typos. **Never filter by abbreviations.** Ap
 
 ```sql
 CASE
-  WHEN REGEXP_CONTAINS(LOWER(state), r'^gujarat')   THEN 'gujarat'
-  WHEN REGEXP_CONTAINS(LOWER(state), r'^maharash')  THEN 'maharashtra'
-  WHEN REGEXP_CONTAINS(LOWER(state), r'^rajas')     THEN 'rajasthan'
-  WHEN REGEXP_CONTAINS(LOWER(state), r'^madhya')    THEN 'madhya pradesh'
-  WHEN REGEXP_CONTAINS(LOWER(state), r'^uttar')     THEN 'uttar pradesh'
+  WHEN LOWER(TRIM(state)) LIKE 'gujarat%'   THEN 'gujarat'
+  WHEN LOWER(TRIM(state)) LIKE 'maharash%'  THEN 'maharashtra'
+  WHEN LOWER(TRIM(state)) LIKE 'rajas%'     THEN 'rajasthan'
+  WHEN LOWER(TRIM(state)) LIKE 'madhya%'    THEN 'madhya pradesh'
+  WHEN LOWER(TRIM(state)) LIKE 'uttar%'     THEN 'uttar pradesh'
+  ELSE LOWER(TRIM(state))
 END AS state_norm
 ```
 
 Both `static_tables_views.csr_villageaddress.state` and `assignment_deliveryarea.state` have these typo variants (e.g. `'rajashtan'`, `'Maharasthra'`).
+
+**CRITICAL — use `LIKE` not `REGEXP_CONTAINS` for state normalization inside CASE statements.** `REGEXP_CONTAINS(x, r'^gujarat')` raw string literals inside CASE/WHEN blocks cause a BigQuery syntax error: `"Expected keyword END but got identifier"`. Always use `LOWER(TRIM(state)) LIKE 'gujarat%'` instead — same logic, no parser issues.
 
 ---
 
@@ -1121,21 +1124,31 @@ Both `static_tables_views.csr_villageaddress.state` and `assignment_deliveryarea
 Logistics team marks LMD delivery coverage at village+pincode, taluka, or pincode level. Chain:
 
 ```
-prod_db_views.assignment_deliverycoverage   (coverage record: coverage_type, village, pincode)
-  → prod_db_views.assignment_deliveryarea   (state, district, taluka)
-  → prod_db_views.assignment_pickuplocationfranchisemapping
-  → prod_db_views.assignment_franchise
+prod_agroex_db_views.assignment_deliverycoverage   (coverage record: coverage_type, village, pincode)
+  → prod_agroex_db_views.assignment_deliveryarea   (state, district, taluka)
+      JOIN: da.id = dc.delivery_area_id
+  → prod_agroex_db_views.assignment_pickuplocationfranchisemapping
+      JOIN: apl.id = da.pickuplocation_franchise_mapping_id   ← NOT apl.delivery_area_id
+  → prod_agroex_db_views.assignment_franchise
+      JOIN: asf.id = apl.franchise_id
+  → prod_agroex_db_views.assignment_pickuplocation (pickup hub)
+      JOIN: pl.id = apl.pickuplocation_id
   → prod_db_views.delivery_franchise        (LMD franchisee entity)
-  → prod_db_views.assignment_pickuplocation (pickup hub)
+      JOIN: df.id = asf.franchise_id
 ```
 
-**Active filters required at EVERY level:**
+**Active filters required at EVERY level — all 5 must be 1:**
 ```sql
 WHERE da.is_active = 1
   AND dc.is_active = 1
-  AND apl.is_active = 1
   AND asf.is_active = 1
+  AND pl.is_active = 1        -- CRITICAL: pickup hub must be active; franchise can be active but hub deactivated = not serviceable
 ```
+
+**CRITICAL GOTCHA — pickup location is the real gate:**
+`delivery_franchise.is_active = 1` and `assignment_franchise.is_active = 1` being true does NOT mean the farmer is serviceable. The pickup hub (`assignment_pickuplocation.is_active`) must ALSO be `1`. A deactivated hub means no physical operations — no pickups, no deliveries — even if all other records are active. Always include `pl.is_active = 1` in the WHERE clause.
+
+**Note:** `assignment_pickuplocationfranchisemapping` has NO `is_active` column — do not filter on it.
 
 **`coverage_type` values in `assignment_deliverycoverage`:**
 | Value | Row count | Match logic |
@@ -1151,35 +1164,37 @@ WHERE da.is_active = 1
 A single farmer location can match multiple coverage types. Use UNION not LEFT JOIN to deduplicate:
 
 ```sql
--- svc_village, svc_taluka, svc_pincode = pre-built CTEs from serviceability chain above
--- vm = village master CTE with state_norm, village_norm, taluka_norm, pincode_norm
-
 serviceable_ids AS (
-  -- Village-level
+  -- Village-level: match on village + pincode ONLY
+  -- (pincode is geographically specific enough; adding taluka/state risks false negatives from name mismatches)
   SELECT DISTINCT vm.id
   FROM vm
-  JOIN svc_village sv
-    ON sv.state_norm    = vm.state_norm
-    AND sv.village_norm = vm.village_norm
-    AND sv.pincode_norm = vm.pincode_norm
+  JOIN svc_coverage sv
+    ON  sv.coverage_type = 'village'
+    AND sv.village_norm  = vm.village_norm
+    AND sv.pincode_norm  = vm.pincode_norm
 
   UNION DISTINCT
 
-  -- Taluka-level
+  -- Taluka-level: match on state + district + taluka
+  -- (district is MANDATORY — same taluka name exists in multiple districts of the same state)
   SELECT DISTINCT vm.id
   FROM vm
-  JOIN svc_taluka st
-    ON st.state_norm  = vm.state_norm
-    AND st.taluka_norm = vm.taluka_norm
+  JOIN svc_coverage sv
+    ON  sv.coverage_type  = 'taluka'
+    AND sv.state_norm     = vm.state_norm
+    AND sv.district_norm  = vm.district_norm
+    AND sv.taluka_norm    = vm.taluka_norm
 
   UNION DISTINCT
 
-  -- Pincode-level
+  -- Pincode-level: match on state + pincode
   SELECT DISTINCT vm.id
   FROM vm
-  JOIN svc_pincode sp
-    ON sp.state_norm  = vm.state_norm
-    AND sp.pincode_norm = vm.pincode_norm
+  JOIN svc_coverage sv
+    ON  sv.coverage_type = 'pincode'
+    AND sv.state_norm    = vm.state_norm
+    AND sv.pincode_norm  = vm.pincode_norm
 ),
 vm_svc AS (
   SELECT vm.*, (si.id IS NOT NULL) AS is_serviceable
@@ -1189,6 +1204,49 @@ vm_svc AS (
 
 **Why UNION not LEFT JOIN:** One village often has both a village-level and taluka-level coverage row. LEFT JOINs inflate counts ~2–3×.
 
+**Correct match keys per coverage type (validated June 2026):**
+
+| Coverage Type | Join Keys | Why |
+|---|---|---|
+| `village` | `village + pincode` | Pincode is geographically specific. Adding taluka/state over-constrains and causes false negatives when name spellings differ between `csr_shippingaddress` and `assignment_deliveryarea` |
+| `taluka` | `state + district + taluka` | District is mandatory — same taluka name exists in multiple districts of the same state (e.g. "Haveli" in Maharashtra) |
+| `pincode` | `state + pincode` | State disambiguates rare cross-state pincode overlaps |
+
+---
+
+### Address Quality Check — Is the Address Usable?
+
+Before concluding a farmer is "not serviceable", check if their address data is valid. An address is **clean** only if ALL 5 fields pass:
+
+```sql
+CASE
+  WHEN village  IS NULL OR TRIM(village)  IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(village))  < 2 THEN FALSE
+  WHEN taluka   IS NULL OR TRIM(taluka)   IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(taluka))   < 2 THEN FALSE
+  WHEN district IS NULL OR TRIM(district) IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(district)) < 2 THEN FALSE
+  WHEN state    IS NULL OR TRIM(state)    IN ('', 'na', 'n/a', 'nil', 'none', 'unknown', 'not available') OR LENGTH(TRIM(state))    < 2 THEN FALSE
+  WHEN pincode  IS NULL OR NOT REGEXP_CONTAINS(TRIM(pincode), r'^\d{6}$')                                                             THEN FALSE
+  ELSE TRUE
+END AS is_address_clean
+```
+
+**Three-bucket classification for non-serviceable farmers:**
+
+| Status | Condition | Action |
+|---|---|---|
+| `Serviceable` | Coverage match found | Push DVS demand |
+| `Genuine Coverage Gap` | Address is clean, no coverage match | LMD expansion opportunity |
+| `Address Problem` | No clean address exists | Fix registration data first |
+
+```sql
+CASE
+  WHEN is_serviceable                    THEN 'Serviceable'
+  WHEN has_any_clean_address             THEN 'Genuine Coverage Gap'
+  ELSE                                        'Address Problem'
+END AS serviceability_status
+```
+
+`has_any_clean_address = MAX(CASE WHEN is_address_clean THEN 1 ELSE 0 END) = 1` — if ANY one of a transacting farmer's addresses is clean, they have valid data.
+
 ---
 
 ### Farmer Order → Serviceability Resolution Chain (8 buckets)
@@ -1197,6 +1255,7 @@ vm_svc AS (
 - `prod_db_views.order_management_order` — `sales_order_id`, `owner_id` (farmer), `shipping_address_id`
 - `prod_db_views.csr_shippingaddress` — `id`, `state`, `district`, `taluka`, `village`, `pin_code` (free-text, no validation at entry)
 - `static_tables_views.csr_villageaddress` — canonical village master (LGD)
+- `dwh_views.farmer_profile_master` — lifetime farmer base; has profile address for non-transacting farmers
 - Assignment serviceability chain (above)
 
 **Step 1 — Concat-match shipping address → village master:**
@@ -1303,6 +1362,18 @@ These were discovered through live testing — not in any schema documentation:
 | LMD hold reason table — use `prod_agroex_db_views.delivery_localisedstring` | `delivery_shippingpackagestatushistory.reason` is a UUID. Decode via `prod_agroex_db_views.delivery_localisedstring` on `string_id_id = reason`, filter `language = 'en'`. Do NOT use `prod_db_views.delivery_applicationstring` — it is incomplete and misses key reasons including "Inventory not available at Store". |
 | `delivery_shippingpackagestatushistory` has ~5x duplicate rows | The same event appears multiple times per package per status. Always `SELECT DISTINCT package_id, reason` (or equivalent) when counting hold events — raw row counts are inflated ~5x. |
 | `RETURNED` count can exceed `RETURNED_BY_LMD` count | Many RTO orders skip `RETURNED_BY_LMD` and go directly from `RETURN_IN_TRANSIT` → `RETURNED`. Never assume RETURNED_BY_LMD → RETURNED is the only path. To measure SOP compliance: count orders where `RETURNED` exists but `RETURNED_BY_LMD` does not. |
+| Serviceability — active franchise ≠ serviceable | `delivery_franchise.is_active = 1` and `assignment_franchise.is_active = 1` being true does NOT mean a farmer is serviceable. The pickup hub (`assignment_pickuplocation.is_active`) must ALSO be `1`. Always join to `assignment_pickuplocation` and filter `pl.is_active = 1` — a deactivated hub means zero physical operations. |
+| Assignment tables are in `prod_agroex_db_views` | `assignment_deliverycoverage`, `assignment_deliveryarea`, `assignment_pickuplocationfranchisemapping`, `assignment_franchise`, `assignment_pickuplocation` are all in `prod_agroex_db_views` — NOT `prod_db_views`. Using `prod_db_views` returns table-not-found errors. |
+| `assignment_pickuplocationfranchisemapping` join direction | Join as `apl.id = da.pickuplocation_franchise_mapping_id` — NOT `apl.delivery_area_id = da.id` (that column does not exist on the mapping table). |
+| `assignment_pickuplocationfranchisemapping` has no `is_active` | This table has no `is_active` column — do not filter on it. The active gate is `assignment_pickuplocation.is_active = 1`. |
+| `WITH` + comment before first CTE causes syntax error | In BigQuery, placing a `-- comment` between `WITH` and the first CTE name causes `"Unexpected identifier"` syntax error. Never put comments between `WITH` and `cte_name AS (`. Put comments inside the CTE body or remove them. |
+| `REGEXP_CONTAINS(x, r'^...')` inside CASE causes syntax error | Raw string literals `r'^gujarat'` inside `CASE/WHEN` blocks cause `"Expected keyword END but got identifier"`. Use `LOWER(TRIM(x)) LIKE 'gujarat%'` instead — same logic, no parser issues. |
+| Serviceability village match = `village + pincode` only | Do NOT join on taluka or state for village-level coverage matches. The `assignment_deliverycoverage` table stores village + pincode as the key. Adding taluka/state over-constrains and causes false negatives due to spelling differences between source tables. |
+| Serviceability taluka match requires district | Taluka match must include district: `state + district + taluka`. Omitting district causes false positives — same taluka name exists in multiple districts of the same state. |
+| `dwh_views.farmer_profile_master` is the lifetime farmer base | Use this as the starting point for any farmer-level analysis. Contains profile address (village, taluka, district, state, pin_code). For transacting farmers, always prefer `csr_shippingaddress` (from orders) over profile address — it's more current. |
+| Profile state can be blank for transacting farmers | `farmer_profile_master.profile_state` can be NULL/empty even when the farmer has valid shipping addresses in `csr_shippingaddress`. For display/grouping, fall back to the shipping address state: `COALESCE(NULLIF(INITCAP(TRIM(profile_state)), ''), INITCAP(MAX(a.state_norm)))`. |
+| Address quality — bad values beyond NULL | Addresses can be bad without being NULL: `'na'`, `'n/a'`, `'nil'`, `'none'`, `'unknown'`, single characters, or pincodes that aren't 6 digits. Always check `LENGTH(TRIM(field)) < 2` and `IN ('', 'na', 'n/a', 'nil', 'none', 'unknown')` in addition to `IS NULL`. Non-serviceable farmers with dirty addresses are "Address Problem" not "Genuine Coverage Gap". |
+| Bulk farmer serviceability from a file — use UNNEST of farmer_id + village_id | When checking serviceability for a list of farmers from an Excel file that has LGD village IDs (from `static_tables_views.csr_villageaddress`), use `UNNEST([STRUCT(farmer_id, village_id), ...])` + join to village master for canonical addresses. This is more accurate than pulling raw addresses from `csr_shippingaddress`. Keep UNNEST payload under ~700KB (BQ query limit is 1MB). |
 
 ---
 
