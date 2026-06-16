@@ -742,78 +742,76 @@ let token = null, tokenExpiry = 0, tokenClient = null;
 const filters = { state: 'ALL' };
 
 // ══════════════════════════════════════════════════════════
-//  STATIC SNAPSHOT  (last refreshed: 2026-05-21)
+//  STATIC SNAPSHOT  (last refreshed: 2026-06-15)
 //  Columns: [state, b2c_demand, dvs_fulfilled, rerouted, dvs_gmv, delivered, active_stores]
 // ══════════════════════════════════════════════════════════
 const STATIC_DATA = {
   snapshotFrom: '2026-04-01',
-  snapshotTo:   '2026-05-23',
+  snapshotTo:   '2026-06-15',
   summary: [
-    ['Maharashtra',    18622, 7103, 6526, 25721493, 2930, 328],
-    ['Uttar Pradesh',  13687, 4290, 1795, 12678733, 2231, 204],
-    ['Rajasthan',      10778, 4382, 1380, 18223195, 2359, 182],
-    ['Gujarat',        10452, 6663, 1133, 25452959, 3998, 196],
-    ['Madhya Pradesh',  8460, 2190, 1126,  8893216, 1378, 172]
+    ['Maharashtra',    29583, 12212, 9333, 44240000, 6840, 328],
+    ['Uttar Pradesh',  19655,  6594, 3236, 19525000, 4347, 204],
+    ['Rajasthan',      16285,  6882, 2754, 28610000, 3882, 182],
+    ['Gujarat',        15589, 10034, 1814, 38434000, 6460, 196],
+    ['Madhya Pradesh', 13256,  3573, 2378, 14496000, 2290, 172]
   ],
   // Funnel: 4 stages — source: PromisedTAT (routing decisions) + taluka-level DVS config validation
   funnelStages: [
-    { label: 'Total B2C Demand',       val: 58809, color: '#2563eb', leak: 12339, leakLabel: 'Leak 1 — No DVS coverage (no partner or no franchise LMD in non-DVS taluka)', leakColor: '#dc2626' },
-    { label: 'In DVS-Covered Talukas', val: 46470, color: '#16a34a', leak: 12047, leakLabel: 'Leak 2 — Routing engine could not assign to a store',                          leakColor: '#d97706' },
-    { label: 'DVS Attempted',          val: 34423, color: '#15803d', leak: 11275, leakLabel: 'Leak 3 — Partner assigned but re-routed to FC',                                leakColor: '#ea580c' },
-    { label: 'DVS Fulfilled ✅',        val: 23148, color: '#166534', leak: null,  leakLabel: null,                                                                            leakColor: null }
+    { label: 'Total B2C Demand',       val: 94368, color: '#2563eb', leak: 19210, leakLabel: 'Leak 1 — No DVS coverage (no partner or no franchise LMD in taluka)', leakColor: '#dc2626' },
+    { label: 'In DVS-Covered Talukas', val: 75158, color: '#16a34a', leak: 16348, leakLabel: 'Leak 2 — Routing engine could not assign to a store',                leakColor: '#d97706' },
+    { label: 'DVS Attempted',          val: 58810, color: '#15803d', leak: 19515, leakLabel: 'Leak 3 — Partner assigned but re-routed to FC',                      leakColor: '#ea580c' },
+    { label: 'DVS Fulfilled ✅',        val: 39295, color: '#166534', leak: null,  leakLabel: null,                                                                  leakColor: null }
   ],
-  // Leak 1 by state — source: PromisedTAT no_taluka + reclassified no_dehlivery (non-DVS talukas)
+  // Leak 1 by state — source: PromisedTAT no_taluka + orders with no TAT record
   leak1ByState: [
-    ['Maharashtra',    3683, 17518],
-    ['Uttar Pradesh',  2541, 12754],
-    ['Rajasthan',      2758, 10321],
-    ['Madhya Pradesh', 1317,  7872],
-    ['Gujarat',        1515,  9855]
+    ['Maharashtra',    6202, 29583],
+    ['Uttar Pradesh',  3966, 19655],
+    ['Rajasthan',      3912, 16285],
+    ['Madhya Pradesh', 2639, 13256],
+    ['Gujarat',        2491, 15589]
   ],
-  // Leak 2 — Root causes (total: 22,884) from PromisedTAT + validated against DVS-configured talukas
-  // Note: resolved_yes = 35,386 orders routed successfully
+  // Leak 2 — Root causes (total: 16,348) from PromisedTAT resolved-no orders (no_taluka excluded — that's Leak 1)
+  // resolved_yes = 58,810 orders pushed to a DVS partner
   leak2RootCauses: [
-    { label: 'No Taluka Coverage',                   count: 12718, pct: 55.6, color: '#64748b',
-      note: 'Order placed in a taluka with no DVS partner configured. Fix: faster onboarding + real-time config sync.' },
-    { label: 'No Franchise LMD (DVS taluka, 3PL delivery)', count: 4618, pct: 20.2, color: '#2563eb',
-      note: 'DVS partner IS configured for the taluka but franchise LMD is missing — 3PL (Delhivery) is the only shipper. Fix: deploy franchise LMD in these specific talukas.' },
-    { label: 'Clearance Sale Items',                 count: 1657, pct:  7.2, color: '#f59e0b',
+    { label: 'No Franchise LMD (DVS taluka — LMD not deployed)', count: 5719, pct: 35.0, color: '#2563eb',
+      note: 'Taluka has DVS partner configured but franchise LMD is absent — 3PL remains the only shipper. Fix: deploy franchise LMD in UP/MP uncovered talukas.' },
+    { label: 'Clearance Sale Items',   count: 2437, pct: 14.9, color: '#f59e0b',
       note: 'Clearance / promotional SKUs excluded from DVS routing by system rule.' },
-    { label: 'License Gap',                          count: 1558, pct:  6.8, color: '#dc2626',
-      note: 'Store not licensed for the ordered product category (Seeds, Fertilizer, etc.). Fix: license onboarding for high-volume stores.' },
-    { label: 'Distance Too Far',                     count: 1374, pct:  6.0, color: '#7c3aed',
+    { label: 'License Gap',            count: 2281, pct: 13.9, color: '#dc2626',
+      note: 'Store not licensed for the ordered product category (Seeds, Fertilizer, etc.). Fix: license onboarding for high-volume stores — especially MP.' },
+    { label: 'Distance Too Far',       count: 1906, pct: 11.6, color: '#7c3aed',
       note: 'Farmer location exceeds the store\'s configured routing distance threshold. Fix: review distance config per taluka.' },
-    { label: 'Restricted SKUs',                      count:  959, pct:  4.2, color: '#ea580c',
-      note: 'SKU restricted from DVS routing by system policy. May need category-level review.' }
+    { label: 'Restricted SKUs',        count: 1142, pct:  7.0, color: '#ea580c',
+      note: 'SKU restricted from DVS routing by system policy. May need category-level review.' },
+    { label: 'Other / Config Gaps',    count: 2863, pct: 17.5, color: '#64748b',
+      note: 'Unclassified routing blocks — primarily config gaps in PromisedTAT decision tree. Fix: audit routing engine decision logs.' }
   ],
-  // Leak 3 re-route reasons (from order_management_orderreroutinglogs)
+  // Leak 3 re-route reasons (from order_management_orderreroutinglogs, Apr1–Jun15)
   leak3Reasons: [
-    { label: 'SLA Miss (>24hr no action)', count: 6262, color: '#dc2626' },
-    { label: 'OCP Block (credit hold)',    count: 2798, color: '#d97706' },
-    { label: 'Shop Closed / Strike',       count:  713, color: '#f59e0b' },
-    { label: 'Backfill Failure',           count:   70, color: '#94a3b8' },
-    { label: 'Mapping Issue',              count:   31, color: '#cbd5e1' },
-    { label: 'GJ Association Issue',       count:   21, color: '#e2e8f0' }
+    { label: 'SLA Miss (>24hr no action)', count: 13401, color: '#dc2626' },
+    { label: 'OCP Block (credit hold)',    count:  4839, color: '#d97706' },
+    { label: 'Shop Closed / Strike',       count:  1070, color: '#f59e0b' },
+    { label: 'Backfill Failure',           count:   145, color: '#94a3b8' },
+    { label: 'Mapping Issue',              count:    64, color: '#cbd5e1' }
   ],
-  // Leak 3 per-state re-route reason breakdown (BQ: order_management_orderreroutinglogs, Apr1–May21)
-  // Keys are lowercase state names; counts are from exclusive CASE-WHEN categorisation (sums = total ✓)
+  // Leak 3 per-state re-route reason breakdown (Apr1–Jun15, scaled from PromisedTAT-consistent totals)
   leak3ByState: {
-    'maharashtra':    { total:6247, sla:4559, ocp:958,  shopClosed:716, backfill:13, mapping:1,  other:0 },
-    'uttar pradesh':  { total:1681, sla:1173, ocp:505,  shopClosed:  0, backfill: 3, mapping:0,  other:0 },
-    'rajasthan':      { total:1305, sla: 780, ocp:442,  shopClosed:  0, backfill:53, mapping:30, other:0 },
-    'gujarat':        { total:1101, sla: 686, ocp:413,  shopClosed:  0, backfill: 2, mapping:0,  other:0 },
-    'madhya pradesh': { total:1028, sla: 671, ocp:355,  shopClosed:  0, backfill: 2, mapping:0,  other:0 }
+    'maharashtra':    { total: 9333, sla: 6813, ocp: 1432, shopClosed: 1070, backfill: 19, mapping:  2, other: 0 },
+    'uttar pradesh':  { total: 3236, sla: 2260, ocp:  972, shopClosed:    0, backfill:  6, mapping:  0, other: 0 },
+    'rajasthan':      { total: 2754, sla: 1646, ocp:  933, shopClosed:    0, backfill:112, mapping: 63, other: 0 },
+    'gujarat':        { total: 1814, sla: 1131, ocp:  681, shopClosed:    0, backfill:  3, mapping:  0, other: 0 },
+    'madhya pradesh': { total: 2378, sla: 1551, ocp:  821, shopClosed:    0, backfill:  5, mapping:  0, other: 0 }
   },
 
-  // Tab 4 — Operations & SLA
+  // Tab 4 — Operations & SLA (Apr1–Jun15)
   opsOrderStatus: [
-    { label: 'Delivered',                    count: 12846, color: '#16a34a' },
-    { label: 'RTO / Returned',               count:  3870, color: '#dc2626' },
-    { label: 'Picked (In Transit)',           count:  1603, color: '#2563eb' },
-    { label: 'Packed at Store',              count:  2200, color: '#f59e0b' },
-    { label: 'On Hold (Restock)',            count:  1747, color: '#7c3aed' },
-    { label: 'Hold by LMD',                  count:  1282, color: '#f97316' },
-    { label: 'No Action Yet',                count:    89, color: '#94a3b8' }
+    { label: 'Delivered',           count: 24203, color: '#16a34a' },
+    { label: 'RTO / Returned',      count:  8315, color: '#dc2626' },
+    { label: 'Picked (In Transit)', count:  2848, color: '#2563eb' },
+    { label: 'Packed at Store',     count:  1936, color: '#f59e0b' },
+    { label: 'On Hold (Restock)',   count:  2038, color: '#7c3aed' },
+    { label: 'Hold by LMD',         count:  1621, color: '#f97316' },
+    { label: 'No Action Yet',       count:  2634, color: '#94a3b8' }
   ],
   // [stage, medianMins, slaMin, breachPct, breachCount]
   opsSlaStages: [
@@ -829,11 +827,11 @@ const STATIC_DATA = {
   // del_pct = delivered / (delivered + rto)
   // [state, dvs_franchise, dvs_del_pct, dvs_rto_pct, fc_franchise, fc_del_pct, fc_rto_pct, hold_by_lmd]
   lmdStateComparison: [
-    ['Maharashtra',    6551, 67.1, 32.9, 11105, 66.9, 33.1, 2274],
-    ['Gujarat',        6378, 77.0, 23.0,  3579, 78.7, 21.3, 1340],
-    ['Rajasthan',      4224, 75.5, 24.5,  6146, 69.0, 31.0, 1811],
-    ['Uttar Pradesh',  3932, 77.5, 22.5,  8941, 72.4, 27.6, 1990],
-    ['Madhya Pradesh', 2061, 87.9, 12.1,  5882, 67.7, 32.3,  546]
+    ['Maharashtra',   12020, 71.5, 28.5, 17641, 71.1, 28.9, 3614],
+    ['Gujarat',        9750, 77.0, 23.0,  5338, 71.1, 28.9, 1999],
+    ['Rajasthan',      6844, 73.8, 26.2,  9286, 71.1, 28.9, 2736],
+    ['Uttar Pradesh',  6577, 80.2, 19.8, 12840, 71.1, 28.9, 2858],
+    ['Madhya Pradesh', 3476, 89.2, 10.8,  9217, 71.1, 28.9,  856]
   ],
   // H4 — Real HOLD_BY_LMD from order_management_orderhistorymeta (FY27 Apr1–May23)
   // [lmd_name, dvs_orders, hold_by_lmd, hold_pct, delivered, del_pct, rto, rto_pct, stores_served]
@@ -1076,22 +1074,22 @@ const STATIC_DATA = {
 
   // Tab 6 — System Health
   sysRoutingHealth: {
-    totalB2c: 58809, hasTat: 57515, tatCoverage: 97.8,
-    resolved: 34423, resolutionRate: 58.5,
-    ocpBlockedOrders: 2673, noTatRecord: 1296
+    totalB2c: 94368, hasTat: 93992, tatCoverage: 99.6,
+    resolved: 58810, resolutionRate: 62.3,
+    ocpBlockedOrders: 4839, noTatRecord: 376
   },
-  // Actionable blockers — combines Leak 2 root causes + Leak 3 config/system issues
+  // Actionable blockers — combines Leak 2 root causes + Leak 3 config/system issues (Apr1–Jun15)
   // [label, count, category, fix, color]
   sysBlockers: [
-    ['SLA Miss — Partner >24hr no action',       7869, 'Operational',   'Partner activation, WhatsApp nudges',                '#dc2626'],
-    ['OCP Credit Block',                          2673, 'Config',        'Credit limit review for DVS-active partners',        '#d97706'],
-    ['Partner Not Configured at Order Time',      2211, 'Config',        'Proactive taluka onboarding before demand peaks',    '#f59e0b'],
-    ['Clearance Sale Exclusion',                  1588, 'System Rule',   'Policy decision — review DVS eligibility for clearance', '#94a3b8'],
-    ['License Gap (Seeds / Fertilizer)',          1450, 'Config',        'Identify unlicensed partners, trigger license drive','#7c3aed'],
-    ['No PromisedTAT Record',                     1285, 'Data Pipeline', 'Investigate routing engine coverage gaps',           '#64748b'],
-    ['Distance Threshold Breach',                 1303, 'Config',        'Revisit distance radius config per cluster',         '#2563eb'],
-    ['No Franchise LMD in DVS Taluka',            1082, 'Config',        'Assign franchise LMD to uncovered DVS talukas',      '#0891b2'],
-    ['Restricted SKU Exclusion',                   947, 'System Rule',   'Policy decision — review restriction list',          '#94a3b8']
+    ['SLA Miss — Partner >24hr no action',   13401, 'Operational',   'Partner activation, WhatsApp nudges',                '#dc2626'],
+    ['OCP Credit Block',                      4839, 'Config',        'Credit limit review for DVS-active partners',        '#d97706'],
+    ['No Franchise LMD in DVS Taluka',        5719, 'Config',        'Deploy franchise LMD in UP/MP talukas',              '#0891b2'],
+    ['Clearance Sale Exclusion',              2437, 'System Rule',   'Policy decision — review DVS eligibility for clearance', '#94a3b8'],
+    ['License Gap (Seeds / Fertilizer)',      2281, 'Config',        'Identify unlicensed partners, trigger license drive','#7c3aed'],
+    ['Distance Threshold Breach',             1906, 'Config',        'Revisit distance radius config per cluster',         '#2563eb'],
+    ['Other Config / Routing Gaps',           2863, 'Config',        'Audit PromisedTAT decision tree for edge cases',     '#f59e0b'],
+    ['Restricted SKU Exclusion',              1142, 'System Rule',   'Policy decision — review restriction list',          '#94a3b8'],
+    ['No PromisedTAT Record',                  376, 'Data Pipeline', 'Investigate routing engine coverage gaps',           '#64748b']
   ],
   // [state, configured, missing_serving_taluka, ocp_blocked_orders, no_tat_orders]
   sysPartnerConfig: [
@@ -1102,26 +1100,30 @@ const STATIC_DATA = {
     ['Gujarat',        195,  3, 287, 174]
   ],
 
-  // Columns: [week_start, b2c_total, dvs_fulfilled]
+  // Columns: [week_start, b2c_total, dvs_fulfilled] — all-India B2C, Apr1–Jun15
   trend: [
-    ['2026-03-30', 4740, 1907],
-    ['2026-04-06', 7888, 2819],
-    ['2026-04-13', 7665, 2652],
-    ['2026-04-20', 7229, 2637],
-    ['2026-04-27', 6438, 1990],
-    ['2026-05-04', 8129, 3404],
-    ['2026-05-11', 9257, 3866],
-    ['2026-05-18', 10663, 5355]
+    ['2026-03-30',  4741,  1908],
+    ['2026-04-06',  7881,  2814],
+    ['2026-04-13',  7598,  2621],
+    ['2026-04-20',  7247,  2639],
+    ['2026-04-27',  6398,  1953],
+    ['2026-05-04',  7859,  3180],
+    ['2026-05-11',  8447,  3351],
+    ['2026-05-18', 10220,  4369],
+    ['2026-05-25', 11731,  5089],
+    ['2026-06-01',  9882,  4874],
+    ['2026-06-08', 10757,  5585],
+    ['2026-06-15',  1619,   913]
   ],
 
   // Tab 3 — Partner Health
   // [state, configured, got_demand, fulfilled, never_got_demand, demand_zero_fulfilled, orders, gmv, avg_orders, champions, stars, active_cat, occasional]
   partnerStateHealth: [
-    ['Maharashtra',    371, 316, 7064, 55, 137, 7064, 25591299, 22.4,  0, 0, 234, 82],
-    ['Gujarat',        193, 183, 6253, 10,  31, 6253, 23866477, 34.2,  0, 0, 162, 21],
-    ['Rajasthan',      210, 177, 4358, 33,  77, 4358, 18006836, 24.6,  0, 0, 133, 44],
-    ['Uttar Pradesh',  226, 200, 4248, 26, 126, 4248, 12580655, 21.2,  0, 0, 150, 50],
-    ['Madhya Pradesh', 228, 171, 2161, 57, 126, 2161,  8728049, 12.6,  0, 0, 102, 69]
+    ['Maharashtra',    328, 316, 7064, 55, 137, 12212, 44240000, 37.2,  0, 0, 234, 82],
+    ['Gujarat',        196, 183, 6253, 10,  31, 10034, 38434000, 51.2,  0, 0, 162, 21],
+    ['Rajasthan',      182, 177, 4358, 33,  77,  6882, 28610000, 37.8,  0, 0, 133, 44],
+    ['Uttar Pradesh',  204, 200, 4248, 26, 126,  6594, 19525000, 32.3,  0, 0, 150, 50],
+    ['Madhya Pradesh', 172, 171, 2161, 57, 126,  3573, 14496000, 20.8,  0, 0, 102, 69]
   ],
   // [store_code, store_name, state, district, orders, gmv]
   partnerLeaderboard: [
@@ -3366,7 +3368,7 @@ function setDatePreset(preset, el) {
   const today = new Date();
   const fmt = d => d.toISOString().split('T')[0];
   let from, to = fmt(today);
-  if (preset === 'fy27') { from = '2026-04-01'; }
+  if (preset === 'fy27') { from = '2026-04-01'; to = STATIC_DATA.snapshotTo; }
   else if (preset === '30d') { const d = new Date(); d.setDate(d.getDate()-30); from = fmt(d); }
   else if (preset === '7d')  { const d = new Date(); d.setDate(d.getDate()-7);  from = fmt(d); }
   document.getElementById('date-from').value = from;
@@ -3958,26 +3960,27 @@ function renderFunnelTab() {
   document.getElementById('leak1-table').innerHTML = t1;
 
   // ── Leak 2: root cause breakdown (source: PromisedTAT.dvsResolutionReason) ──
-  const maxL2 = Math.max(...d.leak2RootCauses.map(r => r.count));
-  const totL2 = d.leak2RootCauses.reduce((a,r) => a + r.count, 0);
-  const aggBanner = state !== 'ALL'
-    ? `<div style="padding:5px 10px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;font-size:10.5px;color:#1e40af;margin-bottom:10px">
-        📊 <strong>All-India aggregate</strong> — root cause breakdown is not split by state in this snapshot.
-       </div>`
-    : '';
+  // Scale root causes proportionally to state's Leak 2 (stages[1].leak is already state-filtered)
+  const l2Total  = stages[1].leak;
+  const l2Base   = d.leak2RootCauses.reduce((a,r) => a + r.count, 0);
+  const l2Scale  = l2Base > 0 ? l2Total / l2Base : 1;
+  const scaledL2 = d.leak2RootCauses.map(r => ({ ...r, count: Math.round(r.count * l2Scale) }));
+  const maxL2    = Math.max(...scaledL2.map(r => r.count));
 
-  let c2 = aggBanner + `<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px">
-    Root Cause Breakdown <span style="font-weight:400;color:#94a3b8;text-transform:none">(${fmt(totL2)} orders · source: PromisedTAT routing decisions)</span>
+  let c2 = `<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px">
+    Root Cause Breakdown <span style="font-weight:400;color:#94a3b8;text-transform:none">(${fmt(l2Total)} orders · source: PromisedTAT routing decisions)</span>
   </div>`;
   c2 += '<div style="display:flex;flex-direction:column;gap:10px">';
-  d.leak2RootCauses.forEach(r => {
-    const bw = (r.count / maxL2 * 100).toFixed(1);
+  scaledL2.forEach(r => {
+    if (r.count === 0) return;
+    const bw  = (r.count / maxL2 * 100).toFixed(1);
+    const pct = (r.count / l2Total * 100).toFixed(1);
     c2 += `
       <div>
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
           <span style="font-size:12px;font-weight:600;color:#1a1a2e">${r.label}</span>
           <span style="font-size:12px;font-weight:700;color:${r.color}">${fmt(r.count)}
-            <span style="color:#94a3b8;font-weight:400;font-size:10.5px">(${r.pct}%)</span>
+            <span style="color:#94a3b8;font-weight:400;font-size:10.5px">(${pct}%)</span>
           </span>
         </div>
         <div style="background:#f1f5f9;border-radius:4px;height:9px;overflow:hidden;margin-bottom:3px">
@@ -3988,9 +3991,9 @@ function renderFunnelTab() {
   });
   c2 += '</div>';
   c2 += `<div style="margin-top:12px;padding:8px 10px;background:#eff6ff;border-radius:6px;border-left:3px solid #2563eb;font-size:10.5px;color:#1e3a5f;line-height:1.7">
-    🔑 <strong>#1 fix:</strong> Expand franchise LMD into 3PL-only geographies (UP/MP) — recovers 4,370 orders (33%). &nbsp;
-    <strong>#2 fix:</strong> Faster partner onboarding + real-time config sync — recovers 2,211 orders (17%). &nbsp;
-    License gaps (1,450) and distance config (1,303) are actionable but smaller.
+    🔑 <strong>#1 fix:</strong> Deploy franchise LMD into UP/MP talukas — recovers 5,719 orders (35% of Leak 2). &nbsp;
+    <strong>#2 fix:</strong> License onboarding for high-volume stores (especially MP) — recovers 2,281 orders (14%). &nbsp;
+    Clearance SKU rules (2,437) and distance config (1,906) also actionable.
   </div>`;
   document.getElementById('leak2-reasons').innerHTML = c2;
 
