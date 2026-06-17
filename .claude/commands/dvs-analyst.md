@@ -1534,10 +1534,12 @@ ORDER BY fb.farmer_id
 
 When given a file (Excel/CSV) with village, taluka, district, pincode columns, perform serviceability checks **entirely locally** — no BigQuery ingestion required.
 
+**Script:** `/Users/darpan/Documents/claude code/DVS Analysis/serviceability_check.py`
+
 **Approach:**
-1. **Pull 2 reference tables from BQ** (read-only, pre-approved):
-   - **VM table (state-filtered):** `SELECT id, village, taluka, district, pin_code, is_archived, replaced_by_id FROM static_tables_views.csr_villageaddress WHERE LOWER(state) LIKE 'uttar%'` (~412K rows for UP)
-   - **Coverage table (flattened, state-filtered):** The full serviceability join chain as a single SELECT returning `coverage_type, village, pincode, district, taluka, lmd_partner_name` — filter to target state at source
+1. **Pull 2 reference tables from BQ** (read-only, via `google.cloud.bigquery` Python client — NOT MCP tools, which truncate at 3,000 rows):
+   - **VM table (state-filtered):** `SELECT id, village, taluka, district, pin_code, is_archived, replaced_by_id FROM static_tables_views.csr_villageaddress WHERE LOWER(state) LIKE 'uttar%'` (~262K rows for UP)
+   - **Coverage table (flattened, state-filtered):** The full serviceability join chain as a single SELECT returning `coverage_type, village, pincode, district, taluka, lmd_partner_name` with ALL `is_active=1` filters applied — filter to target state at source (~71K rows for UP)
 2. **Python/pandas 3-tier matching:**
    - Normalize all fields: `LOWER(TRIM(...))`, pincode → `str(int(float(x))).zfill(6)` (handles float like `277216.0`)
    - Tier 1: pandas merge on (village+taluka+district+pincode) → resolve archived/replacement chain
@@ -1556,6 +1558,21 @@ df['Pincode'] = df['Pincode'].apply(
 **Null handling:**
 - 1 null village row → goes to Tier 3 (raw fallback), likely non-serviceable
 - Null pincode rows → Tier 1 will fail (no pincode to match), Tier 2 resolves if village+taluka+district exist
+
+**CRITICAL — Coverage join key for village-level: `canonical_village + canonical_pincode`**
+The `assignment_deliverycoverage` table indexes coverage by village + pincode. This is the canonical join key — do NOT substitute district or taluka. Validated June 2026: UP coverage pincodes are aligned with LGD VM pincodes for the vast majority of villages.
+
+**CRITICAL — Must use full active LMD chain when fetching coverage:**
+Coverage rows in `assignment_deliverycoverage` without an active franchise+pickup hub represent stale/historical assignments — the LMD is no longer operational. Always apply:
+```
+WHERE da.is_active=1 AND dc.is_active=1 AND asf.is_active=1 AND pl.is_active=1
+```
+Omitting `asf.is_active=1` or `pl.is_active=1` can inflate serviceable count by 5–14× (validated on the 15K Satya Mishra list: 95 serviceable with full filters vs 1,220 without LMD join at all).
+
+**UP-specific data note:** As of June 2026, UP has coverage records ONLY of `coverage_type='village'` — there are no taluka-level or pincode-level coverage records for UP that pass the full active LMD filter. Taluka/pincode hits = 0 for all UP queries.
+
+**Interpreting low serviceability % on target lists:**
+A file of expansion-target villages (e.g. Satya Mishra's 15K list) will show very low serviceability (0.7% in June 2026) because these are precisely the villages OUTSIDE the current LMD network. Low % is the correct answer — it quantifies the expansion opportunity, not a query error.
 
 ---
 
