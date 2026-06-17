@@ -227,8 +227,8 @@
   .vchip-detail .vc-geo { font-size:9px; color:#92400e; display:block; }
   .lmd-filter-row { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
   .lmd-filter-row label { font-size:12px; font-weight:700; color:#64748b; white-space:nowrap; }
-  #lmd-search { padding:6px 12px; border-radius:20px; border:2px solid #e2e8f0; font-size:12px; width:260px; outline:none; }
-  #lmd-search:focus { border-color:#6366f1; }
+  #lmd-search, #zone-search { padding:6px 12px; border-radius:20px; border:2px solid #e2e8f0; font-size:12px; width:220px; outline:none; }
+  #lmd-search:focus, #zone-search:focus { border-color:#6366f1; }
 </style>
 </head>
 <body>
@@ -840,6 +840,9 @@
       <input type="text" id="lmd-search" placeholder="Type to search LMD name..." list="lmd-datalist" oninput="applyFilters()" autocomplete="off">
       <datalist id="lmd-datalist"></datalist>
       <button class="afbtn" onclick="clearLmd()" style="margin-left:8px">✕ Clear</button>
+      <span style="margin-left:16px;font-size:12px;font-weight:700;color:#64748b;white-space:nowrap">Zone ID:</span>
+      <input type="text" id="zone-search" placeholder="e.g. RJ_047 or GJ_086..." oninput="applyFilters()" autocomplete="off">
+      <button class="afbtn" onclick="clearZone()" style="margin-left:8px">✕ Clear</button>
     </div>
   </div>
   <div id="audit-s1" class="audit-section"></div>
@@ -1691,7 +1694,7 @@ function renderAudit() {
     const chips = parts.map((p,i) => `<span class="lmd-chip ${i===0?'lmd-primary':'lmd-stray'}">${p}</span>`).join('');
     const missCell = z.miss > 0 ? `<span class="num-red">${z.miss}</span>` : `<span style="color:#94a3b8">—</span>`;
     const lmdNames = (z.bd.match(/([^[|]+?)\s*\[/g) || []).map(m => m.replace(/\s*\[$/, '').trim()).join('|');
-    return `<tr data-state="${z.state}" data-lmds="${lmdNames.replace(/"/g,'&quot;')}">
+    return `<tr data-state="${z.state}" data-lmds="${lmdNames.replace(/"/g,'&quot;')}" data-zone="${z.name}">
       <td style="font-size:10px;color:#6366f1;font-weight:700;white-space:nowrap">${z.state}</td>
       <td style="font-weight:700;white-space:nowrap">${z.name}</td>
       <td>${tierBadge(z.tier)}</td>
@@ -1726,7 +1729,7 @@ function renderAudit() {
       return `<span class="vchip">${v}</span>`;
     }).join('');
     const note = z.miss > 30 ? `<span style="color:#d97706;font-size:10px;display:block;margin-top:4px">Showing 30 of ${z.miss} missing villages</span>` : '';
-    return `<tr data-state="${z.state}" data-lmds="${z.lmd.replace(/"/g,'&quot;')}">
+    return `<tr data-state="${z.state}" data-lmds="${z.lmd.replace(/"/g,'&quot;')}" data-zone="${z.name}">
       <td style="font-size:10px;color:#6366f1;font-weight:700;white-space:nowrap">${z.state}</td>
       <td style="font-weight:700;white-space:nowrap">${z.name}</td>
       <td>${tierBadge(z.tier)}</td>
@@ -1750,7 +1753,7 @@ function renderAudit() {
 
   /* Section 4 — No LMD Zones */
   const rows4 = NO_LMD_ZONES.map(z => {
-    return `<tr data-state="${z.state}" data-lmds="">
+    return `<tr data-state="${z.state}" data-lmds="" data-zone="${z.name}">
       <td style="font-size:10px;color:#6366f1;font-weight:700;white-space:nowrap">${z.state}</td>
       <td style="font-weight:700;white-space:nowrap">${z.name}</td>
       <td>${tierBadge(z.tier)}</td>
@@ -1778,6 +1781,7 @@ function filterAudit(state) {
 
 function applyFilters() {
   const lmdQuery = (document.getElementById('lmd-search')?.value || '').trim().toLowerCase();
+  const zoneQuery = (document.getElementById('zone-search')?.value || '').trim().toLowerCase();
   const secDefs = [
     { tbodyId: 's2-tbody', headingId: 's2-heading', label: 'Section 2 — Critical Split Zone Violations' },
     { tbodyId: 's3-tbody', headingId: 's3-heading', label: 'Section 3 — Incomplete Zone Mappings' },
@@ -1791,14 +1795,17 @@ function applyFilters() {
       const stateMatch = currentAuditState === 'all' || tr.dataset.state === currentAuditState;
       const lmdData = (tr.dataset.lmds || '').toLowerCase();
       const lmdMatch = !lmdQuery || lmdData.includes(lmdQuery);
-      tr.style.display = (stateMatch && lmdMatch) ? '' : 'none';
-      if (stateMatch && lmdMatch) vis++;
+      const zoneData = (tr.dataset.zone || '').toLowerCase();
+      const zoneMatch = !zoneQuery || zoneData.includes(zoneQuery);
+      tr.style.display = (stateMatch && lmdMatch && zoneMatch) ? '' : 'none';
+      if (stateMatch && lmdMatch && zoneMatch) vis++;
     });
     const heading = document.getElementById(sec.headingId);
     if (heading) {
       const stateLbl = currentAuditState === 'all' ? 'across 4 states' : '· ' + currentAuditState;
       const lmdLbl = lmdQuery ? ` · LMD: "${lmdQuery}"` : '';
-      heading.textContent = `${sec.label} (${vis} zones ${stateLbl}${lmdLbl})`;
+      const zoneLbl = zoneQuery ? ` · Zone: "${zoneQuery.toUpperCase()}"` : '';
+      heading.textContent = `${sec.label} (${vis} zones ${stateLbl}${lmdLbl}${zoneLbl})`;
     }
   });
   renderAuditKPIs(currentAuditState);
@@ -1806,6 +1813,12 @@ function applyFilters() {
 
 function clearLmd() {
   const inp = document.getElementById('lmd-search');
+  if (inp) inp.value = '';
+  applyFilters();
+}
+
+function clearZone() {
+  const inp = document.getElementById('zone-search');
   if (inp) inp.value = '';
   applyFilters();
 }
