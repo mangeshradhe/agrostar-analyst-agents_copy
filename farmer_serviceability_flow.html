@@ -225,6 +225,10 @@
   /* enriched village chip with district/taluka */
   .vchip-detail { display:inline-block; background:#fff; border:1px solid #fca5a5; border-radius:4px; padding:2px 7px; margin:2px 2px; font-size:10px; color:#7f1d1d; line-height:1.5; }
   .vchip-detail .vc-geo { font-size:9px; color:#92400e; display:block; }
+  .lmd-filter-row { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .lmd-filter-row label { font-size:12px; font-weight:700; color:#64748b; white-space:nowrap; }
+  #lmd-search { padding:6px 12px; border-radius:20px; border:2px solid #e2e8f0; font-size:12px; width:260px; outline:none; }
+  #lmd-search:focus { border-color:#6366f1; }
 </style>
 </head>
 <body>
@@ -825,11 +829,17 @@
   <div style="max-width:1160px;margin:0 auto 8px">
     <div class="audit-filter-bar">
       <span class="afb-label">Filter State:</span>
-      <button class="afbtn active" onclick="filterAudit('all')">All States</button>
-      <button class="afbtn" onclick="filterAudit('Gujarat')">Gujarat</button>
-      <button class="afbtn" onclick="filterAudit('Madhya Pradesh')">Madhya Pradesh</button>
-      <button class="afbtn" onclick="filterAudit('Rajasthan')">Rajasthan</button>
-      <button class="afbtn" onclick="filterAudit('Uttar Pradesh')">Uttar Pradesh</button>
+      <button class="afbtn active" data-filter="state" onclick="filterAudit('all')">All States</button>
+      <button class="afbtn" data-filter="state" onclick="filterAudit('Gujarat')">Gujarat</button>
+      <button class="afbtn" data-filter="state" onclick="filterAudit('Madhya Pradesh')">Madhya Pradesh</button>
+      <button class="afbtn" data-filter="state" onclick="filterAudit('Rajasthan')">Rajasthan</button>
+      <button class="afbtn" data-filter="state" onclick="filterAudit('Uttar Pradesh')">Uttar Pradesh</button>
+    </div>
+    <div class="lmd-filter-row">
+      <label>LMD Partner:</label>
+      <input type="text" id="lmd-search" placeholder="Type to search LMD name..." list="lmd-datalist" oninput="applyFilters()" autocomplete="off">
+      <datalist id="lmd-datalist"></datalist>
+      <button class="afbtn" onclick="clearLmd()" style="margin-left:8px">✕ Clear</button>
     </div>
   </div>
   <div id="audit-s1" class="audit-section"></div>
@@ -1680,7 +1690,8 @@ function renderAudit() {
     const parts = z.bd.split(' | ');
     const chips = parts.map((p,i) => `<span class="lmd-chip ${i===0?'lmd-primary':'lmd-stray'}">${p}</span>`).join('');
     const missCell = z.miss > 0 ? `<span class="num-red">${z.miss}</span>` : `<span style="color:#94a3b8">—</span>`;
-    return `<tr data-state="${z.state}">
+    const lmdNames = (z.bd.match(/([^[|]+?)\s*\[/g) || []).map(m => m.replace(/\s*\[$/, '').trim()).join('|');
+    return `<tr data-state="${z.state}" data-lmds="${lmdNames.replace(/"/g,'&quot;')}">
       <td style="font-size:10px;color:#6366f1;font-weight:700;white-space:nowrap">${z.state}</td>
       <td style="font-weight:700;white-space:nowrap">${z.name}</td>
       <td>${tierBadge(z.tier)}</td>
@@ -1715,7 +1726,7 @@ function renderAudit() {
       return `<span class="vchip">${v}</span>`;
     }).join('');
     const note = z.miss > 30 ? `<span style="color:#d97706;font-size:10px;display:block;margin-top:4px">Showing 30 of ${z.miss} missing villages</span>` : '';
-    return `<tr data-state="${z.state}">
+    return `<tr data-state="${z.state}" data-lmds="${z.lmd.replace(/"/g,'&quot;')}">
       <td style="font-size:10px;color:#6366f1;font-weight:700;white-space:nowrap">${z.state}</td>
       <td style="font-weight:700;white-space:nowrap">${z.name}</td>
       <td>${tierBadge(z.tier)}</td>
@@ -1739,7 +1750,7 @@ function renderAudit() {
 
   /* Section 4 — No LMD Zones */
   const rows4 = NO_LMD_ZONES.map(z => {
-    return `<tr data-state="${z.state}">
+    return `<tr data-state="${z.state}" data-lmds="">
       <td style="font-size:10px;color:#6366f1;font-weight:700;white-space:nowrap">${z.state}</td>
       <td style="font-weight:700;white-space:nowrap">${z.name}</td>
       <td>${tierBadge(z.tier)}</td>
@@ -1756,43 +1767,59 @@ function renderAudit() {
     </table>`;
 }
 
+let currentAuditState = 'all';
+
 function filterAudit(state) {
-  activeAuditState = state;
-  // Update button styles
-  document.querySelectorAll('.afbtn').forEach(b => b.classList.remove('active'));
+  currentAuditState = state;
+  document.querySelectorAll('.afbtn[data-filter="state"]').forEach(b => b.classList.remove('active'));
   event.target.classList.add('active');
+  applyFilters();
+}
 
-  // Update KPIs
-  renderAuditKPIs(state === 'all' ? 'all' : state);
-
-  // Filter table rows in sections 2, 3, 4
-  ['s2-tbody','s3-tbody','s4-tbody'].forEach(tbodyId => {
-    const tbody = document.getElementById(tbodyId);
+function applyFilters() {
+  const lmdQuery = (document.getElementById('lmd-search')?.value || '').trim().toLowerCase();
+  const secDefs = [
+    { tbodyId: 's2-tbody', headingId: 's2-heading', label: 'Section 2 — Critical Split Zone Violations' },
+    { tbodyId: 's3-tbody', headingId: 's3-heading', label: 'Section 3 — Incomplete Zone Mappings' },
+    { tbodyId: 's4-tbody', headingId: 's4-heading', label: 'Section 4 — Zones with Zero LMD Coverage' }
+  ];
+  secDefs.forEach(sec => {
+    const tbody = document.getElementById(sec.tbodyId);
     if (!tbody) return;
-    Array.from(tbody.querySelectorAll('tr[data-state]')).forEach(tr => {
-      if (state === 'all' || tr.dataset.state === state) {
-        tr.style.display = '';
-      } else {
-        tr.style.display = 'none';
-      }
+    let vis = 0;
+    tbody.querySelectorAll('tr[data-state]').forEach(tr => {
+      const stateMatch = currentAuditState === 'all' || tr.dataset.state === currentAuditState;
+      const lmdData = (tr.dataset.lmds || '').toLowerCase();
+      const lmdMatch = !lmdQuery || lmdData.includes(lmdQuery);
+      tr.style.display = (stateMatch && lmdMatch) ? '' : 'none';
+      if (stateMatch && lmdMatch) vis++;
     });
+    const heading = document.getElementById(sec.headingId);
+    if (heading) {
+      const stateLbl = currentAuditState === 'all' ? 'across 4 states' : '· ' + currentAuditState;
+      const lmdLbl = lmdQuery ? ` · LMD: "${lmdQuery}"` : '';
+      heading.textContent = `${sec.label} (${vis} zones ${stateLbl}${lmdLbl})`;
+    }
   });
+  renderAuditKPIs(currentAuditState);
+}
 
-  // Update section headings with visible counts
-  ['s2','s3','s4'].forEach((sid, i) => {
-    const tbody = document.getElementById(sid + '-tbody');
-    if (!tbody) return;
-    const visCount = Array.from(tbody.querySelectorAll('tr[data-state]')).filter(tr => tr.style.display !== 'none').length;
-    const heading = document.getElementById(sid + '-heading');
-    if (!heading) return;
-    const stateLbl = state === 'all' ? 'across 4 states' : '· ' + state;
-    const titles = [
-      `Section 2 — Critical Split Zone Violations (${visCount} zones ${stateLbl})`,
-      `Section 3 — Incomplete Zone Mappings (${visCount} zones ${stateLbl})`,
-      `Section 4 — Zones with Zero LMD Coverage (${visCount} zones ${stateLbl})`
-    ];
-    heading.textContent = titles[i];
+function clearLmd() {
+  const inp = document.getElementById('lmd-search');
+  if (inp) inp.value = '';
+  applyFilters();
+}
+
+function buildLmdList() {
+  const names = new Set();
+  SPLIT_ZONES.forEach(z => {
+    (z.bd.match(/([^[|]+?)\s*\[/g) || []).forEach(m => names.add(m.replace(/\s*\[$/, '').trim()));
   });
+  INCOMPLETE_ZONES.forEach(z => { if (z.lmd) names.add(z.lmd.trim()); });
+  const dl = document.getElementById('lmd-datalist');
+  if (!dl) return;
+  [...names].sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+    .forEach(n => { const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
 }
 
 function toggleVill(btn) {
@@ -1810,6 +1837,7 @@ function switchTab(tab) {
 }
 
 renderAudit();
+buildLmdList();
 
 </script>
 </body>
