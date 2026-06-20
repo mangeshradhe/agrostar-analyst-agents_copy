@@ -500,12 +500,12 @@ footer{{padding:20px 40px;display:flex;justify-content:space-between;align-items
     <span class="section-note" id="pt-count-label">{kpis['total']} partners · sorted by OCP ↓</span>
   </div>
   <div class="pt-controls">
-    <input class="pt-search" id="pt-search" type="text" placeholder="Search partner name, territory, district…">
+    <input class="pt-search" id="pt-search" type="text" placeholder="Search name, farmer ID, territory, district, taluka…">
     <select class="pt-select" id="filter-state"><option value="">All States</option></select>
     <select class="pt-select" id="filter-bu"><option value="">All BUs</option></select>
-    <select class="pt-select" id="filter-flag"><option value="">All Statuses</option>
-      <option>OCP Blocked</option><option>OCP Collect MPD</option><option>Open for sale</option>
-    </select>
+    <select class="pt-select" id="filter-territory"><option value="">All Territories</option></select>
+    <select class="pt-select" id="filter-flag"><option value="">All Statuses</option></select>
+    <button class="pt-group-btn" id="btn-clear" onclick="clearFilters()" style="color:var(--warn);border-color:var(--warn)">✕ Clear</button>
     <div class="pt-groups">
       <button class="pt-group-btn active" data-group="core">Core</button>
       <button class="pt-group-btn active" data-group="ageing">OCP Ageing</button>
@@ -677,29 +677,78 @@ function cellVal(col,val){{
 function buildFilters(){{
   const states=[...new Set(RAW.rows.map(r=>r[CI['state']]).filter(Boolean))].sort();
   const bus=[...new Set(RAW.rows.map(r=>r[CI['business_unit']]).filter(Boolean))].sort();
-  const selS=document.getElementById('filter-state'),selB=document.getElementById('filter-bu');
+  const territories=[...new Set(RAW.rows.map(r=>r[CI['territory']]).filter(Boolean))].sort();
+  const flags=[...new Set(RAW.rows.map(r=>r[CI['bill_flag']]).filter(Boolean))].sort();
+  const selS=document.getElementById('filter-state');
+  const selB=document.getElementById('filter-bu');
+  const selT=document.getElementById('filter-territory');
+  const selF=document.getElementById('filter-flag');
   states.forEach(s=>{{const o=document.createElement('option');o.value=o.textContent=s;selS.appendChild(o)}});
   bus.forEach(b=>{{const o=document.createElement('option');o.value=o.textContent=b;selB.appendChild(o)}});
+  territories.forEach(t=>{{const o=document.createElement('option');o.value=o.textContent=t;selT.appendChild(o)}});
+  flags.forEach(f=>{{const o=document.createElement('option');o.value=o.textContent=f;selF.appendChild(o)}});
+  // When state changes, re-populate territory options to match
+  selS.addEventListener('change',()=>{{
+    const st=selS.value;
+    selT.innerHTML='<option value="">All Territories</option>';
+    const terrs=[...new Set(RAW.rows.filter(r=>!st||r[CI['state']]===st).map(r=>r[CI['territory']]).filter(Boolean))].sort();
+    terrs.forEach(t=>{{const o=document.createElement('option');o.value=o.textContent=t;selT.appendChild(o)}});
+    applyFilters();
+  }});
 }}
 function applyFilters(){{
-  const q=document.getElementById('pt-search').value.toLowerCase();
+  const q=document.getElementById('pt-search').value.toLowerCase().trim();
   const st=document.getElementById('filter-state').value;
   const bu=document.getElementById('filter-bu').value;
+  const te=document.getElementById('filter-territory').value;
   const fl=document.getElementById('filter-flag').value;
   filtered=RAW.rows.filter(r=>{{
     if(st&&r[CI['state']]!==st)return false;
     if(bu&&r[CI['business_unit']]!==bu)return false;
+    if(te&&r[CI['territory']]!==te)return false;
     if(fl&&r[CI['bill_flag']]!==fl)return false;
-    if(q){{const n=(r[CI['partner_name']]||'').toLowerCase(),t=(r[CI['territory']]||'').toLowerCase(),d=(r[CI['district']]||'').toLowerCase(),c=(r[CI['cluster']]||'').toLowerCase();if(!n.includes(q)&&!t.includes(q)&&!d.includes(q)&&!c.includes(q))return false}}
+    if(q){{
+      const fid=String(r[CI['farmer_id']]||'');
+      const name=(r[CI['partner_name']]||'').toLowerCase();
+      const terr=(r[CI['territory']]||'').toLowerCase();
+      const dist=(r[CI['district']]||'').toLowerCase();
+      const taluka=(r[CI['taluka']]||'').toLowerCase();
+      const clus=(r[CI['cluster']]||'').toLowerCase();
+      const state=(r[CI['state']]||'').toLowerCase();
+      const bu2=(r[CI['business_unit']]||'').toLowerCase();
+      if(!fid.includes(q)&&!name.includes(q)&&!terr.includes(q)&&!dist.includes(q)&&!taluka.includes(q)&&!clus.includes(q)&&!state.includes(q)&&!bu2.includes(q))return false;
+    }}
     return true;
   }});
   const si=CI[sortCol];
   filtered.sort((a,b)=>{{const av=a[si],bv=b[si];if(typeof av==='number')return sortDir*(bv-av);return sortDir*String(av||'').localeCompare(String(bv||''))}});
   currentPage=0;render();
 }}
+function clearFilters(){{
+  document.getElementById('pt-search').value='';
+  document.getElementById('filter-state').value='';
+  document.getElementById('filter-bu').value='';
+  document.getElementById('filter-flag').value='';
+  // Reset territory dropdown to full list
+  const selT=document.getElementById('filter-territory');
+  selT.innerHTML='<option value="">All Territories</option>';
+  const terrs=[...new Set(RAW.rows.map(r=>r[CI['territory']]).filter(Boolean))].sort();
+  terrs.forEach(t=>{{const o=document.createElement('option');o.value=o.textContent=t;selT.appendChild(o)}});
+  selT.value='';
+  applyFilters();
+}}
 function render(){{
   const visCols=getVisCols(),start=currentPage*PAGE_SIZE,end=Math.min(start+PAGE_SIZE,filtered.length);
   document.getElementById('pt-thead').innerHTML='<tr>'+visCols.map(c=>`<th class="${{c===sortCol?(sortDir<0?'sorted-desc':'sorted-asc'):''}}" onclick="sortBy('${{c}}')">${{COL_LABELS[c]||c}}</th>`).join('')+'</tr>';
+  if(filtered.length===0){{
+    document.getElementById('pt-tbody').innerHTML=`<tr><td colspan="${{visCols.length}}" style="text-align:center;color:var(--muted);padding:32px">No partners match the current filters. <a href="#" onclick="clearFilters();return false;" style="color:var(--accent)">Clear filters</a></td></tr>`;
+    document.getElementById('pt-showing').textContent='No results';
+    document.getElementById('pt-count-label').textContent='0 partners';
+    document.getElementById('pt-page-info').textContent='—';
+    document.getElementById('pt-prev').disabled=true;
+    document.getElementById('pt-next').disabled=true;
+    return;
+  }}
   document.getElementById('pt-tbody').innerHTML=filtered.slice(start,end).map(r=>'<tr>'+visCols.map(c=>`<td>${{cellVal(c,r[CI[c]])}}</td>`).join('')+'</tr>').join('');
   document.getElementById('pt-showing').textContent=`Showing ${{start+1}}–${{end}} of ${{filtered.length.toLocaleString('en-IN')}}`;
   document.getElementById('pt-count-label').textContent=`${{filtered.length.toLocaleString('en-IN')}} partners`;
@@ -710,7 +759,7 @@ function render(){{
 function sortBy(col){{if(sortCol===col)sortDir*=-1;else{{sortCol=col;sortDir=-1}}filtered.sort((a,b)=>{{const si=CI[col],av=a[si],bv=b[si];if(typeof av==='number')return sortDir*(bv-av);return sortDir*String(av||'').localeCompare(String(bv||''))}});currentPage=0;render()}}
 function ptPage(dir){{const max=Math.ceil(filtered.length/PAGE_SIZE)-1;currentPage=Math.max(0,Math.min(max,currentPage+dir));render();document.getElementById('pt-table').scrollIntoView({{behavior:'smooth',block:'nearest'}})}}
 document.querySelectorAll('.pt-group-btn').forEach(btn=>{{btn.addEventListener('click',()=>{{const g=btn.dataset.group;if(g==='core')return;if(activeGroups.has(g)){{activeGroups.delete(g);btn.classList.remove('active')}}else{{activeGroups.add(g);btn.classList.add('active')}};render()}})}});
-['pt-search','filter-state','filter-bu','filter-flag'].forEach(id=>{{document.getElementById(id).addEventListener('input',applyFilters);document.getElementById(id).addEventListener('change',applyFilters)}});
+['pt-search','filter-bu','filter-territory','filter-flag'].forEach(id=>{{document.getElementById(id).addEventListener('input',applyFilters);document.getElementById(id).addEventListener('change',applyFilters)}});
 window.addEventListener('load',()=>{{
   setTimeout(()=>document.querySelectorAll('[data-pct]').forEach(el=>el.style.width=el.dataset.pct+'%'),120);
   buildFilters();applyFilters();
