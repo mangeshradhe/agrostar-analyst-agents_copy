@@ -232,20 +232,24 @@ ORDER BY os.OCP DESC
 def compute_kpis(rows, cols):
     """Compute hero KPIs from partner rows."""
     ci = {c: i for i, c in enumerate(cols)}
-    total_os  = sum(r[ci['total_os']] or 0 for r in rows)
-    total_ocp = sum(r[ci['OCP']] or 0 for r in rows)
-    ocp_240   = sum(r[ci['OCP_240_plus']] or 0 for r in rows)
-    blocked   = sum(1 for r in rows if r[ci['bill_flag']] == 'OCP Blocked')
-    total_p   = len(rows)
+    total_os   = sum(r[ci['total_os']] or 0 for r in rows)
+    total_ocp  = sum(r[ci['OCP']] or 0 for r in rows)
+    ocp_240    = sum(r[ci['OCP_240_plus']] or 0 for r in rows)
+    blocked    = sum(1 for r in rows if r[ci['bill_flag']] == 'OCP Blocked')
+    total_p    = len(rows)
+    fy27_rev   = sum(r[ci['FY27_rev']] or 0 for r in rows)
+    fy27_parts = sum(1 for r in rows if (r[ci['FY27_rev']] or 0) > 0)
 
     def cr(v): return f"₹{v/1e7:.1f} Cr"
     return {
-        "total_os":  cr(total_os),
-        "total_ocp": cr(total_ocp),
-        "ocp_240":   cr(ocp_240),
-        "blocked":   f"{blocked:,}",
-        "total":     f"{total_p:,}",
+        "total_os":    cr(total_os),
+        "total_ocp":   cr(total_ocp),
+        "ocp_240":     cr(ocp_240),
+        "blocked":     f"{blocked:,}",
+        "total":       f"{total_p:,}",
         "blocked_pct": f"{blocked/total_p*100:.0f}%",
+        "fy27_rev":    cr(fy27_rev),
+        "fy27_parts":  f"{fy27_parts:,}",
     }
 
 
@@ -483,6 +487,8 @@ footer{{padding:20px 40px;display:flex;justify-content:space-between;align-items
     <div class="hero-stat"><div class="hero-stat-val danger">{kpis['total_ocp']}</div><div class="hero-stat-label">Overdue (OCP)</div></div>
     <div class="hero-stat"><div class="hero-stat-val warn">{kpis['blocked']}</div><div class="hero-stat-label">Partners Blocked</div></div>
     <div class="hero-stat"><div class="hero-stat-val danger">{kpis['ocp_240']}</div><div class="hero-stat-label">240+ Days Overdue</div></div>
+    <div class="hero-stat" style="border-left:1px solid var(--border-bright);padding-left:28px;margin-left:4px"><div class="hero-stat-val" style="color:var(--safe)">{kpis['fy27_rev']}</div><div class="hero-stat-label">FY27 Revenue</div></div>
+    <div class="hero-stat"><div class="hero-stat-val" style="color:var(--safe)">{kpis['fy27_parts']}</div><div class="hero-stat-label">Partners Transacted FY27</div></div>
   </div>
 </section>
 
