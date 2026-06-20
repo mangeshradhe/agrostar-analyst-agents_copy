@@ -731,7 +731,7 @@ function applyFilters(){{
     return true;
   }});
   const si=CI[sortCol];
-  filtered.sort((a,b)=>{{const av=a[si],bv=b[si];if(typeof av==='number')return sortDir*(bv-av);return sortDir*String(av||'').localeCompare(String(bv||''))}});
+  filtered.sort((a,b)=>{{const av=a[si],bv=b[si];if(typeof av==='number')return sortDir*(av-bv);return sortDir*String(av||'').localeCompare(String(bv||''))}});
   currentPage=0;render();
 }}
 function clearFilters(){{
@@ -766,7 +766,7 @@ function render(){{
   document.getElementById('pt-prev').disabled=currentPage===0;
   document.getElementById('pt-next').disabled=end>=filtered.length;
 }}
-function sortBy(col){{if(sortCol===col)sortDir*=-1;else{{sortCol=col;sortDir=-1}}filtered.sort((a,b)=>{{const si=CI[col],av=a[si],bv=b[si];if(typeof av==='number')return sortDir*(bv-av);return sortDir*String(av||'').localeCompare(String(bv||''))}});currentPage=0;render()}}
+function sortBy(col){{if(sortCol===col)sortDir*=-1;else{{sortCol=col;sortDir=-1}}filtered.sort((a,b)=>{{const si=CI[col],av=a[si],bv=b[si];if(typeof av==='number')return sortDir*(av-bv);return sortDir*String(av||'').localeCompare(String(bv||''))}});currentPage=0;render()}}
 function ptPage(dir){{const max=Math.ceil(filtered.length/PAGE_SIZE)-1;currentPage=Math.max(0,Math.min(max,currentPage+dir));render();document.getElementById('pt-table').scrollIntoView({{behavior:'smooth',block:'nearest'}})}}
 document.querySelectorAll('.pt-group-btn').forEach(btn=>{{btn.addEventListener('click',()=>{{const g=btn.dataset.group;if(g==='core')return;if(activeGroups.has(g)){{activeGroups.delete(g);btn.classList.remove('active')}}else{{activeGroups.add(g);btn.classList.add('active')}};render()}})}});
 ['pt-search','filter-bu','filter-territory','filter-flag'].forEach(id=>{{document.getElementById(id).addEventListener('input',applyFilters);document.getElementById(id).addEventListener('change',applyFilters)}});
