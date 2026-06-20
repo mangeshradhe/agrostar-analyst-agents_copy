@@ -112,6 +112,7 @@ revenue AS (
     ROUND(SUM(CASE WHEN debit_date BETWEEN '2023-04-01' AND '2024-03-31' AND PL_NPL = 'PL' THEN amount END), 0) AS FY24_rev,
     ROUND(SUM(CASE WHEN debit_date BETWEEN '2024-04-01' AND '2025-03-31' AND PL_NPL = 'PL' THEN amount END), 0) AS FY25_rev,
     ROUND(SUM(CASE WHEN debit_date BETWEEN '2025-04-01' AND '2026-03-31' AND PL_NPL = 'PL' THEN amount END), 0) AS FY26_rev,
+    ROUND(SUM(CASE WHEN debit_date >= '2026-04-01' AND PL_NPL = 'PL' THEN amount END), 0) AS FY27_rev,
     COUNT(DISTINCT CASE WHEN debit_date BETWEEN '2025-04-01' AND '2026-03-31' AND PL_NPL = 'PL'
                         THEN product_group END) AS FY26_PG
   FROM `agrostar-data.optimized_reports_data.debit_id_wise_Sales_settlement`
@@ -195,6 +196,7 @@ SELECT
   COALESCE(rev.FY24_rev, 0)        AS FY24_rev,
   COALESCE(rev.FY25_rev, 0)        AS FY25_rev,
   COALESCE(rev.FY26_rev, 0)        AS FY26_rev,
+  COALESCE(rev.FY27_rev, 0)        AS FY27_rev,
   COALESCE(rev.FY26_PG, 0)         AS FY26_PG,
   COALESCE(lp.last_paid_date, '')  AS last_paid_date,
   COALESCE(lp.days_since_payment, 999) AS days_since_payment,
@@ -437,6 +439,14 @@ nav{{display:flex;justify-content:space-between;align-items:center;padding:14px 
 .ocp-cell{{color:var(--danger);font-weight:600}}
 .wcp-cell{{color:var(--safe)}}
 .zero-cell{{color:rgba(122,155,181,.3)}}
+/* Frozen columns: farmer_id (col1) + partner_name (col2) */
+.pt-table th{{z-index:2}}
+.pt-table td:nth-child(1),.pt-table td:nth-child(2){{position:sticky;z-index:1;background:var(--ground)}}
+.pt-table td:nth-child(1){{left:0;min-width:90px;width:90px}}
+.pt-table td:nth-child(2){{left:90px;box-shadow:3px 0 8px rgba(0,0,0,.35)}}
+.pt-table th:nth-child(1){{position:sticky;left:0;z-index:4;min-width:90px;width:90px;background:var(--surface)}}
+.pt-table th:nth-child(2){{position:sticky;left:90px;z-index:4;background:var(--surface);box-shadow:3px 0 8px rgba(0,0,0,.35)}}
+.pt-table tr:hover td:nth-child(1),.pt-table tr:hover td:nth-child(2){{background:#111f30}}
 .pt-pagination{{display:flex;align-items:center;gap:8px;margin-top:16px;justify-content:center}}
 .pt-page-btn{{background:var(--surface-2);border:1px solid var(--border-bright);color:var(--text);font-size:12px;padding:5px 12px;border-radius:4px;cursor:pointer}}
 .pt-page-btn:disabled{{opacity:.3;cursor:default}}
@@ -497,7 +507,7 @@ footer{{padding:20px 40px;display:flex;justify-content:space-between;align-items
 <section class="section">
   <div class="section-header">
     <span class="section-title">All Partner Details</span>
-    <span class="section-note" id="pt-count-label">{kpis['total']} partners · sorted by OCP ↓</span>
+    <span class="section-note" id="pt-count-label">{kpis['total']} partners · sorted by FY27 Rev ↓</span>
   </div>
   <div class="pt-controls">
     <input class="pt-search" id="pt-search" type="text" placeholder="Search name, farmer ID, territory, district, taluka…">
@@ -510,7 +520,7 @@ footer{{padding:20px 40px;display:flex;justify-content:space-between;align-items
       <button class="pt-group-btn active" data-group="core">Core</button>
       <button class="pt-group-btn active" data-group="ageing">OCP Ageing</button>
       <button class="pt-group-btn" data-group="category">Seeds / CPCN</button>
-      <button class="pt-group-btn" data-group="revenue">Revenue</button>
+      <button class="pt-group-btn active" data-group="revenue">Revenue</button>
       <button class="pt-group-btn" data-group="info">Info</button>
     </div>
     <div class="pt-info" id="pt-showing">Showing 0–0 of 0</div>
@@ -636,11 +646,11 @@ TOP15.forEach((p,i)=>{{
 
 // Partner table
 const GROUPS={{
-  core:    ['partner_name','territory','state','bill_flag','total_os','OCP','OCP_90_plus','last_paid_date','days_since_payment'],
+  core:    ['farmer_id','partner_name','territory','state','bill_flag','total_os','OCP','OCP_90_plus','last_paid_date','days_since_payment'],
   ageing:  ['OCP_0_30','OCP_30_60','OCP_60_90','OCP_90_150','OCP_150_180','OCP_180_210','OCP_210_240','OCP_240_plus'],
   category:['total_os_seed','OCP_seed','OCP_90plus_seed','total_os_cpcn','OCP_cpcn','total_os_interest'],
-  revenue: ['FY24_rev','FY25_rev','FY26_rev','FY26_PG'],
-  info:    ['farmer_id','cluster','business_unit','district','taluka','store_type','gst_slabs','mpd_enabled','state_head','partner_status'],
+  revenue: ['FY27_rev','FY26_rev','FY25_rev','FY24_rev','FY26_PG'],
+  info:    ['cluster','business_unit','district','taluka','store_type','gst_slabs','mpd_enabled','state_head','partner_status','revised_state'],
 }};
 const COL_LABELS={{
   partner_name:'Partner',territory:'Territory',state:'State',bill_flag:'Status',
@@ -649,14 +659,14 @@ const COL_LABELS={{
   OCP_60_90:'60–90d',OCP_90_150:'90–150d',OCP_150_180:'150–180d',OCP_180_210:'180–210d',
   OCP_210_240:'210–240d',OCP_240_plus:'240d+',total_os_seed:'OS Seeds',OCP_seed:'OCP Seeds',
   OCP_90plus_seed:'Seeds 90d+',total_os_cpcn:'OS CPCN',OCP_cpcn:'OCP CPCN',
-  total_os_interest:'OS Interest',FY24_rev:'FY24 Rev',FY25_rev:'FY25 Rev',FY26_rev:'FY26 Rev',
+  total_os_interest:'OS Interest',FY27_rev:'FY27 Rev',FY26_rev:'FY26 Rev',FY25_rev:'FY25 Rev',FY24_rev:'FY24 Rev',
   FY26_PG:'FY26 PGs',farmer_id:'Farmer ID',cluster:'Cluster',business_unit:'BU',
   district:'District',taluka:'Taluka',store_type:'Store Type',gst_slabs:'GST Slab',
   mpd_enabled:'MPD',state_head:'State Head',partner_status:'Status',
 }};
-const MONEY_COLS=new Set(['total_os','WCP','OCP','OCP_0_30','OCP_30_60','OCP_60_90','OCP_90_150','OCP_150_180','OCP_180_210','OCP_210_240','OCP_240_plus','OCP_90_plus','total_os_seed','OCP_seed','OCP_90plus_seed','total_os_cpcn','OCP_cpcn','total_os_interest','FY24_rev','FY25_rev','FY26_rev']);
+const MONEY_COLS=new Set(['total_os','WCP','OCP','OCP_0_30','OCP_30_60','OCP_60_90','OCP_90_150','OCP_150_180','OCP_180_210','OCP_210_240','OCP_240_plus','OCP_90_plus','total_os_seed','OCP_seed','OCP_90plus_seed','total_os_cpcn','OCP_cpcn','total_os_interest','FY24_rev','FY25_rev','FY26_rev','FY27_rev']);
 const OCP_COLS=new Set(['OCP','OCP_0_30','OCP_30_60','OCP_60_90','OCP_90_150','OCP_150_180','OCP_180_210','OCP_210_240','OCP_240_plus','OCP_90_plus','OCP_seed','OCP_90plus_seed','OCP_cpcn']);
-let activeGroups=new Set(['core','ageing']),sortCol='OCP',sortDir=-1,currentPage=0;
+let activeGroups=new Set(['core','ageing','revenue']),sortCol='FY27_rev',sortDir=-1,currentPage=0;
 const PAGE_SIZE=50;
 let filtered=[];
 function getVisCols(){{const seen=new Set(),out=[];for(const g of['core','ageing','category','revenue','info']){{if(!activeGroups.has(g))continue;for(const c of GROUPS[g]){{if(!seen.has(c)&&CI[c]!==undefined){{seen.add(c);out.push(c)}}}}}}return out}}
