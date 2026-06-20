@@ -489,6 +489,110 @@ ORDER BY ty.month, ty.channel
 
 ---
 
+## Saathi Partner Outstanding & Collections Query (Panil's Query)
+
+This is the canonical B2B collections report. One row per active Saathi partner. Shows last order, outstanding balance with full OCP ageing, DPD score, last payment, and billing flag. Returns ~25,100 rows. **Fixed and verified working as of Jun 2026.**
+
+**Key fix:** `offline_team.OKR_RAW_MAPPING` is a Google Sheets–backed external table that breaks with Drive credential errors. Always use `offline_team.okr_data_live` instead — it's a native BQ table with identical fields.
+
+### The 7 Subqueries
+
+**Subquery A — Last B2B order per partner**
+```sql
+FROM `agrostar-data.prod_db_views.sale_order` so
+LEFT JOIN `agrostar-data.dwh_views.txn_source` ts ON ts.unicommerce_id = so.Display_Order_Code
+LEFT JOIN `agrostar-data.galaxy_views.institution` ins ON ts.farmer_id = ins.reference_customer_id
+LEFT JOIN `agrostar-data.offline_team.okr_data_live` okr ON ts.farmer_id = okr.farmer_id
+WHERE ts.initiating_source LIKE '%B2B%' AND reference_customer_id IS NOT NULL
+```
+Dense rank on `farmer_id ORDER BY order_date DESC`, keep `rn = 1`. Gets: city, pincode, address line, village/taluka (from ins), Territory (from okr), status, gst_slabs, store_type.
+
+**Subquery B — FY-wise revenue from `optimized_reports_data.debit_id_wise_Sales_settlement`**
+Filter `reason_id = 3`. Computes FY23–FY26 gross revenue, return revenue, and product group counts split by `PL_NPL = 'PL'`.
+
+**Subquery C — DPD (Days Past Due) score**
+Complex weighted DPD. Inner query joins `wallet_creditwallettransaction` debits (reason_id=3, transaction_type=0) with credits via `wallet_creditwallettransactionreconciliation`. Classifies each repayment as WCP (before due date) or OCP (after). `DPD = SUM(weights) / SUM(debit_amount)`. Joined via `csr_farmer.user_id` → `farmer_id`.
+
+**Subquery D — Last payment**
+Three UNION branches: (1) reason_id=4, amount≥1000, (2) reason_id IN (4,12,36,31), (3) first debit as fallback. All ranked by recency then amount. Output: `last_paid_created_on`, `amount`, `paymnet_Bucket` (0-30/31-60/61-90/91-120/120+ days).
+
+**Subquery E — First/last B2B order dates**
+`order_management_order` where `initiating_source LIKE '%b2b%'`, grouped by `owner_id` as farmer_id.
+
+**Subquery F — Outstanding balance + OCP ageing + billing flag (the core)**
+
+Three CTEs inside F:
+
+`helth` CTE — unreconciled debits with full ageing:
+- `wallet_creditwallettransaction` (cwt): filter `cancelled=0`, `transaction_type=0`, `reason_id NOT IN (2)`, `is_reconciled=0`
+- `csr_farmer`: maps `wallet_user_id` → `farmer_id`
+- `offline_team.okr_data_live` (okr): joins on `csr.farmer_id = okr.farmer_id` — provides State, Revised_State, Territory, Cluster, Business_Unit, status, name, sh
+- `wallet_creditwallettransactionreconciliation`: partial reconciliation amounts
+- `order_management_order` + `agrostar_sale_order`: for `invoice_created` date (billing_ageing)
+- `optimized_reports_data.debit_id_wise_Sales_settlement`: item_type_name, sku_code, PL_NPL, product_group, category
+
+Key computed fields:
+- `pending_amount = amount + interest_amount − reconciled_amount`
+- `ageing_days = DATE_DIFF(current_date, due_date, DAY)` — negative = within term (WCP zone), positive = overdue (OCP zone)
+- `billing_ageing = DATE_DIFF(current_date, invoice_created OR created_on, DAY)`
+
+Revised_State CASE: MH → "MH", UP+RAKESH.SINGH → "UP_A", UP+PINTOO.VERMA → "UP_B"
+
+Outer filter: `pending_amount >= 1` → `total_os >= 100 AND status IS NOT NULL`
+
+Ageing buckets computed for: Overall, Seeds (reason_id=3, category="Seeds"), CPCN (reason_id=3, category≠"Seeds"), Interest (reason_id=10), Accrual interest, Other debits. Buckets: WCP, nex_3_day_due, nex_7_day_due, OCP_0_30 through OCP_240_plus; billing_ageing buckets: 0-30 through 365+.
+
+`gal` CTE — MPD-enabled partners from `galaxy_views.institution` (archive=FALSE, Saathi, isMpdEnabled=TRUE). Provides: partnerCreditType, isDeliveryViaStoreEnabled, isMpdEnabled.
+
+`mpd` CTE — MPD window from `galaxy_views.creditwallet`. Provides: mpdData_startWindowDate/endWindowDate, mpdData_initialAmount, mpdData_orderAmount, mpdData_orderEligibleAmount, mpdData_remainingAmount, can_place_order (= orderEligibleAmount − orderAmount), bucket_0_30/31_60/60_plus.
+
+`bill_flag` logic:
+```sql
+CASE
+  WHEN OCP < 5000 AND OCP_90_plus < 1000 THEN 'Open for sale'
+  WHEN total_os IS NULL THEN 'Open for sale'
+  WHEN isMpdEnabled = TRUE AND mpdData_remainingAmount = 0 THEN 'OCP billing unlocked'
+  WHEN isMpdEnabled = TRUE AND mpdData_remainingAmount > 0 THEN 'OCP Collect MPD'
+  WHEN OCP >= 5000 THEN 'OCP Blocked'
+  WHEN OCP_90_plus > 1000 THEN 'OCP Blocked'
+END AS bill_flag
+```
+
+**Subquery G — Monthly average app usage (MAU)**
+`saathi_clevertap_views.app_launched`, last 180 days, for all active Saathi partners with at least one B2B order. `ROUND(AVG(MAU), 0)` per partner. Joined to A via `CAST(farmer_id AS STRING) = patner_id`.
+
+### wallet_creditwallettransaction reason_id Reference
+| reason_id | Meaning |
+|---|---|
+| 2 | Adjustment — always exclude |
+| 3 | Product billing (main B2B invoice debit) |
+| 4 | Cash payment received |
+| 10 | Interest charged |
+| 12, 31, 36 | Other payment types |
+
+### transaction_type Reference
+- `0` = debit (money owed to Agrostar)
+- `1` = credit (payment received from partner)
+
+### Complete Table Map for This Query
+| Alias | Full Table | Role |
+|---|---|---|
+| so | `prod_db_views.sale_order` | Order facts, date, address |
+| ts | `dwh_views.txn_source` | Links order → farmer_id, initiating_source |
+| ins | `galaxy_views.institution` | Store address, status, GST slab, store type |
+| okr | `offline_team.okr_data_live` | Territory/hierarchy — **never use OKR_RAW_MAPPING** |
+| cwt | `prod_db_views.wallet_creditwallettransaction` | All wallet debits and credits |
+| cwtr | `prod_db_views.wallet_creditwallettransactionreconciliation` | Partial reconciliation amounts |
+| csr | `prod_db_views.csr_farmer` | wallet_user_id → farmer_id mapping |
+| omo | `prod_db_views.order_management_order` | reference_id → unicommerce_id |
+| sa | `prod_db_views.agrostar_sale_order` | invoice_created date for billing_ageing |
+| opti | `optimized_reports_data.debit_id_wise_Sales_settlement` | Item/category/SKU/PL_NPL detail |
+| gal | `galaxy_views.institution` | MPD flag, credit type |
+| wal | `galaxy_views.creditwallet` | MPD window, remaining amount |
+| — | `saathi_clevertap_views.app_launched` | App session events for MAU |
+
+---
+
 ## Known Data Caveats
 
 | Issue | Detail |
