@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      padding: 28px 24px;
+      background: #fff;
+      color: #333;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: #1a1a1a;
+    }
+    .form-group { margin-bottom: 14px; }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    input {
+      width: 100%;
+      padding: 9px 11px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #4a90e2; }
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #2e7d32;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 6px;
+      transition: background 0.2s;
+    }
+    button:hover { background: #1b5e20; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    .msg {
+      margin-top: 12px;
+      font-size: 13px;
+      padding: 8px 10px;
+      border-radius: 4px;
+      display: none;
+    }
+    .msg.error   { background: #fdecea; color: #c62828; border: 1px solid #ef9a9a; }
+    .msg.success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+    .spinner {
+      display: none;
+      text-align: center;
+      margin-top: 10px;
+      font-size: 13px;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+  <h3>🔐 Partner Tools — Login</h3>
+
+  <div class="form-group">
+    <label>Username</label>
+    <input type="text" id="username" placeholder="Enter username" autocomplete="off" />
+  </div>
+
+  <div class="form-group">
+    <label>Password</label>
+    <input type="password" id="password" placeholder="Enter password" />
+  </div>
+
+  <button id="loginBtn" onclick="login()">Login</button>
+
+  <div class="spinner" id="spinner">⏳ Validating credentials...</div>
+  <div class="msg error"   id="errorMsg"></div>
+  <div class="msg success" id="successMsg"></div>
+
+  <script>
+    // Allow Enter key to submit
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') login();
+    });
+
+    function login() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      if (!username || !password) {
+        showMsg('error', 'Please enter both username and password.');
+        return;
+      }
+
+      setLoading(true);
+      hideMessages();
+
+      google.script.run
+        .withSuccessHandler(handleResponse)
+        .withFailureHandler(handleError)
+        .validateUser(username, password);
+    }
+
+    function handleResponse(result) {
+      setLoading(false);
+      if (result.success) {
+        showMsg('success', '✅ Welcome, ' + result.name + '! Redirecting...');
+        setTimeout(() => google.script.host.close(), 1500);
+      } else {
+        showMsg('error', '❌ ' + result.message);
+      }
+    }
+
+    function handleError(err) {
+      setLoading(false);
+      showMsg('error', 'Unexpected error: ' + err.message);
+    }
+
+    function setLoading(on) {
+      document.getElementById('loginBtn').disabled = on;
+      document.getElementById('spinner').style.display = on ? 'block' : 'none';
+    }
+
+    function showMsg(type, text) {
+      const el = document.getElementById(type + 'Msg');
+      el.textContent = text;
+      el.style.display = 'block';
+    }
+
+    function hideMessages() {
+      document.getElementById('errorMsg').style.display = 'none';
+      document.getElementById('successMsg').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
