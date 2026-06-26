@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
-"""BT Scan — Greedy Allocation for Agrostar RF Program (2026-05-29)"""
+"""
+BT Scan v2 — Two-Mode Balance Transfer Scan for Agrostar RF Program
+  Mode 1: Full Order BT  — order total ≤ original partner balance → push entire order
+  Mode 2: Debit ID Level — order total > original balance → maximise utilisation per debit
+CSV source: /Users/darpan/Documents/AvailableLimit Rupifi Partners.csv
+"""
 
-import json
-from collections import defaultdict
+import pandas as pd
+from google.cloud import bigquery
+from datetime import date, timedelta
+import warnings
+warnings.filterwarnings("ignore")
 
-# ─── FILE PATHS ───────────────────────────────────────────────────────────────
-BQ_FILE = (
-    "/Users/darpan/.claude/projects/"
-    "-Users-darpan-Documents-claude-code-DVS-Analysis/"
-    "77df03d8-2db2-4828-bd62-e7494d4c4296/tool-results/"
-    "mcp-claude_ai_Google_Cloud_BigQuery-execute_sql_readonly-1780030596906.txt"
-)
-SHEET_FILE = (
-    "/Users/darpan/.claude/projects/"
-    "-Users-darpan-Documents-claude-code-DVS-Analysis/"
-    "77df03d8-2db2-4828-bd62-e7494d4c4296/tool-results/"
-    "mcp-claude_ai_Google_Drive-read_file_content-1780030602163.txt"
-)
+# ── Config ────────────────────────────────────────────────────────────────────
+CSV_PATH  = "/Users/darpan/Documents/AvailableLimit Rupifi Partners.csv"
+PROJECT   = "agrostar-data"
+DELIVERED = {"delivered", "delivered_at_godown"}
 
-
-# ─── HELPERS ─────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 def inr(amount):
-    """Format float as Indian comma-separated ₹ string."""
     amount = int(round(float(amount)))
     s = str(abs(amount))
     if len(s) <= 3:
@@ -35,265 +32,6 @@ def inr(amount):
     return ("₹" if amount >= 0 else "-₹") + result
 
 
-def parse_float(val):
-    if val is None or str(val).strip() in ("", "null", "0", "-"):
-        return 0.0
-    try:
-        return float(str(val).replace(",", "").strip())
-    except Exception:
-        return 0.0
-
-
-# ─── PARSE BQ FILE ───────────────────────────────────────────────────────────
-with open(BQ_FILE, "r", encoding="utf-8") as f:
-    bq_raw = f.read()
-
-bq_data = json.loads(bq_raw)
-
-total_bytes_processed = int(bq_data.get("totalBytesProcessed", 0))
-total_bytes_billed    = int(bq_data.get("totalBytesBilled", 0))
-mb_processed = total_bytes_processed / (1024 * 1024)
-mb_billed    = total_bytes_billed    / (1024 * 1024)
-
-FIELDS = [
-    "partner_id", "store_name", "partner_name", "state", "district",
-    "order_id", "order_bt_amount", "invoice_created_date",
-    "invoice_age_days", "credit_term_days"
-]
-
-rows = bq_data.get("rows", [])
-bq_orders = []
-for row in rows:
-    vals = [cell["v"] for cell in row["f"]]
-    record = dict(zip(FIELDS, vals))
-    record["partner_id"]      = str(record["partner_id"])
-    record["order_id"]        = str(record["order_id"])
-    record["order_bt_amount"] = parse_float(record["order_bt_amount"])
-    record["invoice_age_days"]= int(float(record["invoice_age_days"])) if record["invoice_age_days"] else 0
-    record["credit_term_days"]= int(float(record["credit_term_days"])) if record["credit_term_days"] else 0
-    bq_orders.append(record)
-
-# Group by partner
-partner_orders = defaultdict(list)
-partner_meta   = {}
-for o in bq_orders:
-    pid = o["partner_id"]
-    partner_orders[pid].append(o)
-    if pid not in partner_meta:
-        partner_meta[pid] = {
-            "store_name": o["store_name"],
-            "partner_name": o["partner_name"],
-            "state": o["state"],
-            "district": o["district"],
-        }
-
-
-# ─── PARSE SHEET FILE ────────────────────────────────────────────────────────
-with open(SHEET_FILE, "r", encoding="utf-8") as f:
-    sheet_raw = f.read()
-
-sheet_data   = json.loads(sheet_raw)
-file_content = sheet_data.get("fileContent", "")
-lines        = file_content.split("\n")
-
-# The sheet has two Rupifi-specific sections with STATUS column:
-#
-# ACTIVE section  — lines 2495-2626
-#   Header: # | CREDITLINE ID | CREATED ON | BIZ NAME | PHONE | EMAIL | NAME
-#           | LIMIT | BALANCE | LENDER | STATUS | BIZ ID | Date | Month
-#           | Vender | Partner Id | CRM LIMIT | Agrostar Status |
-#   After stripping leading '' from pipe-split:
-#   idx:  0=#  1=cl_id  2=created  3=name  4=phone  5=email  6=person
-#         7=LIMIT  8=BALANCE  9=LENDER  10=STATUS  11=biz_id  12=date
-#         13=month  14=vender  15=Partner Id  [16=crm_limit  17=ag_status]
-#
-# INACTIVE section — lines 2628-2645 (same header but only 16 cols; BALANCE=limit value, actual available=0)
-#   idx:  0=#  1=cl_id  2=created  3=name  4=phone  5=email  6=person
-#         7=LIMIT  8=BALANCE  9=LENDER  10=STATUS  11=biz_id  12=date
-#         13=month  14=vender  15=Partner Id
-
-def parse_pipe_row(line):
-    """Parse a markdown pipe-delimited row, stripping leading/trailing empties."""
-    parts = [p.strip() for p in line.split("|")]
-    while parts and parts[0] == "":
-        parts.pop(0)
-    while parts and parts[-1] == "":
-        parts.pop()
-    return parts
-
-
-rupifi_dict = {}  # partner_id (str) -> {status, balance, limit}
-
-# ACTIVE section: lines 2497 to 2626 (skip header at 2495, separator at 2496)
-for i in range(2497, 2627):
-    line = lines[i].strip()
-    if not line or ":-:" in line:
-        continue
-    parts = parse_pipe_row(line)
-    if len(parts) < 16:
-        continue
-    pid = parts[15].strip()
-    if not pid or not pid.isdigit():
-        continue
-    status  = parts[10].strip().upper()  # "ACTIVE"
-    balance = parse_float(parts[8])      # BALANCE col — actual available balance
-    limit   = parse_float(parts[7])      # LIMIT col
-    rupifi_dict[pid] = {"status": status, "balance": balance, "limit": limit}
-
-# INACTIVE section: lines 2630 to 2645
-# For INACTIVE rows the col layout is same but BALANCE (parts[8]) shows the
-# sanctioned limit (not usable). Account is deactivated → effective balance = 0
-# but the BALANCE column value is used to decide B3 vs B4 per the spec.
-for i in range(2630, 2646):
-    line = lines[i].strip()
-    if not line or ":-:" in line:
-        continue
-    parts = parse_pipe_row(line)
-    if len(parts) < 16:
-        continue
-    pid = parts[15].strip()
-    if not pid or not pid.isdigit():
-        continue
-    status  = parts[10].strip().upper()  # "INACTIVE"
-    # For inactive rows: parts[8] contains the credit limit value (same as parts[7])
-    # and there is no valid available-balance figure — treat as 0 since deactivated
-    balance = 0.0
-    limit   = parse_float(parts[7])
-    rupifi_dict[pid] = {"status": status, "balance": balance, "limit": limit}
-
-
-# ─── GREEDY ALLOCATION ────────────────────────────────────────────────────────
-bucket0 = []  # missing from sheet
-bucket1 = []  # actionable
-bucket3 = []  # balance exhausted / zero / inactive+zero
-bucket4 = []  # inactive but balance > 0 (not applicable given above, but kept)
-
-for pid, orders in partner_orders.items():
-    meta = partner_meta[pid]
-
-    if pid not in rupifi_dict:
-        total_bt  = sum(o["order_bt_amount"] for o in orders)
-        oldest    = max(o["invoice_age_days"] for o in orders)
-        bucket0.append({
-            "partner_id":             pid,
-            "store_name":             meta["store_name"],
-            "state":                  meta["state"],
-            "orders":                 len(orders),
-            "total_bt_amount":        total_bt,
-            "oldest_invoice_age_days": oldest,
-        })
-        continue
-
-    rdata             = rupifi_dict[pid]
-    rupifi_status     = rdata["status"]
-    available_balance = rdata["balance"]
-    sorted_orders     = sorted(orders, key=lambda o: o["invoice_age_days"], reverse=True)
-    total_bt          = sum(o["order_bt_amount"] for o in sorted_orders)
-
-    if rupifi_status == "ACTIVE" and available_balance > 0:
-        remaining     = available_balance
-        selected      = []
-        not_selected  = []
-        for o in sorted_orders:
-            if o["order_bt_amount"] <= remaining:
-                selected.append(o)
-                remaining -= o["order_bt_amount"]
-            else:
-                not_selected.append(o)
-
-        if selected:
-            actionable_amt = sum(o["order_bt_amount"] for o in selected)
-            oldest_sel     = max(o["invoice_age_days"] for o in selected)
-            bucket1.append({
-                "partner_id":             pid,
-                "store_name":             meta["store_name"],
-                "state":                  meta["state"],
-                "available_balance":      available_balance,
-                "actionable_bt_amount":   actionable_amt,
-                "orders_selected":        len(selected),
-                "oldest_invoice_age_days": oldest_sel,
-            })
-            if not_selected:
-                blocked_amt = sum(o["order_bt_amount"] for o in not_selected)
-                bucket3.append({
-                    "partner_id":      pid,
-                    "store_name":      meta["store_name"],
-                    "state":           meta["state"],
-                    "available_balance": remaining,
-                    "blocked_amount":  blocked_amt,
-                    "reason":          "Partial: balance exhausted after B1 picks",
-                    "orders":          len(not_selected),
-                })
-        else:
-            bucket3.append({
-                "partner_id":      pid,
-                "store_name":      meta["store_name"],
-                "state":           meta["state"],
-                "available_balance": available_balance,
-                "blocked_amount":  total_bt,
-                "reason":          "Active — balance too small for any order",
-                "orders":          len(sorted_orders),
-            })
-
-    elif rupifi_status == "ACTIVE" and available_balance <= 0:
-        bucket3.append({
-            "partner_id":      pid,
-            "store_name":      meta["store_name"],
-            "state":           meta["state"],
-            "available_balance": available_balance,
-            "blocked_amount":  total_bt,
-            "reason":          "Active — zero balance",
-            "orders":          len(sorted_orders),
-        })
-
-    elif rupifi_status == "INACTIVE" and available_balance > 0:
-        # B4: inactive but has usable balance (shouldn't occur with our 0-override above,
-        # but kept for completeness if any future row has a real balance)
-        bucket4.append({
-            "partner_id":        pid,
-            "store_name":        meta["store_name"],
-            "state":             meta["state"],
-            "available_balance": available_balance,
-            "eligible_bt_amount": total_bt,
-            "orders":            len(sorted_orders),
-        })
-
-    else:
-        # INACTIVE + zero balance
-        bucket3.append({
-            "partner_id":      pid,
-            "store_name":      meta["store_name"],
-            "state":           meta["state"],
-            "available_balance": available_balance,
-            "blocked_amount":  total_bt,
-            "reason":          "Inactive — zero/no balance",
-            "orders":          len(sorted_orders),
-        })
-
-
-# ─── AGGREGATE STATS ─────────────────────────────────────────────────────────
-b0_partners = len(bucket0)
-b0_orders   = sum(p["orders"] for p in bucket0)
-b0_amount   = sum(p["total_bt_amount"] for p in bucket0)
-
-b1_partners = len(bucket1)
-b1_orders   = sum(p["orders_selected"] for p in bucket1)
-b1_amount   = sum(p["actionable_bt_amount"] for p in bucket1)
-
-b3_partners = len(bucket3)
-b3_orders   = sum(p["orders"] for p in bucket3)
-b3_amount   = sum(p["blocked_amount"] for p in bucket3)
-
-b4_partners = len(bucket4)
-b4_orders   = sum(p["orders"] for p in bucket4)
-b4_amount   = sum(p["eligible_bt_amount"] for p in bucket4)
-
-total_partners  = len(partner_orders)
-total_eligible  = b1_amount + b3_amount + b4_amount + b0_amount
-actionable_pct  = (b1_amount / total_eligible * 100) if total_eligible > 0 else 0
-
-
-# ─── PRINT TABLE ─────────────────────────────────────────────────────────────
 def print_table(headers, rows_data):
     if not rows_data:
         print("  (none)")
@@ -307,101 +45,499 @@ def print_table(headers, rows_data):
         print(fmt.format(*[str(c) for c in row]))
 
 
-# ─── OUTPUT ──────────────────────────────────────────────────────────────────
-print()
-print("=" * 72)
-print("=== BT SCAN — 2026-05-29 ===")
-print(f"Scan cost: {mb_processed:.1f} MB processed | {mb_billed:.1f} MB billed")
-print("=" * 72)
+# ── Load CSV ──────────────────────────────────────────────────────────────────
+limit_df = pd.read_csv(CSV_PATH)
+limit_df.columns = ["partner_id", "available_limit"]
+limit_df = limit_df.dropna(subset=["partner_id"])
+limit_df["partner_id"] = limit_df["partner_id"].apply(lambda x: str(int(float(x))))
+limit_dict = dict(zip(limit_df["partner_id"], limit_df["available_limit"].astype(float)))
+print(f"CSV loaded: {len(limit_dict):,} partners with credit limits")
 
-# BUCKET 0
+# ── BQ Query ──────────────────────────────────────────────────────────────────
+QUERY = """
+WITH
+rf_partners AS (
+  SELECT
+    i.reference_customer_id AS farmer_id,
+    i.user_id,
+    i.name                  AS store_name,
+    i.partner_name,
+    i.address_state,
+    i.address_district,
+    ROW_NUMBER() OVER (PARTITION BY i.reference_customer_id ORDER BY i.created_on DESC) AS rn
+  FROM `agrostar-data.galaxy_views.institution` i
+  WHERE i.lendingProvider = 'RUPIFI'
+    AND i.status = 'ACTIVE'
+),
+partners AS (
+  SELECT farmer_id, user_id, store_name, partner_name, address_state, address_district
+  FROM rf_partners WHERE rn = 1
+),
+partner_wallet AS (
+  SELECT f.farmer_id, f.user_id AS wallet_user_id
+  FROM `agrostar-data.prod_db_views.csr_farmer` f
+  JOIN partners p ON p.farmer_id = f.farmer_id
+),
+all_debits AS (
+  SELECT
+    t.id                               AS debit_id,
+    SAFE_CAST(t.reference_id AS INT64) AS order_id,
+    t.wallet_user_id,
+    t.amount                           AS debit_amount,
+    t.due_date,
+    t.finbox_transaction_id,
+    t.is_reconciled
+  FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` t
+  JOIN partner_wallet pw ON pw.wallet_user_id = t.wallet_user_id
+  WHERE t.reason_id = 3
+    AND t.transaction_type = 0
+    AND t.cancelled = 0
+),
+recon_agg AS (
+  SELECT
+    r.reconciled_for_id AS debit_id,
+    SUM(r.amount)       AS reconciled_amount
+  FROM `agrostar-data.prod_db_views.wallet_creditwallettransactionreconciliation` r
+  WHERE r.cancelled = 0
+  GROUP BY 1
+),
+debits AS (
+  SELECT
+    d.debit_id,
+    d.order_id,
+    d.wallet_user_id,
+    d.debit_amount,
+    d.due_date,
+    d.finbox_transaction_id,
+    d.is_reconciled,
+    COALESCE(r.reconciled_amount, 0)                          AS reconciled_amount,
+    d.debit_amount - COALESCE(r.reconciled_amount, 0)         AS remaining_amount,
+    (d.finbox_transaction_id IS NULL AND d.is_reconciled = 0) AS is_bt_eligible_debit
+  FROM all_debits d
+  LEFT JOIN recon_agg r ON r.debit_id = d.debit_id
+),
+order_agg AS (
+  SELECT
+    order_id,
+    wallet_user_id,
+    SUM(debit_amount)  AS total_order_debit_amount,
+    MAX(due_date)      AS max_due_date
+  FROM debits
+  GROUP BY 1, 2
+),
+order_info AS (
+  SELECT
+    o.sales_order_id                 AS order_id,
+    o.status                         AS order_status,
+    o.unicommerce_status,
+    CAST(o.unicommerce_id AS STRING) AS unicommerce_id
+  FROM `agrostar-data.prod_db_views.order_management_order` o
+  JOIN order_agg oa ON oa.order_id = o.sales_order_id
+),
+invoice_dates AS (
+  SELECT
+    oi.order_id,
+    MIN(DATE(inv.CreatedOn)) AS invoice_created_date
+  FROM order_info oi
+  JOIN `agrostar-data.pristine_wms_views.invoiced_report` inv
+    ON oi.unicommerce_id = inv.DisplayOrderCode
+  WHERE inv.line_status != 'CANCELLED'
+    AND inv.is_return = 0
+  GROUP BY 1
+)
+SELECT
+  p.farmer_id                                                                     AS partner_id,
+  p.store_name,
+  p.partner_name,
+  p.address_state                                                                  AS state,
+  p.address_district                                                               AS district,
+  d.order_id,
+  oi.order_status,
+  oi.unicommerce_status,
+  id.invoice_created_date,
+  DATE_DIFF(CURRENT_DATE('Asia/Kolkata'), id.invoice_created_date, DAY)           AS invoice_age_days,
+  oa.total_order_debit_amount,
+  DATE_DIFF(DATE(oa.max_due_date), id.invoice_created_date, DAY)                  AS credit_term_days,
+  d.debit_id,
+  d.debit_amount,
+  d.reconciled_amount,
+  d.remaining_amount,
+  d.due_date,
+  d.is_reconciled,
+  d.is_bt_eligible_debit,
+  DATE_DIFF(DATE(d.due_date), id.invoice_created_date, DAY) AS credit_term_per_debit
+FROM debits d
+JOIN order_agg oa      ON oa.order_id = d.order_id AND oa.wallet_user_id = d.wallet_user_id
+JOIN partner_wallet pw ON pw.wallet_user_id = d.wallet_user_id
+JOIN partners p        ON p.farmer_id = pw.farmer_id
+LEFT JOIN order_info oi   ON oi.order_id = d.order_id
+LEFT JOIN invoice_dates id ON id.order_id = d.order_id
+ORDER BY p.farmer_id, d.order_id, d.due_date DESC, d.remaining_amount DESC
+"""
+
+client = bigquery.Client(project=PROJECT)
+print("Running BQ query (may take 60-90s)…")
+query_job = client.query(QUERY)
+df = query_job.to_dataframe()
+
+billed_mb = (query_job.total_bytes_billed or 0) / (1024 * 1024)
+print(f"Done. {len(df):,} rows | {df['partner_id'].nunique():,} partners | "
+      f"{df['order_id'].nunique():,} orders | Billed: {billed_mb:.1f} MB")
+
+# ── BT Logic ──────────────────────────────────────────────────────────────────
+b0_partners      = []   # in BQ but not in CSV
+partner_summaries = []
+
+for partner_id, p_df in df.groupby("partner_id"):
+    pid_str    = str(int(partner_id))
+    store_name = p_df["store_name"].iloc[0]
+    state      = p_df["state"].iloc[0]
+    district   = p_df["district"].iloc[0]
+
+    # B0 — no CSV record
+    if pid_str not in limit_dict:
+        b0_partners.append({
+            "partner_id": partner_id, "store_name": store_name, "state": state
+        })
+        continue
+
+    original_balance  = limit_dict[pid_str]
+    remaining_balance = original_balance
+
+    mode1_candidates = []
+    mode2_candidates = []
+    b2_waiting        = []
+
+    for order_id, o_df in p_df.groupby("order_id"):
+
+        # Gate 1: unicommerce_status must be delivered
+        uni_raw = o_df["unicommerce_status"].iloc[0]
+        if pd.isna(uni_raw) or str(uni_raw).lower().strip() not in DELIVERED:
+            continue
+
+        # Gate 2: invoice date must exist
+        inv_date_raw = o_df["invoice_created_date"].iloc[0]
+        if pd.isna(inv_date_raw):
+            continue
+        inv_date = inv_date_raw.date() if hasattr(inv_date_raw, "date") else inv_date_raw
+
+        # Gate 3: invoice age ≤ 55 days
+        inv_age_raw = o_df["invoice_age_days"].iloc[0]
+        if pd.isna(inv_age_raw):
+            continue
+        inv_age = int(inv_age_raw)
+        if inv_age > 55:
+            continue
+
+        # Gate 4: total order debit amount ≥ ₹200
+        total_amt = float(o_df["total_order_debit_amount"].iloc[0])
+        if total_amt < 200:
+            continue
+
+        # Gate 5: credit term — Mode 1 requires all debits within 120d term;
+        #   Mode 2 applies the gate per debit, so mixed-term orders can still be partially pushed
+        ct_raw          = o_df["credit_term_days"].iloc[0]
+        credit_term_max = int(ct_raw) if not pd.isna(ct_raw) else 0
+        m1_credit_ok    = not (credit_term_max > 120 and inv_age <= 33)
+
+        order_rec = {
+            "order_id":                 order_id,
+            "order_status":             o_df["order_status"].iloc[0],
+            "unicommerce_status":       uni_raw,
+            "invoice_date":             inv_date,
+            "invoice_age_days":         inv_age,
+            "is_exceptional":           inv_age >= 46,
+            "total_order_debit_amount": total_amt,
+            "credit_term_max":          credit_term_max,
+            "m1_credit_ok":             m1_credit_ok,
+            "debits_df":                o_df,
+        }
+
+        # Mode 1: full order push — only if order fits balance AND all debits within credit term
+        # Mode 2: debit-level — for oversized orders OR orders with mixed credit terms
+        if total_amt <= original_balance and m1_credit_ok:
+            mode1_candidates.append(order_rec)
+        else:
+            mode2_candidates.append(order_rec)
+
+    # Sort oldest invoice first for both modes
+    mode1_candidates.sort(key=lambda x: x["invoice_date"])
+    mode2_candidates.sort(key=lambda x: x["invoice_date"])
+
+    b1_picks  = []
+    b3_orders = []
+
+    # ── Pass 1: Full Order BT ──────────────────────────────────────────────────
+    for oi in mode1_candidates:
+        eligible     = oi["debits_df"][oi["debits_df"]["is_bt_eligible_debit"] == True].copy()
+        net_consumed = float(eligible["remaining_amount"].sum())
+
+        if net_consumed > 0 and net_consumed <= remaining_balance:
+            remaining_balance -= net_consumed
+            b1_picks.append({
+                "mode":              "FULL_ORDER",
+                "order_id":          oi["order_id"],
+                "order_status":      oi["order_status"],
+                "unicommerce_status": oi["unicommerce_status"],
+                "invoice_date":      oi["invoice_date"],
+                "invoice_age_days":  oi["invoice_age_days"],
+                "is_exceptional":    oi["is_exceptional"],
+                "total_order_amount": oi["total_order_debit_amount"],
+                "actionable_amount": net_consumed,
+                "debit_count":       len(eligible),
+                "push_instructions": [
+                    {
+                        "debit_id":    int(row["debit_id"]),
+                        "push_amount": float(row["debit_amount"]),
+                        "void_amount": float(row["reconciled_amount"]) if float(row["reconciled_amount"]) > 0 else None,
+                    }
+                    for _, row in eligible.iterrows()
+                ],
+            })
+        else:
+            b3_orders.append({
+                "mode":              "FULL_ORDER_NO_BALANCE",
+                "order_id":          oi["order_id"],
+                "invoice_date":      oi["invoice_date"],
+                "invoice_age_days":  oi["invoice_age_days"],
+                "total_order_amount": oi["total_order_debit_amount"],
+                "blocked_amount":    net_consumed,
+            })
+
+    # ── Pass 2: Debit ID Level BT ──────────────────────────────────────────────
+    for oi in mode2_candidates:
+        eligible = oi["debits_df"][oi["debits_df"]["is_bt_eligible_debit"] == True].copy()
+
+        if remaining_balance <= 0:
+            b3_orders.append({
+                "mode":              "DEBIT_LEVEL_NO_BALANCE",
+                "order_id":          oi["order_id"],
+                "invoice_date":      oi["invoice_date"],
+                "invoice_age_days":  oi["invoice_age_days"],
+                "total_order_amount": oi["total_order_debit_amount"],
+                "blocked_amount":    float(eligible["remaining_amount"].sum()),
+            })
+            continue
+
+        # Debit-level filters
+        eligible = eligible[eligible["remaining_amount"] >= 200]
+        eligible = eligible[eligible["invoice_age_days"] <= 55]
+
+        # Per-debit credit term gate: exclude debits where lender would hold paper >120d
+        #   only applies while invoice is still in the 0–33d waiting window
+        inv_age_order = oi["invoice_age_days"]
+        ct_gated  = (eligible["credit_term_per_debit"] > 120) & (inv_age_order <= 33)
+        waiting_df = eligible[ct_gated]
+        eligible   = eligible[~ct_gated]
+
+        if not waiting_df.empty:
+            b2_waiting.append({
+                "order_id":           oi["order_id"],
+                "order_status":       oi["order_status"],
+                "unicommerce_status": oi["unicommerce_status"],
+                "invoice_date":       oi["invoice_date"],
+                "invoice_age_days":   inv_age_order,
+                "credit_term_days":   oi["credit_term_max"],
+                "eligible_from":      oi["invoice_date"] + timedelta(days=34),
+                "total_order_amount": float(waiting_df["debit_amount"].sum()),
+                "partial":            not eligible.empty,
+            })
+
+        if eligible.empty:
+            continue
+
+        eligible = eligible.copy()
+        eligible["due_date"] = pd.to_datetime(eligible["due_date"])
+        eligible = eligible.sort_values(
+            ["due_date", "remaining_amount"], ascending=[False, False]
+        )
+
+        picked  = []
+        skipped = []
+        for _, row in eligible.iterrows():
+            rem = float(row["remaining_amount"])
+            if rem <= remaining_balance:
+                picked.append(row)
+                remaining_balance -= rem
+            else:
+                skipped.append(row)
+
+        if picked:
+            b1_picks.append({
+                "mode":              "DEBIT_LEVEL",
+                "order_id":          oi["order_id"],
+                "order_status":      oi["order_status"],
+                "unicommerce_status": oi["unicommerce_status"],
+                "invoice_date":      oi["invoice_date"],
+                "invoice_age_days":  oi["invoice_age_days"],
+                "is_exceptional":    oi["is_exceptional"],
+                "total_order_amount": oi["total_order_debit_amount"],
+                "actionable_amount": sum(float(r["remaining_amount"]) for r in picked),
+                "debit_count":       len(picked),
+                "push_instructions": [
+                    {
+                        "debit_id":    int(r["debit_id"]),
+                        "push_amount": float(r["debit_amount"]),
+                        "void_amount": float(r["reconciled_amount"]) if float(r["reconciled_amount"]) > 0 else None,
+                    }
+                    for r in picked
+                ],
+            })
+
+        if skipped:
+            b3_orders.append({
+                "mode":              "DEBIT_LEVEL_PARTIAL",
+                "order_id":          oi["order_id"],
+                "invoice_date":      oi["invoice_date"],
+                "invoice_age_days":  oi["invoice_age_days"],
+                "total_order_amount": oi["total_order_debit_amount"],
+                "blocked_amount":    sum(float(r["remaining_amount"]) for r in skipped),
+            })
+
+    total_actionable = sum(p["actionable_amount"] for p in b1_picks)
+    partner_summaries.append({
+        "partner_id":       partner_id,
+        "store_name":       store_name,
+        "state":            state,
+        "district":         district,
+        "original_balance": original_balance,
+        "remaining_balance": remaining_balance,
+        "total_actionable": total_actionable,
+        "utilization_pct":  round(100 * total_actionable / original_balance, 1) if original_balance > 0 else 0,
+        "b1_picks":         b1_picks,
+        "b2_waiting":       b2_waiting,
+        "b3_orders":        b3_orders,
+    })
+
+# ── Output ────────────────────────────────────────────────────────────────────
+SEP = "=" * 80
 print()
-print("--- BUCKET 0: MISSING FROM SHEET ---")
-print(f"{b0_partners} partners with eligible orders but no Rupifi sheet record")
-if bucket0:
-    rows_data = []
-    for p in sorted(bucket0, key=lambda x: x["total_bt_amount"], reverse=True):
-        rows_data.append([
-            p["partner_id"],
-            p["store_name"][:38],
-            p["state"],
-            str(p["orders"]),
-            inr(p["total_bt_amount"]),
-        ])
+print(SEP)
+print(f"  BT SCAN — {date.today()}")
+print(f"  Billed: {billed_mb:.1f} MB")
+print(SEP)
+
+# B0
+if b0_partners:
+    print(f"\n⚠  BUCKET 0 — {len(b0_partners)} partners in Rupifi BQ but NOT in available limit CSV")
     print_table(
-        ["partner_id", "store_name", "state", "orders", "total_bt_amount"],
-        rows_data,
+        ["partner_id", "store_name", "state"],
+        [[p["partner_id"], str(p["store_name"])[:40], p["state"]] for p in b0_partners],
     )
 
-# BUCKET 1
-print()
-print("--- BUCKET 1: ACTIONABLE TODAY (B1) ---")
-print(f"{b1_partners} partners | {b1_orders} orders | {inr(b1_amount)} actionable")
-if bucket1:
-    rows_data = []
-    for p in sorted(bucket1, key=lambda x: x["actionable_bt_amount"], reverse=True):
-        rows_data.append([
-            p["partner_id"],
-            p["store_name"][:35],
-            p["state"],
-            inr(p["available_balance"]),
-            inr(p["actionable_bt_amount"]),
-            str(p["orders_selected"]),
-            str(p["oldest_invoice_age_days"]) + "d",
-        ])
-    print_table(
-        ["partner_id", "store_name", "state", "avail_balance", "actionable_bt", "orders", "oldest_age"],
-        rows_data,
-    )
+# B1 summary
+actionable = sorted(
+    [ps for ps in partner_summaries if ps["total_actionable"] > 0],
+    key=lambda x: x["total_actionable"], reverse=True,
+)
+total_b1_amount = sum(ps["total_actionable"] for ps in actionable)
+total_m1 = sum(
+    len([p for p in ps["b1_picks"] if p["mode"] == "FULL_ORDER"]) for ps in actionable
+)
+total_m2 = sum(
+    len([p for p in ps["b1_picks"] if p["mode"] == "DEBIT_LEVEL"]) for ps in actionable
+)
 
-# BUCKET 3
-print()
-print("--- BUCKET 3: BALANCE EXHAUSTED / ZERO ---")
-print(f"{b3_partners} partners | {b3_orders} orders | {inr(b3_amount)} eligible but blocked")
-if bucket3:
-    rows_data = []
-    for p in sorted(bucket3, key=lambda x: x["blocked_amount"], reverse=True):
-        rows_data.append([
-            p["partner_id"],
-            p["store_name"][:28],
-            p["state"],
-            inr(p["available_balance"]),
-            inr(p["blocked_amount"]),
-            p["reason"][:42],
-        ])
-    print_table(
-        ["partner_id", "store_name", "state", "avail_balance", "blocked_amount", "reason"],
-        rows_data,
-    )
+print(f"\n--- BUCKET 1: ACTIONABLE TODAY ---")
+print(f"{len(actionable)} partners | {inr(total_b1_amount)} | "
+      f"M1 (Full Order): {total_m1} orders | M2 (Debit Level): {total_m2} orders")
 
-# BUCKET 4
-print()
-print("--- BUCKET 4: INACTIVE ON RUPIFI (balance available) ---")
-print(f"{b4_partners} partners | {inr(b4_amount)} stranded — push Rupifi to activate")
-if bucket4:
-    rows_data = []
-    for p in sorted(bucket4, key=lambda x: x["eligible_bt_amount"], reverse=True):
-        rows_data.append([
-            p["partner_id"],
-            p["store_name"][:35],
-            p["state"],
-            inr(p["available_balance"]),
-            inr(p["eligible_bt_amount"]),
-        ])
-    print_table(
-        ["partner_id", "store_name", "state", "avail_balance", "eligible_bt_amount"],
-        rows_data,
-    )
-else:
-    print("  (none)")
+rows_data = []
+for ps in actionable:
+    m1_cnt   = len([p for p in ps["b1_picks"] if p["mode"] == "FULL_ORDER"])
+    m2_cnt   = len([p for p in ps["b1_picks"] if p["mode"] == "DEBIT_LEVEL"])
+    exc_cnt  = len([p for p in ps["b1_picks"] if p.get("is_exceptional")])
+    mode_str = f"M1:{m1_cnt} M2:{m2_cnt}" + (f" ⚡{exc_cnt}exc" if exc_cnt else "")
+    rows_data.append([
+        str(ps["partner_id"]),
+        str(ps["store_name"])[:32],
+        str(ps["state"])[:12],
+        inr(ps["original_balance"]),
+        inr(ps["total_actionable"]),
+        f"{ps['utilization_pct']}%",
+        mode_str,
+    ])
+print_table(
+    ["partner_id", "store_name", "state", "avail_limit", "actionable", "util%", "mode"],
+    rows_data,
+)
 
-# SUMMARY
-print()
-print("--- SUMMARY ---")
-print(f"Total RF partners with eligible orders: {total_partners}")
-print(f"  B0 (no sheet data):  {b0_partners} partners")
-print(f"  B1 (actionable):     {b1_partners} partners | {inr(b1_amount)}")
-print(f"  B3 (blocked):        {b3_partners} partners | {inr(b3_amount)}")
-print(f"  B4 (inactive):       {b4_partners} partners | {inr(b4_amount)}")
-print(f"Total eligible BT amount: {inr(total_eligible)}")
-print(f"Actionable today: {inr(b1_amount)} ({actionable_pct:.1f}%)")
+# B1 push detail — per partner with actual debit IDs
+print(f"\n--- PUSH INSTRUCTIONS (B1 DETAIL) ---")
+for ps in actionable:
+    if not ps["b1_picks"]:
+        continue
+    print(f"\n  ► {ps['partner_id']} | {ps['store_name']} | {ps['state']} "
+          f"| Avail: {inr(ps['original_balance'])} | Action: {inr(ps['total_actionable'])}")
+    for pick in ps["b1_picks"]:
+        exc_tag = " ⚡EXCEPTIONAL" if pick.get("is_exceptional") else ""
+        print(f"    [{pick['mode']}] Order {pick['order_id']} "
+              f"| Status: {pick['order_status']} / {pick['unicommerce_status']} "
+              f"| Invoice: {pick['invoice_date']} ({pick['invoice_age_days']}d){exc_tag} "
+              f"| Action: {inr(pick['actionable_amount'])}")
+        for instr in pick["push_instructions"]:
+            void_str = f" → void {inr(instr['void_amount'])}" if instr["void_amount"] else ""
+            print(f"      debit_id={instr['debit_id']}  push={inr(instr['push_amount'])}{void_str}")
+
+# B2 waiting room
+b2_partners_list = [ps for ps in partner_summaries if ps["b2_waiting"]]
+total_b2 = sum(len(ps["b2_waiting"]) for ps in b2_partners_list)
+print(f"\n--- BUCKET 2: WAITING ROOM ({total_b2} orders across {len(b2_partners_list)} partners) ---")
+rows_data = []
+for ps in sorted(b2_partners_list, key=lambda x: x["partner_id"]):
+    for o in ps["b2_waiting"]:
+        partial_tag = "[PARTIAL]" if o.get("partial") else ""
+        rows_data.append([
+            str(ps["partner_id"]),
+            str(ps["store_name"])[:28],
+            str(o["order_id"]),
+            str(o["invoice_date"]),
+            f"{o['invoice_age_days']}d",
+            str(o["eligible_from"]),
+            inr(o["total_order_amount"]),
+            partial_tag,
+        ])
+print_table(
+    ["partner_id", "store_name", "order_id", "invoice_date", "age", "eligible_from", "amount", "note"],
+    rows_data,
+)
+
+# B3 blocked
+b3_partners_list = [ps for ps in partner_summaries if ps["b3_orders"]]
+total_b3 = sum(len(ps["b3_orders"]) for ps in b3_partners_list)
+total_b3_amt = sum(
+    sum(o["blocked_amount"] for o in ps["b3_orders"]) for ps in b3_partners_list
+)
+print(f"\n--- BUCKET 3: BALANCE INSUFFICIENT ({total_b3} orders | {inr(total_b3_amt)} blocked) ---")
+rows_data = []
+for ps in sorted(b3_partners_list, key=lambda x: x["partner_id"]):
+    for o in ps["b3_orders"]:
+        rows_data.append([
+            str(ps["partner_id"]),
+            str(ps["store_name"])[:25],
+            o["mode"],
+            str(o["order_id"]),
+            f"{o['invoice_age_days']}d",
+            inr(o["blocked_amount"]),
+        ])
+print_table(
+    ["partner_id", "store_name", "mode", "order_id", "age", "blocked_amount"],
+    rows_data,
+)
+
+# B0 partners in CSV but no orders in BQ
+csv_only = set(limit_dict.keys()) - {str(int(ps["partner_id"])) for ps in partner_summaries} - {str(p["partner_id"]) for p in b0_partners}
+
+# Summary
+total_avail_csv = sum(limit_dict.values())
+print(f"\n{SEP}")
+print(f"  SUMMARY")
+print(f"  Partners in CSV:               {len(limit_dict):>6,}")
+print(f"  Partners in BQ (RUPIFI ACTIVE):{df['partner_id'].nunique():>6,}")
+print(f"  B0 (BQ not in CSV):            {len(b0_partners):>6,}")
+print(f"  Partners with actionable BT:   {len(actionable):>6,}")
+print(f"  B2 waiting (orders):           {total_b2:>6,}")
+print(f"  B3 blocked (orders):           {total_b3:>6,}")
+print(f"  Total available limit (CSV):   {inr(total_avail_csv):>15}")
+print(f"  Total actionable BT:           {inr(total_b1_amount):>15}")
+print(SEP)
