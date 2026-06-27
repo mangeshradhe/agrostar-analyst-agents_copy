@@ -232,7 +232,7 @@
 </div>
 
 <div class="footer">
-  ⚠️ AD (Andhra Pradesh) and BH (Bihar) B2B rows have no COGS match in <code>static_tables.monthly_cogs</code> — their margin is overstated. &nbsp;·&nbsp; Jun 2026 is month-to-date (5 days). &nbsp;·&nbsp; Total Discount = discount + adj_discount (adj_discount is negligible for B2B, &lt;₹200 total).
+  ⚠️ AD (Andhra Pradesh) and BH (Bihar) B2B rows have no COGS match in <code>static_tables.monthly_cogs</code> — their margin is overstated. &nbsp;·&nbsp; Jun 2026 is month-to-date (26 days, as of Jun 26). &nbsp;·&nbsp; Total Discount = discount + adj_discount (adj_discount is negligible for B2B, &lt;₹200 total).
 </div>
 
 <script>
@@ -256,8 +256,8 @@ const raw = [
   {month:"2026-04",channel:"B2C",orders:1269,units:8645, gross:4709116, disc:2999108, adjDisc:13649,net:1696359, cogs:1736997, gm:-40638,   gmPct:-2.4,  discPct:63.98},
   {month:"2026-05",channel:"B2B",orders:434, units:58889,gross:18775350,disc:12360279,adjDisc:0,    net:6415071, cogs:8667149, gm:-2252078, gmPct:-35.11,discPct:65.83},
   {month:"2026-05",channel:"B2C",orders:1248,units:6905, gross:4572780, disc:3108508, adjDisc:1296, net:1462976, cogs:1689413, gm:-226436,  gmPct:-15.48,discPct:68.01},
-  {month:"2026-06",channel:"B2B",orders:34,  units:2974, gross:1861414, disc:1203652, adjDisc:0,    net:657762,  cogs:1200128, gm:-542366,  gmPct:-82.46,discPct:64.66},
-  {month:"2026-06",channel:"B2C",orders:165, units:841,  gross:531394,  disc:365423,  adjDisc:99,   net:165872,  cogs:185863,  gm:-19990,   gmPct:-12.05,discPct:68.79},
+  {month:"2026-06",channel:"B2B",orders:461, units:29958,gross:14949824,disc:10065319,adjDisc:0,    net:4884505, cogs:6105845, gm:-1221340, gmPct:-25.0, discPct:67.33},
+  {month:"2026-06",channel:"B2C",orders:1306,units:8512, gross:5323172, disc:3654334, adjDisc:622,  net:1668217, cogs:1724901, gm:-56684,   gmPct:-3.4,  discPct:68.65},
 ];
 
 const MONTHS = [...new Set(raw.map(r=>r.month))].sort();
@@ -605,48 +605,48 @@ function setChannel(ch) {
 // ── SKU DATA ─────────────────────────────────
 const skuData = {
   B2B: [
-    {sku:"AGS-CP-1496",name:"Agrostar Agetate Gold (Acephate 50% + Imidacloprid 1.8% SP) 1kg",units:2391,gross:2024161,disc:1168802,net:855359,cogs:1253721,gm:-398362,gmPct:-46.57,discPct:57.74},
-    {sku:"AGS-CP-1722",name:"Quiz Master Plus (Quizalofop Ethyl 10% EC) 1 litre",units:1317,gross:1870205,disc:1303323,net:566882,cogs:658588,gm:-91706,gmPct:-16.18,discPct:69.69},
-    {sku:"AGS-CP-1437",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 1 litre",units:2081,gross:1720415,disc:1179410,net:541005,cogs:662130,gm:-121125,gmPct:-22.39,discPct:68.55},
-    {sku:"AGS-CP-1631",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 1 litre",units:1039,gross:1587117,disc:1075829,net:511288,cogs:387458,gm:123830,gmPct:24.22,discPct:67.79},
-    {sku:"AGS-CP-1294",name:"Parashoot (Imazethapyr 10% SL) 1 litre",units:2123,gross:1484908,disc:912601,net:572307,cogs:936913,gm:-364606,gmPct:-63.71,discPct:61.46},
-    {sku:"AGS-CP-1632",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 500 ml",units:1808,gross:1397348,disc:969300,net:428048,cogs:345451,gm:82597,gmPct:19.3,discPct:69.37},
-    {sku:"AGS-CP-1309",name:"Omni Star (Bispyribac Sodium 10%SC) 500 ml",units:1933,gross:1365723,disc:853589,net:512134,cogs:793819,gm:-281685,gmPct:-55.0,discPct:62.5},
-    {sku:"AGS-CP-1500",name:"Weedlift (Pretilachlor 37% EW) 300 ml",units:6981,gross:1343169,disc:1005817,net:337352,cogs:587024,gm:-249672,gmPct:-74.01,discPct:74.88},
-    {sku:"AGS-CP-1536",name:"Eleos (Thiamethoxam 1% + Chlorantraniliprole 0.5% GR) 5 kg",units:1152,gross:1262916,disc:713644,net:549272,cogs:977898,gm:-428626,gmPct:-78.04,discPct:56.51},
-    {sku:"AGS-CP-1475",name:"Modesty (Imazethapyr 35% + Imazamox 35% WG) 200 gm",units:353,gross:1244509,disc:1079830,net:164679,cogs:703574,gm:-538895,gmPct:-327.24,discPct:86.77},
-    {sku:"AGS-CP-1540",name:"AgroStar Danzhi (Clothianidin 50% WG) 6 g",units:34020,gross:1208220,disc:967116,net:241104,cogs:487442,gm:-246338,gmPct:-102.17,discPct:80.04},
-    {sku:"AGS-CP-1563",name:"Unostar (Novaluron 5.25% + Emamectin Benzoate 0.9% SC) 1 litre",units:670,gross:1111430,disc:568192,net:543238,cogs:488034,gm:55204,gmPct:10.16,discPct:51.12},
-    {sku:"AGS-CP-1436",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 500 ml",units:2176,gross:952184,disc:690035,net:262149,cogs:389524,gm:-127375,gmPct:-48.59,discPct:72.47},
-    {sku:"AGS-CP-1568",name:"Mesozin Xtra (Mesotrione 2.27% + Atrazine 22.7% SC) 3.5lt",units:216,gross:774970,disc:550463,net:224507,cogs:460998,gm:-236491,gmPct:-105.34,discPct:71.03},
-    {sku:"AGS-CP-1755",name:"Treza (Tolfenpyrad 15% + Bifenthrin 7.5% SE) 1 Litre",units:199,gross:750625,disc:476088,net:274537,cogs:370152,gm:-95615,gmPct:-34.83,discPct:63.43},
-    {sku:"AGS-CP-926", name:"TeBull (Tebuconazole 10% + Sulphur 65% WG) 500 g",units:2736,gross:655294,disc:355331,net:299963,cogs:317662,gm:-17699,gmPct:-5.9,discPct:54.22},
-    {sku:"AGS-CP-1499",name:"Agrostar Agetate Gold (Acephate 50% + Imidacloprid 1.8% SP) 100g",units:5600,gross:530400,disc:361350,net:169050,cogs:350137,gm:-181087,gmPct:-107.12,discPct:68.13},
-    {sku:"AGS-CP-1713",name:"Petra 3D (Pyraclostrobin 3.5% + Thiram 15% + Clothianidin 22.5% FS) 500 ml",units:242,gross:528548,disc:409038,net:119510,cogs:327777,gm:-208267,gmPct:-174.27,discPct:77.39},
-    {sku:"AGS-CP-1308",name:"Omni Star (Bispyribac Sodium 10%SC) 200 ml",units:1570,gross:497690,disc:343476,net:154214,cogs:268746,gm:-114532,gmPct:-74.27,discPct:69.01},
-    {sku:"AGS-CP-1757",name:"Treza (Tolfenpyrad 15% + Bifenthrin 7.5% SE) 250 ml",units:460,gross:441380,disc:269545,net:171835,cogs:166237,gm:5598,gmPct:3.26,discPct:61.07},
+    {sku:"AGS-CP-1437",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 1 litre",units:3625,gross:2978775,disc:2251223,net:727552,cogs:1140767,gm:-413215,gmPct:-56.8,discPct:75.58},
+    {sku:"AGS-CP-1536",name:"Eleos (Thiamethoxam 1% + Chlorantraniliprole 0.5% GR) 5 kg",units:2149,gross:2357622,disc:1418616,net:939006,cogs:1582479,gm:-643473,gmPct:-68.53,discPct:60.17},
+    {sku:"AGS-CP-1496",name:"Agrostar Agetate Gold (Acephate 50% + Imidacloprid 1.8% SP) 1kg",units:2770,gross:2326982,disc:1395920,net:931062,cogs:1264631,gm:-333569,gmPct:-35.83,discPct:59.99},
+    {sku:"AGS-CP-1722",name:"Quiz Master Plus (Quizalofop Ethyl 10% EC) 1 litre",units:1402,gross:1985080,disc:1400968,net:584112,cogs:664981,gm:-80869,gmPct:-13.84,discPct:70.57},
+    {sku:"AGS-CP-1631",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 1 litre",units:1249,gross:1913697,disc:1295896,net:617801,cogs:357479,gm:260322,gmPct:42.14,discPct:67.72},
+    {sku:"AGS-CP-1632",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 500 ml",units:2091,gross:1619220,disc:1129981,net:489239,cogs:354820,gm:134419,gmPct:27.48,discPct:69.79},
+    {sku:"AGS-CP-1294",name:"Parashoot (Imazethapyr 10% SL) 1 litre",units:2247,gross:1576048,disc:990696,net:585352,cogs:968617,gm:-383265,gmPct:-65.48,discPct:62.86},
+    {sku:"AGS-CP-1309",name:"Omni Star (Bispyribac Sodium 10%SC) 500 ml",units:2156,gross:1524276,disc:976691,net:547577,cogs:821651,gm:-274074,gmPct:-50.05,discPct:64.08},
+    {sku:"AGS-CP-1563",name:"Unostar (Novaluron 5.25% + Emamectin Benzoate 0.9% SC) 1 litre",units:847,gross:1405073,disc:767194,net:637879,cogs:681547,gm:-43668,gmPct:-6.85,discPct:54.6},
+    {sku:"AGS-CP-1500",name:"Weedlift (Pretilachlor 37% EW) 300 ml",units:6981,gross:1343169,disc:1005817,net:337352,cogs:541760,gm:-204408,gmPct:-60.59,discPct:74.88},
+    {sku:"AGS-CP-1540",name:"AgroStar Danzhi (Clothianidin 50% WG) 6 g",units:37570,gross:1320320,disc:1067441,net:252879,cogs:482586,gm:-229707,gmPct:-90.84,discPct:80.85},
+    {sku:"AGS-CP-1475",name:"Modesty (Imazethapyr 35% + Imazamox 35% WG) 200 gm",units:353,gross:1244509,disc:1079830,net:164679,cogs:680518,gm:-515839,gmPct:-313.24,discPct:86.77},
+    {sku:"AGS-CP-1599",name:"Abectis (Abamectin 1.9% EC) 500 ml",units:1010,gross:1170118,disc:751348,net:418770,cogs:85686,gm:333084,gmPct:79.54,discPct:64.21},
+    {sku:"AGS-CP-1436",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 500 ml",units:2256,gross:986904,disc:716943,net:269961,cogs:386769,gm:-116808,gmPct:-43.27,discPct:72.65},
+    {sku:"AGS-CP-1358",name:"Adonix (Pyriproxyfen 5% + Diafenthiuron 25% SE) 1 litre",units:451,gross:877930,disc:470306,net:407624,cogs:466480,gm:-58856,gmPct:-14.44,discPct:53.57},
+    {sku:"AGS-CP-1755",name:"Treza (Tolfenpyrad 15% + Bifenthrin 7.5% SE) 1 Litre",units:240,gross:871206,disc:566526,net:304680,cogs:454928,gm:-150248,gmPct:-49.31,discPct:65.03},
+    {sku:"AGS-CP-1568",name:"Mesozin Xtra (Mesotrione 2.27% + Atrazine 22.7% SC) 3.5lt",units:237,gross:851421,disc:617803,net:233435,cogs:501518,gm:-268083,gmPct:-114.84,discPct:72.56},
+    {sku:"AGS-CP-926", name:"TeBull (Tebuconazole 10% + Sulphur 65% WG) 500 g",units:3104,gross:744350,disc:417475,net:326875,cogs:266934,gm:59941,gmPct:18.34,discPct:56.09},
+    {sku:"AGS-CP-1597",name:"Abectis (Abamectin 1.9% EC) 100 ml",units:1995,gross:668335,disc:296008,net:372327,cogs:110783,gm:261544,gmPct:70.25,discPct:44.29},
+    {sku:"AGS-CP-1359",name:"Adonix (Pyriproxyfen 5% + Diafenthiuron 25% SE) 500 ml",units:641,gross:643116,disc:312235,net:330881,cogs:380441,gm:-49560,gmPct:-14.98,discPct:48.55},
   ],
   B2C: [
-    {sku:"AGS-CP-1722",name:"Quiz Master Plus (Quizalofop Ethyl 10% EC) 1 litre",units:403,gross:907837,disc:730388,net:177449,cogs:199019,gm:-21570,gmPct:-12.16,discPct:80.45},
-    {sku:"AGS-CP-1500",name:"Weedlift (Pretilachlor 37% EW) 300 ml",units:1398,gross:402048,disc:321612,net:80436,cogs:128946,gm:-48510,gmPct:-60.31,discPct:79.99},
-    {sku:"AGS-CP-1756",name:"Treza (Tolfenpyrad 15% + Bifenthrin 7.5% SE) 500 ml",units:171,gross:397987,disc:290108,net:107879,cogs:183279,gm:-75400,gmPct:-69.89,discPct:72.89},
-    {sku:"AGS-CP-1568",name:"Mesozin Xtra (Mesotrione 2.27% + Atrazine 22.7% SC) 3.5lt",units:78,gross:373458,disc:238568,net:134890,cogs:168194,gm:-33304,gmPct:-24.69,discPct:63.88},
-    {sku:"AGS-CP-1496",name:"Agrostar Agetate Gold (Acephate 50% + Imidacloprid 1.8% SP) 1kg",units:308,gross:327890,disc:186093,net:141797,cogs:178739,gm:-36942,gmPct:-26.05,discPct:56.75},
-    {sku:"AGS-CP-1437",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 1 litre",units:241,gross:323596,disc:213460,net:110136,cogs:83431,gm:26705,gmPct:24.25,discPct:65.97},
-    {sku:"AGS-CP-1631",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 1 litre",units:141,gross:319480,disc:196061,net:123419,cogs:72820,gm:50599,gmPct:41.0,discPct:61.37},
-    {sku:"AGS-CP-1636",name:"Agrostar Danzhi (Clothianidin 50% WDG) 50g",units:694,gross:293762,disc:226319,net:67443,cogs:69705,gm:-2262,gmPct:-3.35,discPct:77.04},
-    {sku:"AGS-CP-896", name:"Heliox (Profenophos 40% + Cypermethrin 4% EC) 250 ml",units:1218,gross:266742,disc:154942,net:111800,cogs:166415,gm:-54616,gmPct:-48.85,discPct:58.09},
-    {sku:"AGS-CP-1294",name:"Parashoot (Imazethapyr 10% SL) 1 litre",units:229,gross:264228,disc:174806,net:89422,cogs:102219,gm:-12797,gmPct:-14.31,discPct:66.16},
-    {sku:"AGS-CP-1436",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 500 ml",units:369,gross:261693,disc:174305,net:87388,cogs:69873,gm:17514,gmPct:20.04,discPct:66.61},
-    {sku:"AGS-CP-1713",name:"Petra 3D (Pyraclostrobin 3.5% + Thiram 15% + Clothianidin 22.5% FS) 500 ml",units:81,gross:234012,disc:173199,net:60813,cogs:109585,gm:-48772,gmPct:-80.2,discPct:74.01},
-    {sku:"AGS-CP-1560",name:"Kopigo (Chlorantraniliprole 9.3% + Lambda 4.6% ZC) 1 litre",units:42,gross:228788,disc:143657,net:85131,cogs:130854,gm:-45723,gmPct:-53.71,discPct:62.79},
-    {sku:"AGS-CP-1452",name:"AgroStar Zenith (Tolfenpyrad 15% EC) 1litre",units:102,gross:225453,disc:128693,net:96760,cogs:82810,gm:13950,gmPct:14.42,discPct:57.08},
-    {sku:"AGS-CP-1537",name:"AgroStar Danzhi (Clothianidin 50% WG) 100 g",units:273,gross:217000,disc:152520,net:64480,cogs:52231,gm:12249,gmPct:19.0,discPct:70.29},
-    {sku:"AGS-CP-1499",name:"Agrostar Agetate Gold (Acephate 50% + Imidacloprid 1.8% SP) 100g",units:1758,gross:216674,disc:147942,net:68732,cogs:112713,gm:-43981,gmPct:-63.99,discPct:68.28},
-    {sku:"AGS-CP-899", name:"Cooper 1 (Copper Oxychloride 50% WG) 500 g",units:316,gross:207219,disc:133782,net:73437,cogs:106762,gm:-33325,gmPct:-45.38,discPct:64.56},
-    {sku:"AGS-CP-1632",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 500 ml",units:166,gross:190599,disc:113171,net:77428,cogs:44216,gm:33212,gmPct:42.89,discPct:59.38},
-    {sku:"AGS-CP-926", name:"TeBull (Tebuconazole 10% + Sulphur 65% WG) 500 g",units:516,gross:185262,disc:103834,net:81428,cogs:61806,gm:19622,gmPct:24.1,discPct:56.05},
-    {sku:"AGS-CP-1714",name:"Petra 3D (Pyraclostrobin 3.5% + Thiram 15% + Clothianidin 22.5% FS) 250 ml",units:126,gross:183351,disc:141835,net:41516,cogs:87791,gm:-46275,gmPct:-111.46,discPct:77.36},
+    {sku:"AGS-CP-1722",name:"Quiz Master Plus (Quizalofop Ethyl 10% EC) 1 litre",units:518,gross:1157312,disc:942851,net:214004,cogs:253536,gm:-39532,gmPct:-18.47,discPct:81.47},
+    {sku:"AGS-CP-1756",name:"Treza (Tolfenpyrad 15% + Bifenthrin 7.5% SE) 500 ml",units:256,gross:593232,disc:435558,net:157602,cogs:264976,gm:-107374,gmPct:-68.13,discPct:73.42},
+    {sku:"AGS-CP-1631",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 1 litre",units:214,gross:496168,disc:309694,net:186474,cogs:104135,gm:82339,gmPct:44.16,discPct:62.42},
+    {sku:"AGS-CP-1437",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 1 litre",units:359,gross:476996,disc:345157,net:130611,cogs:121255,gm:9356,gmPct:7.16,discPct:72.36},
+    {sku:"AGS-CP-1568",name:"Mesozin Xtra (Mesotrione 2.27% + Atrazine 22.7% SC) 3.5lt",units:89,gross:429426,disc:286142,net:143284,cogs:191678,gm:-48394,gmPct:-33.78,discPct:66.63},
+    {sku:"AGS-CP-1632",name:"Adonix Neo (Pyriproxyfen 10% + Bifenthrin 10% EC) 500 ml",units:352,gross:423099,disc:274622,net:148477,cogs:86641,gm:61836,gmPct:41.65,discPct:64.91},
+    {sku:"AGS-CP-1500",name:"Weedlift (Pretilachlor 37% EW) 300 ml",units:1398,gross:402048,disc:321612,net:80436,cogs:128941,gm:-48505,gmPct:-60.3,discPct:79.99},
+    {sku:"AGS-CP-1393",name:"Dragnet (Azoxystrobin 4.8% + Chlorothalonil 40% SC) 300 ml",units:393,gross:349777,disc:239525,net:110252,cogs:78788,gm:31464,gmPct:28.54,discPct:68.48},
+    {sku:"AGS-CP-1436",name:"AgroStar Quiz Master (Quizalofop Ethyl 5% EC) 500 ml",units:487,gross:343349,disc:244738,net:97285,cogs:86390,gm:10894,gmPct:11.2,discPct:71.28},
+    {sku:"AGS-CP-1496",name:"Agrostar Agetate Gold (Acephate 50% + Imidacloprid 1.8% SP) 1kg",units:322,gross:342548,disc:196877,net:145462,cogs:182943,gm:-37481,gmPct:-25.77,discPct:57.47},
+    {sku:"AGS-CP-1760",name:"Armda (Methoxyfenozide 20% + Chlorantraniliprole 5% SC) 500ml",units:137,gross:311104,disc:203196,net:107908,cogs:164329,gm:-56421,gmPct:-52.29,discPct:65.31},
+    {sku:"AGS-CP-1452",name:"AgroStar Zenith (Tolfenpyrad 15% EC) 1litre",units:137,gross:304308,disc:178045,net:124362,cogs:95771,gm:28591,gmPct:22.99,discPct:58.51},
+    {sku:"AGS-CP-1636",name:"Agrostar Danzhi (Clothianidin 50% WDG) 50g",units:706,gross:298034,disc:230022,net:68012,cogs:70236,gm:-2224,gmPct:-3.27,discPct:77.18},
+    {sku:"AGS-CP-1560",name:"Kopigo (Chlorantraniliprole 9.3% + Lambdacyhalothrin 4.6% ZC) 1 litre",units:54,gross:292196,disc:176216,net:115780,cogs:132812,gm:-17032,gmPct:-14.71,discPct:60.31},
+    {sku:"AGS-CP-1294",name:"Parashoot (Imazethapyr 10% SL) 1 litre",units:233,gross:268348,disc:177897,net:90451,cogs:102057,gm:-11606,gmPct:-12.83,discPct:66.29},
+    {sku:"AGS-CP-896", name:"Heliox (Profenophos 40% + Cypermethrin 4% EC) 250 ml",units:1218,gross:266742,disc:151395,net:111800,cogs:166363,gm:-54564,gmPct:-48.81,discPct:56.76},
+    {sku:"AGS-CP-1537",name:"AgroStar Danzhi (Clothianidin 50% WG) 100 g",units:295,gross:231608,disc:165667,net:65941,cogs:55748,gm:10193,gmPct:15.46,discPct:71.53},
+    {sku:"AGS-CP-1625",name:"AgroStar Bifentex (Diafenthiuron 47% + Bifenthrin 9.4% SC) 250 ml",units:243,gross:230783,disc:154545,net:76238,cogs:67118,gm:9120,gmPct:11.96,discPct:66.97},
+    {sku:"AGS-CP-1534",name:"Kopigo (Chlorantraniliprole 9.3% + Lambdacyhalothrin 4.6% ZC) 200 ml",units:203,gross:228739,disc:117784,net:110689,cogs:76711,gm:33978,gmPct:30.7,discPct:51.49},
+    {sku:"AGS-CP-1713",name:"Petra 3D (Pyraclostrobin 3.5% + Thiram 15% + Clothianidin 22.5% FS) 500 ml",units:79,gross:227524,disc:167685,net:59839,cogs:106426,gm:-46587,gmPct:-77.85,discPct:73.7},
   ]
 };
 
