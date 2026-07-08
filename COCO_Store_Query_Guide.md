@@ -329,6 +329,100 @@ ORDER BY store_name, qty_onhand DESC
 
 ---
 
+### F. Net Outstanding per Store — Liable vs Settled (validated Jul 7, 2026)
+
+**What it answers:** how much money is unaccounted for per store overall — liability (COD + online collected at store) minus everything settled (QR + cash/van/manual).
+
+**How it differs from query C:** query C measures *cash the store is holding* (packages still `to_be_paid`, QR excluded). This one nets QR settlements against liability, so it's the total-reconciliation view. Small residuals (₹14–₹50) are timing/rounding, not real dues.
+
+Key logic:
+- **Store master** = `galaxy_views.institution` filtered `LOWER(ancestor_institutions_name) LIKE '% ebo %'` (covers all 23 EBO/COCO stores across MH/MP/UP)
+- **Liability** = `cod_amount + online_paid_amount` on `DELIVERED/DISPATCHED` COCO orders that have a shipping package; `SELECT DISTINCT` at order level first so multi-package orders don't double-count
+- **Payments** = `delivery_payment` → `delivery_lppostpaidtransaction.amount_settled`; store link via `CAST(franchise_id AS STRING) = institution.agroex_franchise_id`
+- **QR detection** = `by_user = 'system' AND creation_type = 'manual'`; everything else is cash (van / manual deposit)
+
+```sql
+WITH stores AS (
+  SELECT
+    CAST(reference_customer_id AS STRING) AS store_id,
+    ANY_VALUE(name)                       AS store_name,
+    ANY_VALUE(agroex_franchise_id)        AS agroex_franchise_id
+  FROM `agrostar-data.galaxy_views.institution`
+  WHERE LOWER(ancestor_institutions_name) LIKE '% ebo %'
+    AND reference_customer_id IS NOT NULL
+  GROUP BY 1
+),
+
+coco_orders AS (
+  -- Delivered/dispatched COCO orders; liability = cash + online collected at store
+  SELECT
+    sales_order_id,
+    CAST(unicommerce_id AS STRING)  AS uni_id,
+    retail_store_code,
+    cod_amount + online_paid_amount AS collect_amount
+  FROM `agrostar-data.prod_db_views.order_management_order`
+  WHERE order_type = 'COCO'
+    AND status IN ('DELIVERED','DISPATCHED')
+    AND created_on > '2026-05-01'
+),
+
+-- Liability: only orders that have a shipping package;
+-- dedup to order level first so multi-package orders don't double-count
+liability AS (
+  SELECT
+    retail_store_code AS store_id,
+    COUNT(*)                      AS liable_orders,
+    ROUND(SUM(collect_amount), 2) AS amount_liable
+  FROM (
+    SELECT DISTINCT o.sales_order_id, o.retail_store_code, o.collect_amount
+    FROM coco_orders o
+    JOIN `agrostar-data.prod_db_views.delivery_shippingpackage` dsp
+      ON dsp.order_id = o.uni_id
+     AND dsp.order_placed_date > '2026-05-01'
+  )
+  GROUP BY 1
+),
+
+-- Payments: settled amounts per store, split QR vs cash (van/manual)
+payments AS (
+  SELECT
+    s.store_id,
+    COUNT(delp.id)                      AS payment_count,
+    ROUND(SUM(delph.amount_settled), 2) AS amount_settled,
+    ROUND(SUM(CASE WHEN delp.by_user = 'system' AND delp.creation_type = 'manual'
+                   THEN delph.amount_settled ELSE 0 END), 2) AS qr_settled,
+    ROUND(SUM(CASE WHEN delp.by_user = 'system' AND delp.creation_type = 'manual'
+                   THEN 0 ELSE delph.amount_settled END), 2) AS cash_settled
+  FROM `agrostar-data.prod_db_views.delivery_payment` delp
+  LEFT JOIN `agrostar-data.prod_db_views.delivery_lppostpaidtransaction` delph
+    ON delp.lp_postpaid_transaction_id = delph.id
+  JOIN stores s
+    ON CAST(delp.franchise_id AS STRING) = s.agroex_franchise_id
+  WHERE delp.created_on > '2026-05-01'
+  GROUP BY 1
+)
+
+SELECT
+  COALESCE(l.store_id, p.store_id)  AS retail_store_code,
+  s.store_name,
+  IFNULL(l.liable_orders, 0)        AS liable_orders,
+  IFNULL(l.amount_liable, 0)        AS amount_liable,
+  IFNULL(p.qr_settled, 0)           AS qr_settled,
+  IFNULL(p.cash_settled, 0)         AS cash_settled,
+  IFNULL(p.amount_settled, 0)       AS total_settled,
+  ROUND(IFNULL(l.amount_liable, 0) - IFNULL(p.amount_settled, 0), 2) AS outstanding
+FROM liability l
+FULL OUTER JOIN payments p ON l.store_id = p.store_id
+LEFT JOIN stores s ON COALESCE(l.store_id, p.store_id) = s.store_id
+ORDER BY outstanding DESC
+```
+
+**Jul 7, 2026 snapshot (orders since May 1):** 23 stores · 553 liable orders · ₹9,66,239 liable · ₹8,42,828 settled (₹3,58,924 QR + ₹4,83,904 cash) · **₹1,23,411 net outstanding — 87.2% settlement rate.**
+
+Top 3 = 64% of dues: Sangavi ₹29,030 (only 33% settled — red flag) · Khalwa ₹26,296 · Kalamb ₹24,171. Pattern: MP stores settle via cash/van, Pune stores are QR-dominant; new UP stores have low absolute dues but 12–30% settlement ratios. Six stores settled to the rupee.
+
+---
+
 ## 5. Data Gotchas
 
 | # | Gotcha | Rule |
@@ -347,7 +441,11 @@ ORDER BY store_name, qty_onhand DESC
 
 ---
 
-## 6. Store Reference (as of June 2026)
+## 6. Store Reference
+
+**As of July 2026 the network is 23 stores across Maharashtra, Madhya Pradesh, and Uttar Pradesh** (see query F output for the full list — new stores include Khalwa, Khar Kalan, Bediya, Mandleshwar, Barwaha in MP and Allapur Ranimau, Kothi, Noorpur, Ram Sanehi Ghat, Chapra Nawabganj, Jalalpur, Machhali Shahar in UP). The full store master comes from `galaxy_views.institution` with `LOWER(ancestor_institutions_name) LIKE '% ebo %'`.
+
+Original 9 Pune stores (June 2026):
 
 | retail_store_code | Store Name | District | State |
 |-------------------|-----------|----------|-------|
