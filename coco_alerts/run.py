@@ -12,30 +12,28 @@ Guardrail 2 — QR PAID BUT NOT REFLECTED. A Razorpay QR payment (is_paid = TRUE
 on a COCO order must produce a settlement row in delivery_payment
 (by_user='system', creation_type='manual', same store, same amount).
 Checks YESTERDAY's payments only (strictly — no carryover); settlements are
-searched from the payment day up to now. By 9 AM every payment has had 9+
-hours to reflect; healthy sync takes seconds.
+searched from the payment day up to now.
 
-Posts one Slack message to #agrostar-pos when either guardrail fires.
-Silent when clean (by design) — check logs/ to confirm the run happened.
+This script only COMPUTES. It writes the alert to logs/latest_alert.md
+(empty file when everything is clean). Posting to Slack is send.sh's job —
+it goes through the user's own claude.ai Slack connector via `claude -p`.
+All table timestamps are UTC; every day boundary here converts via
+'Asia/Kolkata' first.
 
 Usage:
-    python3 coco_alerts/run.py                    # query + post to Slack
-    python3 coco_alerts/run.py --dry-run          # query + print, no Slack post
+    python3 coco_alerts/run.py                    # compute + write latest_alert.md
     python3 coco_alerts/run.py --date 2026-07-07  # guardrail 2 for a specific day
 """
 
 import argparse
-import json
 import logging
 import os
 import sys
-import urllib.request
 from datetime import datetime, timedelta
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
 PROJECT = "agrostar-data"
-SLACK_CHANNEL = "C0AFTP6QASH"  # #agrostar-pos
 PROGRAM_START = "2026-05-01"   # bounds the scan; COCO program has no orders before this
 
 CREATED_THRESHOLD_HRS = 24
@@ -44,6 +42,7 @@ RED_AGE_HRS = 72               # severity marker in the message
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
+ALERT_FILE = os.path.join(LOG_DIR, "latest_alert.md")
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 
@@ -57,36 +56,6 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger("coco_alerts")
-
-# ── Slack ────────────────────────────────────────────────────────────────────
-
-
-def slack_token() -> str:
-    token = os.environ.get("SLACK_BOT_TOKEN", "")
-    if token:
-        return token
-    settings_path = os.path.expanduser("~/.claude/settings.json")
-    with open(settings_path) as f:
-        return json.load(f)["env"]["SLACK_BOT_TOKEN"]
-
-
-def post_to_slack(text: str, channel: str) -> None:
-    payload = json.dumps(
-        {"channel": channel, "text": text, "unfurl_links": False}
-    ).encode()
-    req = urllib.request.Request(
-        "https://slack.com/api/chat.postMessage",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {slack_token()}",
-            "Content-Type": "application/json; charset=utf-8",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        body = json.load(resp)
-    if not body.get("ok"):
-        raise RuntimeError(f"Slack API error: {body.get('error')}")
-
 
 # ── BigQuery ─────────────────────────────────────────────────────────────────
 
@@ -200,6 +169,8 @@ def unmatched_qr_payments(qr_payments: list, settlements: list) -> list:
 
 
 # ── Message formatting ───────────────────────────────────────────────────────
+# Output is standard markdown (**bold**) — the claude.ai Slack MCP tool
+# converts it; this is NOT Slack mrkdwn.
 
 
 def clean_store_name(name: str) -> str:
@@ -209,8 +180,9 @@ def clean_store_name(name: str) -> str:
 def format_stuck_section(orders: list) -> str:
     total = sum(o["amount"] or 0 for o in orders)
     lines = [
-        f":package: *Stuck orders — {len(orders)} order(s) · ₹{total:,.0f}*",
+        f":package: **Stuck orders — {len(orders)} order(s) · ₹{total:,.0f}**",
         "_COCO is same-day; these should not exist._",
+        "",
     ]
     for o in orders:
         days = o["age_hours"] / 24
@@ -220,34 +192,37 @@ def format_stuck_section(orders: list) -> str:
             flags.append("never synced to Unicommerce")
         if o["channel"] == "CUSTOM":
             flags.append("CUSTOM channel")
-        flag_txt = f"  ⚠️ _{' · '.join(flags)}_" if flags else ""
+        flag_txt = f" ⚠️ _{' · '.join(flags)}_" if flags else ""
         lines.append(
-            f"{severity} *{clean_store_name(o['store_name'])}* — "
+            f"{severity} **{clean_store_name(o['store_name'])}** — "
             f"order `{o['sales_order_id']}` · ₹{o['amount']:,.0f} · "
             f"{days:.0f}d in {o['status']} (since {o['created_ist']}){flag_txt}"
         )
-    lines.append(
-        ":point_right: Ask the store manager: *did the sale happen?* "
-        "Yes → complete the order in Unicommerce & account the cash · No → cancel it."
-    )
+    lines += [
+        "",
+        ":point_right: Ask the store manager: **did the sale happen?** "
+        "Yes → complete the order in Unicommerce & account the cash · No → cancel it.",
+    ]
     return "\n".join(lines)
 
 
 def format_qr_section(missing: list, day: str) -> str:
     total = sum(m["amount"] or 0 for m in missing)
     lines = [
-        f":credit_card: *QR paid but NOT in delivery payments — {len(missing)} payment(s) · ₹{total:,.0f}*",
+        f":credit_card: **QR paid but NOT in delivery payments — {len(missing)} payment(s) · ₹{total:,.0f}**",
         f"_Farmer paid via QR on {day}; store ledger was never credited._",
+        "",
     ]
     for m in missing:
         lines.append(
-            f":red_circle: *{clean_store_name(m['store_name'])}* — "
+            f":red_circle: **{clean_store_name(m['store_name'])}** — "
             f"order `{m['order_id']}` · ₹{m['amount']:,.0f} · paid {m['paid_at_ist']}"
         )
-    lines.append(
+    lines += [
+        "",
         ":point_right: Payment-sync failure — escalate to tech for backfill. "
-        "Until fixed, this store's outstanding is overstated by the amount above."
-    )
+        "Until fixed, this store's outstanding is overstated by the amount above.",
+    ]
     return "\n".join(lines)
 
 
@@ -255,13 +230,12 @@ def format_qr_section(missing: list, day: str) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="COCO daily guardrail alerts")
-    parser.add_argument("--dry-run", action="store_true", help="print message, skip Slack")
+    parser = argparse.ArgumentParser(description="COCO daily guardrail checks (compute only)")
     parser.add_argument("--date", help="day to check for guardrail 2 (default: yesterday IST)")
     args = parser.parse_args()
 
     day = args.date or (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    log.info("Run started (dry_run=%s, qr_check_day=%s)", args.dry_run, day)
+    log.info("Run started (qr_check_day=%s)", day)
 
     try:
         client = bq_client()
@@ -289,22 +263,15 @@ def main() -> int:
         sections.append(format_qr_section(missing_qr, day))
 
     if not sections:
-        log.info("Clean run — nothing posted.")
+        open(ALERT_FILE, "w").close()
+        log.info("Clean run — wrote empty %s.", ALERT_FILE)
         return 0
 
     today = datetime.now().strftime("%d %b %Y")
-    message = f":convenience_store: *COCO Alerts — {today}*\n\n" + "\n\n".join(sections)
-    log.info("Alert message:\n%s", message)
-
-    if args.dry_run:
-        return 0
-
-    try:
-        post_to_slack(message, SLACK_CHANNEL)
-        log.info("Posted to Slack channel %s", SLACK_CHANNEL)
-    except Exception:
-        log.exception("Slack post failed")
-        return 1
+    message = f":convenience_store: **COCO Alerts — {today}**\n\n" + "\n\n".join(sections)
+    with open(ALERT_FILE, "w") as f:
+        f.write(message)
+    log.info("Alert written to %s:\n%s", ALERT_FILE, message)
     return 0
 
 

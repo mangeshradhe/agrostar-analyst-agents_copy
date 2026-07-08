@@ -5,13 +5,20 @@
     <key>Label</key>
     <string>com.agrostar.coco-alerts</string>
 
+    <!-- Runs the DEPLOYED copy at ~/.coco-alerts/ (not the repo copy):
+         launchd agents cannot read ~/Documents (macOS TCC privacy protection).
+         After editing coco_alerts/ in the repo, redeploy with:
+           cp coco_alerts/run.py coco_alerts/send.sh ~/.coco-alerts/ -->
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
-        <string>/Users/darpan/Documents/claude code/DVS Analysis/coco_alerts/run.py</string>
+        <string>/bin/bash</string>
+        <string>/Users/darpan/.coco-alerts/send.sh</string>
     </array>
 
-    <!-- 9:00 AM local (IST). If the laptop is asleep, launchd fires once on wake. -->
+    <!-- Fires at login/restart AND at 9:00 AM (a missed 9 AM fires on wake).
+         send.sh guards against sending more than once per day. -->
+    <key>RunAtLoad</key>
+    <true/>
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
@@ -21,11 +28,8 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/darpan/Documents/claude code/DVS Analysis/coco_alerts/logs/launchd.log</string>
+    <string>/Users/darpan/.coco-alerts/logs/launchd.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/darpan/Documents/claude code/DVS Analysis/coco_alerts/logs/launchd.log</string>
-
-    <key>RunAtLoad</key>
-    <false/>
+    <string>/Users/darpan/.coco-alerts/logs/launchd.log</string>
 </dict>
 </plist>
