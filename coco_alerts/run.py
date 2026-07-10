@@ -10,7 +10,8 @@ DELIVERED same-day.
 
 Guardrail 2 — QR PAID BUT NOT REFLECTED. A Razorpay QR payment (is_paid = TRUE)
 on a COCO order must produce a settlement row in delivery_payment
-(by_user='system', creation_type='manual', same store, same amount).
+(by_user='system', creation_type 'manual' or 'COCO-QR-Payment' — tech switched
+the tag on 09 Jul 2026 — same store, same amount).
 Checks YESTERDAY's payments only (strictly — no carryover); settlements are
 searched from the payment day up to now.
 
@@ -133,7 +134,7 @@ JOIN `{project}.prod_db_views.delivery_lppostpaidtransaction` delph
   ON delp.lp_postpaid_transaction_id = delph.id
 JOIN stores s ON CAST(delp.franchise_id AS STRING) = s.agroex_franchise_id
 WHERE delp.by_user = 'system'
-  AND delp.creation_type = 'manual'
+  AND delp.creation_type IN ('manual', 'COCO-QR-Payment')
   AND delp.created_on >= TIMESTAMP('{day} 00:00:00', 'Asia/Kolkata')
 GROUP BY 1, 2
 """
