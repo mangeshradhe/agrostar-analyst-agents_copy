@@ -16,7 +16,8 @@ Checks YESTERDAY's payments only (strictly — no carryover); settlements are
 searched from the payment day up to now.
 
 This script only COMPUTES. It writes the alert to logs/latest_alert.md
-(empty file when everything is clean). Posting to Slack is send.sh's job —
+(a one-line all-clear when everything is clean, so the channel gets a daily
+heartbeat instead of ambiguous silence). Posting to Slack is send.sh's job —
 it goes through the user's own claude.ai Slack connector via `claude -p`.
 All table timestamps are UTC; every day boundary here converts via
 'Asia/Kolkata' first.
@@ -263,13 +264,19 @@ def main() -> int:
     if missing_qr:
         sections.append(format_qr_section(missing_qr, day))
 
-    if not sections:
-        open(ALERT_FILE, "w").close()
-        log.info("Clean run — wrote empty %s.", ALERT_FILE)
-        return 0
-
     today = datetime.now().strftime("%d %b %Y")
-    message = f":convenience_store: **COCO Alerts — {today}**\n\n" + "\n\n".join(sections)
+    if sections:
+        message = f":convenience_store: **COCO Alerts — {today}**\n\n" + "\n\n".join(sections)
+    else:
+        qr_txt = (
+            f"{len(qr_payments)}/{len(qr_payments)} QR payments reflected"
+            if qr_payments
+            else f"no QR payments on {day}"
+        )
+        message = (
+            f":white_check_mark: **COCO Alerts — {today}: All clear.** "
+            f"0 stuck orders · {qr_txt}."
+        )
     with open(ALERT_FILE, "w") as f:
         f.write(message)
     log.info("Alert written to %s:\n%s", ALERT_FILE, message)
