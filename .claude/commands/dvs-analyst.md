@@ -2457,3 +2457,93 @@ ORDER BY farmer_count DESC
 - Use tables, not paragraphs, for numbers.
 - If a follow-up question is a simple filter change on the last query, just run it — don't re-explain the approach.
 - If the user's question is ambiguous, ask ONE clarifying question, not multiple.
+
+---
+
+## Section 13: B2C Return % Analysis (added Jul 2026)
+
+**Business definition:** Return % = Returned ÷ (Delivered + Returned). The denominator is only orders with a **decided outcome** — never total orders. Orders still in progress, or stuck pre-pickup, sit outside the ratio. Revenue Return % is the same construction weighted by order GMV.
+
+### Committed Returns — status set
+
+A return counts the moment the return journey starts, not when it closes ("a return in transit has already failed as a delivery"). An order is Returned if it has ANY of:
+
+| Signal | Source | Applies to |
+|---|---|---|
+| `RETURN_IN_TRANSIT` | `order_management_orderhistorymeta` | Both |
+| `RETURNED_BY_LMD` | orderhistorymeta | Store |
+| `RETURNED` | orderhistorymeta | Both |
+| `STORE_RETURN_ACKNOWLEDGED` | orderhistorymeta | Store |
+| `RETURN_ACKNOWLEDGED` | orderhistorymeta | FC |
+| `delivery_status = 'process_for_return'` | `delivery_shippingpackage` (current status) | FC only — return APPROVED but not yet in transit |
+
+**Rules:** Return wins over `DELIVERED` if both exist. `Delivered` = has `DELIVERED` and no return signal.
+
+**`process_for_return` matters for recent months:** it's a transient state — old orders have exited it, but in June 2026 it alone surfaced 942 FC returns (moved June FC return % from 29.7% → 33.3%). Never skip it for current-month analysis.
+
+**FC orders ARE tracked in `order_management_orderhistorymeta`** with a parallel vocabulary: `PICKING`, `PICKED`, `READY_TO_SHIP`, `DISPATCHED`, `RETURN_ACKNOWLEDGED`. One uniform order-level classification works for both cohorts.
+
+### FC Invoiced GMV — `pristine_wms_prod_db.invoiced_report`
+
+- **Dataset is `pristine_wms_prod_db`** — `pristine_wms_views` is not accessible / does not exist for the standard service account.
+- **Join:** `CAST(order_management_order.unicommerce_id AS STRING) = invoiced_report.DisplayOrderCode` — validated 96.3% match on June 2026 FC orders. (`unicommerce_id` IS the 12-digit display order code.)
+- **Grain = one row per SERIAL UNIT** — a qty-20 line appears as 20 rows, each with per-unit `TotalPrice`. Order invoiced GMV = `SUM(TotalPrice)` grouped by `DisplayOrderCode`.
+- **`is_return` is an in-place flag** on the same row (validated: zero serials carry both flag values) — summing all rows does NOT double-count returns.
+- Partitioned on `CreatedOn` — always filter it.
+- Store GMV stays `SUM(order_management_orderitem.total_price)` per the Section on invoice sources. ~3.7% of FC orders have no invoiced_report match → carry ₹0 GMV (self-excluded from revenue ratios, still present in order counts).
+
+### 3-Way Fulfilment Split (strict definition)
+
+| Segment | Definition |
+|---|---|
+| `STORE` | `retail_store_code` present |
+| `FC_DVS_REROUTE` | FC-fulfilled AND a row exists in `order_management_orderreroutinglogs` |
+| `FC_PURE` | FC-fulfilled, no reroute log |
+
+**CRITICAL — reroute logs begin March 2026.** First records: Mar (1,220), Apr (7,940), May (10,594), Jun (10,936). Months before Mar-2026 have zero reroutes BY DEFINITION — a colleague-validated fact. Do not use `PromisedTAT dvsResolutionReason LIKE '%resolved-yes%'` as a reroute proxy: resolved-yes-without-log orders (30 in Jan–Feb 2026) are engine anomalies (assignment never stuck / manual intervention), not store SLA pullbacks.
+
+**Why the split matters:** the plain FC bucket is contaminated by DVS failures. Rerouted orders run **35–39% return rate in every state and every month** — ~9–13pp worse than pure FC — because the 24h+ store delay decays farmer intent before dispatch even starts. Every ~10K reroutes/month ≈ ~3,900 extra returns traceable to store inaction.
+
+### Probable Returns (stuck-in-movement rule, >15 days)
+
+Orders that will realistically never deliver, ruled as returns in the "Adjusted" metrics:
+
+- Order created **>15 days ago** (user-agreed threshold; was 30 initially), AND
+- **Goods physically moved:** `PICKED_BY_LMD` or `DISPATCHED` in orderhistorymeta, OR package `delivery_status IN ('in_transit','missing_in_transit','missing','misplaced_by_lp')`, AND
+- No `DELIVERED`, no return signal.
+
+**Excluded — stuck PRE-pickup = likely cancellations, NOT returns:** `WAITING_FOR_PARTNER_APPROVAL`, `PENDING`, `PACKED`, `ON_HOLD`, `PUSHED`, `HOLD_BY_LMD` (store side) and `PICKING`/`PICKED`/`READY_TO_SHIP` (FC side, pre-courier-handover). Also exclude history `CANCELLED` orders from the ratio entirely.
+
+**Adj Ret % = (Returned + Probable) ÷ (Delivered + Returned + Probable)** — same for revenue. At the 15d threshold (Jul 2026): 5,819 orders / ₹2,04,31,178 GMV; moves overall Adj Ret % ~0.6pp above confirmed. Use the probable bucket as an ops recovery list (goods lost between pickup and nowhere), not just a metric adjustment.
+
+### Presentation conventions (user-set)
+
+- **Single B2C channel** — do NOT split APP vs CSR in return reporting (rejected explicitly).
+- Always show **FY26 vs FY27 comparison** rows (Indian FY, Apr–Mar); mark current FY partial.
+- Month-wise tables flag the current month "partial"; its return % is understated until the pipeline matures (~2–4 weeks).
+- Exclude `order_type LIKE '%offline%'` everywhere.
+- GMV in actual ₹, Indian comma format — never lakh/crore rounding.
+- Live artifact (state filter, 3 tables, formula explainer): https://claude.ai/code/artifact/2a9ff6f7-59fd-4d28-9c83-586181f40634
+
+### Benchmark findings (Apr 2025 – 16 Jul 2026, all states)
+
+| Slice | Order Ret % | Rev Ret % |
+|---|---|---|
+| B2C overall | 23.5% | 22.6% |
+| FY26 (full) | 22.2% | 21.5% |
+| FY27 (Apr–Jul 16, partial) | 29.9% | 27.4% |
+| Store | 26.2% | 24.7% |
+| FC Pure | 22.5% | 21.7% |
+| FC DVS-Reroute | 37.3% | 34.0% |
+
+- FY27 deterioration is almost entirely **FC-pure (21.9% → 31.0%)**; Store improved (27.2% → 25.6%) while doubling volume.
+- State pattern (revenue basis): MP store exceptional (12.9% vs 26.5% FC-pure); UP store better; **Gujarat and Rajasthan store WORSE than FC-pure** — the aggregate "DVS is better" story is an MP+UP mix effect.
+- Revenue return % runs ~2–3pp below order return % — returned orders skew smaller-ticket.
+
+### Query-engineering caveats (this analysis)
+
+| Issue | Detail |
+|---|---|
+| `CURRENT_DATE` in query breaks BQ result cache | Probable-return age check uses `CURRENT_DATE('Asia/Kolkata')` → every run re-bills full scan (~2.6 GB). Pin a literal date if re-running repeatedly. |
+| GROUPING SETS | `GROUP BY GROUPING SETS ((month, seg), (state, seg))` gives month-wise + state-wise in one scan. |
+| Grain query for the artifact | month × state × segment with orders/returned/probable/delivered counts and the four GMV sums — aggregate client-side in the artifact JS for all views + filters. |
