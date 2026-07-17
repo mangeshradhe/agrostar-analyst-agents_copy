@@ -8,3 +8,6 @@
 *.private.md
 charts/stuck_orders_detail.csv
 restock_detail_data.js
+returns_investigation_data/
+zone_fix_validation/villages_*.csv
+zone_fix_validation/results_*.csv
