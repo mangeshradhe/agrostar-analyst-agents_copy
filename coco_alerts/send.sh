@@ -37,15 +37,22 @@ if [ ! -s "$ALERT_FILE" ]; then
     exit 0
 fi
 
-"$CLAUDE_BIN" -p "Read the file '$ALERT_FILE' and send its contents EXACTLY as-is (do not rephrase, summarize, or add anything) as a Slack message to channel ID $CHANNEL using the slack_send_message tool. Then reply with just: SENT" \
+# Exit code alone is not proof of success: if the Slack MCP tool is
+# unavailable in this headless session (it's tied to an interactive
+# claude.ai login and can drop out under launchd), `claude -p` still exits 0
+# after just explaining that it couldn't send anything. So we also require
+# the literal "SENT" confirmation line in the reply before marking it sent.
+CLAUDE_OUTPUT="$("$CLAUDE_BIN" -p "Read the file '$ALERT_FILE' and send its contents EXACTLY as-is (do not rephrase, summarize, or add anything) as a Slack message to channel ID $CHANNEL using the slack_send_message tool. Then reply with just: SENT" \
     --allowedTools "Read,mcp__claude_ai_Slack__slack_send_message" \
-    >> "$LOG_FILE" 2>&1
+    2>&1)"
+CLAUDE_EXIT=$?
+echo "$CLAUDE_OUTPUT" >> "$LOG_FILE"
 
-if [ $? -eq 0 ]; then
+if [ $CLAUDE_EXIT -eq 0 ] && printf '%s\n' "$CLAUDE_OUTPUT" | grep -qE '^SENT[[:space:]]*$'; then
     note "alert posted to $CHANNEL"
     echo "$TODAY" > "$STATE_FILE"
     exit 0
 else
-    note "claude -p post FAILED — will retry on next trigger"
+    note "claude -p post FAILED (exit=$CLAUDE_EXIT, no SENT confirmation) — will retry on next trigger"
     exit 1
 fi
