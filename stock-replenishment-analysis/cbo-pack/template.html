@@ -1,0 +1,307 @@
+<title>Stock Health vs Plan — FY 2026-27</title>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#faf9f6; --surface:#fffefb; --surface2:#f3f1ea;
+  --ink:#161613; --ink2:#55534c; --muted:#8a877e;
+  --hair:#e4e2d8; --ring:rgba(22,22,19,.10);
+  --accent:#2c6e49; --accent-ink:#fff;
+  --budget:#8a877e; --sales:#2a78d6; --proc:#c98500;
+  --crit:#d03b3b; --warn:#fab219; --good:#0ca30c;
+  --crit-tint:rgba(208,59,59,.14); --warn-tint:rgba(250,178,25,.16); --ok-tint:rgba(12,163,12,.10);
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --bg:#131310; --surface:#1c1c18; --surface2:#232320;
+    --ink:#f2f1ea; --ink2:#c2c0b4; --muted:#8a877e;
+    --hair:#2d2d28; --ring:rgba(255,255,255,.10);
+    --accent:#7cc39a; --accent-ink:#10130f;
+    --budget:#8a877e; --sales:#3987e5; --proc:#e0a03d;
+    --crit-tint:rgba(208,59,59,.22); --warn-tint:rgba(250,178,25,.16); --ok-tint:rgba(12,163,12,.14);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#131310; --surface:#1c1c18; --surface2:#232320;
+  --ink:#f2f1ea; --ink2:#c2c0b4; --muted:#8a877e;
+  --hair:#2d2d28; --ring:rgba(255,255,255,.10);
+  --accent:#7cc39a; --accent-ink:#10130f;
+  --budget:#8a877e; --sales:#3987e5; --proc:#e0a03d;
+  --crit-tint:rgba(208,59,59,.22); --warn-tint:rgba(250,178,25,.16); --ok-tint:rgba(12,163,12,.14);
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#faf9f6; --surface:#fffefb; --surface2:#f3f1ea;
+  --ink:#161613; --ink2:#55534c; --muted:#8a877e;
+  --hair:#e4e2d8; --ring:rgba(22,22,19,.10);
+  --accent:#2c6e49; --accent-ink:#fff;
+  --budget:#8a877e; --sales:#2a78d6; --proc:#c98500;
+  --crit-tint:rgba(208,59,59,.14); --warn-tint:rgba(250,178,25,.16); --ok-tint:rgba(12,163,12,.10);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 80px}
+a{color:var(--accent)}
+h1{font-size:26px;line-height:1.2;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:19px;margin:0 0 2px;letter-spacing:-.01em}
+.eyebrow{font-size:11px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+.sub{color:var(--ink2);font-size:13.5px;max-width:72ch}
+header.page{padding:34px 0 10px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;justify-content:space-between}
+.asof{font-size:12.5px;color:var(--muted);text-align:right}
+section{margin-top:34px}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:18px 20px}
+.headline{font-size:15.5px;font-weight:600;margin:6px 0 14px;max-width:80ch}
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:16px}
+.tile{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:14px 16px}
+.tile .k{font-size:11px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.tile .v{font-size:26px;font-weight:700;letter-spacing:-.01em;margin-top:2px}
+.tile .d{font-size:12.5px;color:var(--ink2);margin-top:2px}
+.chip{display:inline-block;font-size:11px;font-weight:650;padding:1px 8px;border-radius:99px;vertical-align:2px}
+.chip.crit{background:var(--crit-tint);color:var(--crit)}
+/* filters */
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0}
+.filters label{font-size:12px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
+.filters select{background:var(--surface2);border:1px solid var(--ring);border-radius:8px;padding:6px 10px;
+  font-size:13.5px;color:var(--ink);max-width:220px}
+/* tables */
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650;
+   text-align:right;padding:7px 10px;border-bottom:1px solid var(--hair);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{padding:7px 10px;border-bottom:1px solid var(--hair);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.name{text-align:left;white-space:normal;min-width:180px}
+.tblwrap{overflow-x:auto}
+.skuline{color:var(--muted);font-size:11.5px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink2);margin-top:12px;align-items:center}
+.sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1px solid var(--ring)}
+.sw.line{width:16px;height:3px;border-radius:2px;border:0;vertical-align:1px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:860px){.cols2{grid-template-columns:1fr}}
+.chart{margin-top:10px}
+svg text{font:11.5px system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--ink2)}
+svg .axis line{stroke:var(--hair)}
+svg .base{stroke:#c3c2b7}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;
+     padding:6px 9px;border-radius:6px;z-index:50;display:none;max-width:280px;white-space:normal}
+.note{font-size:12px;color:var(--muted);margin-top:10px;max-width:90ch}
+footer{margin-top:44px;border-top:1px solid var(--hair);padding-top:16px;font-size:12px;color:var(--muted)}
+footer ul{margin:6px 0 0;padding-left:18px}
+</style>
+
+<div class="tip" id="tip"></div>
+<div class="wrap">
+<header class="page">
+  <div>
+    <div class="eyebrow">AgroStar · Supply Chain · Monthly stock review</div>
+    <h1>Stock Health vs Plan — FY 2026-27</h1>
+    <div class="sub">Budget vs actual sales vs procurement, units first. Pick a product group or state to see just that slice, then check the two tables below for where we're off track.</div>
+  </div>
+  <div class="asof">Data as of <b id="asof"></b><br>July figures are 13 days (partial)</div>
+</header>
+
+<div class="tiles" id="tiles"></div>
+
+<section id="s-chart">
+  <div class="eyebrow">1 · Budget vs actual, running total</div>
+  <h2>Are we buying and selling to plan?</h2>
+  <div class="headline" id="chart-headline"></div>
+  <div class="card">
+    <div class="filters">
+      <label>Product</label><select id="f-pg"></select>
+      <label>State</label><select id="f-state"></select>
+    </div>
+    <div class="chart" id="mainchart"></div>
+    <div class="legend">
+      <span><span class="sw line" style="background:var(--budget)"></span>Budget (plan)</span>
+      <span><span class="sw line" style="background:var(--sales)"></span>Actual sales</span>
+      <span><span class="sw line" style="background:var(--proc)"></span>Procurement</span>
+    </div>
+    <div class="note">Budget only has numbers for May–Sep (rolling plan, refreshed monthly). Sales and Procurement stop at today — we don't guess the rest of the year. Both are running totals, not monthly.</div>
+  </div>
+</section>
+
+<section id="s-drill">
+  <div class="eyebrow">2 · Where are we off track</div>
+  <h2>Selling less than planned, buying more than we sell</h2>
+  <div class="card">
+    <div class="cols2">
+      <div>
+        <h2 style="font-size:15px">Selling below plan (May–Jul)</h2>
+        <div class="tblwrap"><table id="t-under"></table></div>
+        <div class="note">Budget vs actual sales, same 3 months only (May, Jun, Jul — the only months Budget has a number for). Biggest shortfall first.</div>
+      </div>
+      <div>
+        <h2 style="font-size:15px">Buying more than we sell (Apr–Jul)</h2>
+        <div class="tblwrap"><table id="t-over"></table></div>
+        <div class="note">Procurement minus sales, same SKU and state, Apr–Jul. Biggest surplus first — this is stock piling up.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s-clearance">
+  <div class="eyebrow">3 · Clearance vs fresh stock</div>
+  <h2>What has to move now vs what can wait</h2>
+  <div class="headline" id="clearance-headline"></div>
+  <div class="card">
+    <div class="tblwrap"><table id="t-clearance"></table></div>
+    <div class="note" id="clearance-note"></div>
+  </div>
+</section>
+
+<footer>
+  <b>Read every number with these caveats.</b>
+  <ul>
+    <li>Budget (ROFO) is a rolling plan — it only has real numbers for May–Sep right now. Apr and Oct onward are not filled in yet.</li>
+    <li>Sales and Procurement stop at 15 Jul 2026. July is 13 of 31 days — don't read it as a full month.</li>
+    <li>Product filter covers the top 100 brands by sales volume (~95% of units). Everything else is grouped as "Other" — no product is silently dropped, just folded in.</li>
+    <li>Procurement = all stock coming in — vendor purchases, own-plant transfers, and seed-channel adjustments — added together.</li>
+    <li>Clearance vs Fresh only covers barcoded (serialised) stock, and excludes plants and in-transit stock.</li>
+    <li>Clearance = less than 150 days left before expiry. Fresh = 150 days or more. Items with no expiry date (mostly hardware) are counted separately and folded into Fresh for the headline tiles.</li>
+  </ul>
+  <div style="margin-top:10px">Definitions & SQL: <i>cbo-pack/sql/</i> in the project folder · Methodology: <i>TRANSFER_ANALYSIS_METHODOLOGY.md</i> · Refresh on request (no schedule).</div>
+</footer>
+</div>
+
+<script id="DATA" type="application/json">__DATA_JSON__</script>
+<script>
+const D = JSON.parse(document.getElementById('DATA').textContent);
+const $ = (s,el=document)=>el.querySelector(s);
+const tip = $('#tip');
+function showTip(e,html){tip.innerHTML=html;tip.style.display='block';moveTip(e)}
+function moveTip(e){const w=tip.offsetWidth;let x=e.clientX+14;if(x+w>innerWidth-8)x=e.clientX-w-10;tip.style.left=x+'px';tip.style.top=(e.clientY+12)+'px'}
+function hideTip(){tip.style.display='none'}
+function hookTips(root){root.querySelectorAll('[data-tip]').forEach(el=>{
+  el.addEventListener('mousemove',e=>showTip(e,el.dataset.tip));
+  el.addEventListener('mouseleave',hideTip);});}
+
+function L(n){
+  if(n==null)return '—';
+  const a=Math.abs(n);
+  if(a>=1e7)return (n/1e7).toFixed(2)+' Cr';
+  if(a>=1e5)return (n/1e5).toFixed(1)+' L';
+  return Math.round(n).toLocaleString('en-IN');
+}
+function full(n){return n==null?'—':Math.round(n).toLocaleString('en-IN')}
+function cr(n){return n==null?'—':'₹'+n.toFixed(n<10?2:1)+' Cr'}
+
+$('#asof').textContent=new Date(D.as_of).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+
+// ---------- tiles ----------
+const T=D.tiles, CF=D.clearance_fresh;
+$('#tiles').innerHTML=[
+ {k:'Budget · May–Sep',v:L(T.budget_may_sep),d:'ROFO rolling plan'},
+ {k:'Sold · Apr–Jul',v:L(T.sales_apr_jul),d:'actual, FYTD'},
+ {k:'Bought · Apr–Jul',v:L(T.procurement_apr_jul),d:'vendor + plant + seeds, combined'},
+ {k:'Clearance stock',v:L(CF.clearance),d:`${CF.clearance_pct}% of on-hand · ${cr(D.drill_clearance_value_cr)} at COGS`},
+].map(t=>`<div class="tile"><div class="k">${t.k}</div><div class="v">${t.v}</div><div class="d">${t.d}</div></div>`).join('');
+
+// ---------- main chart: cumulative Budget / Sales / Procurement ----------
+const ALL_MONTHS=['Apr','May','Jun','Jul','Aug','Sep'];
+const BUDGET_MONTHS=D.months.budget, ACTUAL_MONTHS=D.months.actual;
+
+function fillSelect(el, values, allLabel){
+  el.innerHTML=`<option value="ALL">${allLabel}</option>`+values.map(v=>`<option value="${v}">${v}</option>`).join('');
+}
+fillSelect($('#f-pg'), D.filters.pgs, 'All products');
+fillSelect($('#f-state'), D.filters.states, 'All states');
+
+function seriesByMonth(arr, st, pg){
+  const m={};
+  arr.forEach(r=>{
+    if(st!=='ALL' && r.state!==st) return;
+    if(pg!=='ALL' && r.pg!==pg) return;
+    m[r.month]=(m[r.month]||0)+r.qty;
+  });
+  return m;
+}
+function cumulative(monthMap, months){
+  let acc=0; return months.map(mo=>{acc+=(monthMap[mo]||0); return acc});
+}
+
+function drawChart(){
+  const st=$('#f-state').value, pg=$('#f-pg').value;
+  const budgetCum=cumulative(seriesByMonth(D.budget,st,pg), BUDGET_MONTHS);
+  const salesCum=cumulative(seriesByMonth(D.sales,st,pg), ACTUAL_MONTHS);
+  const procCum=cumulative(seriesByMonth(D.procurement,st,pg), ACTUAL_MONTHS);
+
+  const W=1080,H=340,padL=54,padB=30,padT=14,plotW=W-padL-20,plotH=H-padT-padB;
+  const slot = i => padL + plotW*i/(ALL_MONTHS.length-1);
+  const maxV = Math.max(1, ...budgetCum, ...salesCum, ...procCum);
+  const y = v => padT + plotH - (plotH*v/maxV);
+
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%">`;
+  // gridlines + y labels
+  [0.25,0.5,0.75,1].forEach(f=>{
+    const yy=y(maxV*f);
+    svg+=`<line x1="${padL}" x2="${W-20}" y1="${yy}" y2="${yy}" class="axis" stroke="var(--hair)"/>
+          <text x="${padL-8}" y="${yy+4}" text-anchor="end">${L(maxV*f)}</text>`;
+  });
+  svg+=`<line x1="${padL}" x2="${W-20}" y1="${padT+plotH}" y2="${padT+plotH}" class="base" stroke-width="1"/>`;
+  // x labels
+  ALL_MONTHS.forEach((mo,i)=>{
+    svg+=`<text x="${slot(i)}" y="${H-8}" text-anchor="middle" style="font-weight:600">${mo}${mo==='Jul'?' (13d)':''}</text>`;
+  });
+
+  function line(vals, monthList, color, label){
+    const idxs = monthList.map(mo=>ALL_MONTHS.indexOf(mo));
+    let path='';
+    idxs.forEach((xi,j)=>{
+      const px=slot(xi), py=y(vals[j]);
+      path += (j===0?'M':'L') + px + ' ' + py + ' ';
+    });
+    svg += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"/>`;
+    idxs.forEach((xi,j)=>{
+      const px=slot(xi), py=y(vals[j]);
+      svg += `<circle cx="${px}" cy="${py}" r="4" fill="${color}" data-tip="<b>${label} · ${ALL_MONTHS[xi]}</b><br>${full(vals[j])} units (running total)"></circle>`;
+    });
+  }
+  line(budgetCum, BUDGET_MONTHS, 'var(--budget)', 'Budget');
+  line(procCum, ACTUAL_MONTHS, 'var(--proc)', 'Procurement');
+  line(salesCum, ACTUAL_MONTHS, 'var(--sales)', 'Actual sales');
+  svg+='</svg>';
+  $('#mainchart').innerHTML=svg;
+  hookTips($('#mainchart'));
+
+  const label = (st==='ALL'?'All states':st) + ' · ' + (pg==='ALL'?'all products':pg);
+  const lastSales = salesCum[salesCum.length-1]||0, lastProc = procCum[procCum.length-1]||0;
+  const lastBudget3 = cumulative(seriesByMonth(D.budget,st,pg), ['May','Jun','Jul']).slice(-1)[0] || 0;
+  const salesVsBudget = lastBudget3 ? Math.round(100*(salesCum[3]||0)/lastBudget3 - 100) : null;
+  $('#chart-headline').textContent = `${label}: sold ${L(lastSales)} units, bought ${L(lastProc)} units, since April.` +
+    (salesVsBudget!=null ? ` Sales through July are ${salesVsBudget>=0?'+':''}${salesVsBudget}% vs the May–Jul plan.` : '');
+}
+$('#f-pg').addEventListener('change', drawChart);
+$('#f-state').addEventListener('change', drawChart);
+drawChart();
+
+// ---------- drill tables ----------
+function fillDrillTable(sel, rows, cols){
+  const t=$(sel);
+  t.innerHTML = `<tr>${cols.map(c=>`<th>${c.h}</th>`).join('')}</tr>` +
+    rows.slice(0,30).map(r=>`<tr>${cols.map(c=>c.cell(r)).join('')}</tr>`).join('');
+}
+fillDrillTable('#t-under', D.drill_underselling, [
+  {h:'SKU · State', cell:r=>`<td class="name">${r.item_name||r.sku}<div class="skuline">${r.sku} · ${r.state}</div></td>`},
+  {h:'Plan', cell:r=>`<td>${full(r.budget_qty)}</td>`},
+  {h:'Sold', cell:r=>`<td>${full(r.sales_qty)}</td>`},
+  {h:'Gap', cell:r=>`<td style="color:var(--crit);font-weight:650">${full(r.gap)}</td>`},
+]);
+fillDrillTable('#t-over', D.drill_overbuying, [
+  {h:'SKU · State', cell:r=>`<td class="name">${r.item_name||r.sku}<div class="skuline">${r.sku} · ${r.state}</div></td>`},
+  {h:'Bought', cell:r=>`<td>${full(r.proc_qty)}</td>`},
+  {h:'Sold', cell:r=>`<td>${full(r.sales_qty)}</td>`},
+  {h:'Gap', cell:r=>`<td style="font-weight:650">${full(r.gap)}</td>`},
+]);
+
+// ---------- clearance vs fresh ----------
+$('#clearance-headline').textContent = `${L(CF.clearance)} units (${CF.clearance_pct}%) of on-hand stock have less than 150 days left before expiry — worth ${cr(D.drill_clearance_value_cr)} at COGS in the named lines below. ${L(CF.fresh)} units are Fresh (150+ days left).`;
+fillDrillTable('#t-clearance', D.drill_clearance, [
+  {h:'SKU · FC', cell:r=>`<td class="name">${r.item_name||r.sku}<div class="skuline">${r.sku} · ${r.fc}</div></td>`},
+  {h:'Clearance qty', cell:r=>`<td style="font-weight:650">${full(r.qty_clearance)}</td>`},
+  {h:'₹ at COGS', cell:r=>`<td>${cr(r.value_cr)}</td>`},
+]);
+$('#clearance-note').textContent = `Top 30 of ${D.drill_clearance.length} named SKU×FC lines shown, ranked by clearance units. No-expiry items (mostly hardware, ${L(CF.no_expiry)} units) aren't shown here — they don't face a clearance deadline.`;
+</script>

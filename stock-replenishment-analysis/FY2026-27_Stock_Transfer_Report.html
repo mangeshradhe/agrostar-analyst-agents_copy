@@ -1,0 +1,563 @@
+<title>Stock Transfer Report — FY 2026-27</title>
+<style>
+  :root{
+    --paper:#FBFAF6; --ink:#22301F; --ink-soft:#5A6653; --line:#E3E2D8;
+    --card:#F3F2EA; --accent:#2E7D4F; --accent-ink:#FFFFFF;
+    --warn:#A9650F; --bad:#A8433D; --good:#2E7D4F;
+    --bar-track:#E8E7DD;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#171D15; --ink:#E9EBE2; --ink-soft:#9DA695; --line:#2E3629;
+      --card:#1F261C; --accent:#5CB584; --accent-ink:#101510;
+      --warn:#D99A4E; --bad:#D97C74; --good:#5CB584;
+      --bar-track:#2A3126;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#171D15; --ink:#E9EBE2; --ink-soft:#9DA695; --line:#2E3629;
+    --card:#1F261C; --accent:#5CB584; --accent-ink:#101510;
+    --warn:#D99A4E; --bad:#D97C74; --good:#5CB584;
+    --bar-track:#2A3126;
+  }
+  :root[data-theme="light"]{
+    --paper:#FBFAF6; --ink:#22301F; --ink-soft:#5A6653; --line:#E3E2D8;
+    --card:#F3F2EA; --accent:#2E7D4F; --accent-ink:#FFFFFF;
+    --warn:#A9650F; --bad:#A8433D; --good:#2E7D4F;
+    --bar-track:#E8E7DD;
+  }
+  html{background:var(--paper); scroll-behavior:smooth;}
+  section{scroll-margin-top:16px;}
+  .toc{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; margin:22px 0 4px;}
+  .toc a{display:block; background:var(--card); border-radius:8px; padding:12px 14px; text-decoration:none; color:var(--ink); border:1px solid var(--line); transition:border-color .15s;}
+  .toc a:hover, .toc a:focus{border-color:var(--accent); outline:none;}
+  .toc .tno{font-size:.68rem; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); font-weight:700;}
+  .toc .tt{font-weight:650; margin:2px 0 3px; font-size:.92rem;}
+  .toc .th{font-size:.8rem; color:var(--ink-soft); line-height:1.4;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); background:var(--paper); line-height:1.55;
+    margin:0; padding:0 20px;
+  }
+  .wrap{max-width:800px; margin:0 auto; padding:48px 0 72px;}
+  h1,h2{font-family:Charter,Georgia,"Times New Roman",serif; text-wrap:balance; line-height:1.2;}
+  h1{font-size:2.1rem; margin:8px 0 6px; font-weight:700;}
+  h2{font-size:1.35rem; margin:0 0 14px; font-weight:700;}
+  h3{font-size:1rem; margin:20px 0 6px; font-weight:650;}
+  .eyebrow{font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;}
+  .sub{color:var(--ink-soft); margin:0 0 8px; font-size:1rem; max-width:62ch;}
+  p{max-width:68ch; margin:0 0 12px;}
+  section{border-top:1px solid var(--line); margin-top:40px; padding-top:28px;}
+  .statband{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin:26px 0 6px;}
+  .stat{background:var(--card); border-radius:8px; padding:14px 16px;}
+  .stat b{display:block; font-size:1.45rem; font-variant-numeric:tabular-nums; letter-spacing:-.01em;}
+  .stat span{font-size:.78rem; color:var(--ink-soft);}
+  table{border-collapse:collapse; width:100%; font-size:.88rem; margin:10px 0 6px;}
+  th{font-size:.7rem; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-soft); text-align:left; font-weight:600; padding:6px 10px 6px 0; border-bottom:1px solid var(--line);}
+  td{padding:7px 10px 7px 0; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums;}
+  td.num,th.num{text-align:right;}
+  tr.total td{font-weight:650; border-bottom:none;}
+  .tablebox{overflow-x:auto;}
+  .scrollbox{max-height:440px; overflow:auto; border:1px solid var(--line); border-radius:8px; padding:0 12px; margin:10px 0;}
+  .scrollbox th{position:sticky; top:0; background:var(--paper); z-index:1;}
+  .barrow{display:grid; grid-template-columns:170px 1fr 108px; gap:12px; align-items:center; margin:8px 0; font-size:.88rem;}
+  .bartrack{background:var(--bar-track); border-radius:4px; height:16px; overflow:hidden;}
+  .barfill{height:100%; background:var(--accent); border-radius:4px;}
+  .barfill.warn{background:var(--warn);}
+  .barfill.bad{background:var(--bad);}
+  .barval{font-variant-numeric:tabular-nums; color:var(--ink-soft); font-size:.82rem;}
+  .callout{background:var(--card); border-left:3px solid var(--accent); border-radius:0 8px 8px 0; padding:14px 18px; margin:18px 0; font-size:.92rem; max-width:70ch;}
+  .callout.warn{border-left-color:var(--warn);}
+  .verdict{font-weight:600;}
+  ol.actions{padding-left:20px; max-width:68ch;}
+  ol.actions li{margin:0 0 12px;}
+  ol.actions b{font-weight:650;}
+  .fine{font-size:.8rem; color:var(--ink-soft); max-width:72ch;}
+  .fine p{margin:0 0 8px; max-width:none;}
+  .pill{display:inline-block; font-size:.7rem; font-weight:600; letter-spacing:.05em; padding:2px 8px; border-radius:99px; background:var(--card); color:var(--ink-soft); vertical-align:2px;}
+  .good-t{color:var(--good); font-weight:600;}
+  .warn-t{color:var(--warn); font-weight:600;}
+  .bad-t{color:var(--bad); font-weight:600;}
+  .note{font-size:.8rem; color:var(--ink-soft); max-width:68ch;}
+  footer{border-top:1px solid var(--line); margin-top:48px; padding-top:16px; font-size:.78rem; color:var(--ink-soft);}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">AgroStar Supply Chain · FY 2026-27 · 1 Apr – 13 Jul 2026</div>
+  <h1>Stock Transfer Report</h1>
+  <p class="sub">How stock moved between our facilities this year — month by month, system vs manual, factory to farm — whether it sold after moving, and where we are paying freight for nothing.</p>
+
+  <div class="statband">
+    <div class="stat"><b>5,301 t</b><span>total weight dispatched</span></div>
+    <div class="stat"><b>51 lakh</b><span>units transferred</span></div>
+    <div class="stat"><b>19,263</b><span>transfer orders created</span></div>
+    <div class="stat"><b>₹80 Cr</b><span>sales fulfilled by transferred stock — 31% of all barcoded revenue</span></div>
+  </div>
+
+  <h2 style="margin-top:34px">What's inside — pick your question</h2>
+  <p class="sub">Ten sections, each answering one question a reviewer will ask. Click any card to jump straight there.</p>
+  <div class="toc">
+    <a href="#s1"><span class="tno">1 · Volumes</span><div class="tt">What moved, month by month</div><div class="th">Nearly 2× last year's orders. Manual peaks, the system holds steady, factories ramp 6×.</div></a>
+    <a href="#s2"><span class="tno">2 · Distance</span><div class="tt">How far it travelled</div><div class="th">80% of the weight rides paid trucks — 17.8 lakh tonne-km — and our own distance file has holes.</div></a>
+    <a href="#s3"><span class="tno">3 · Factories</span><div class="tt">Factory dispatches, up close</div><div class="th">Six factories, ~1,000 t. One ships invisibly as UTOs; another has 93% of its output still parked.</div></a>
+    <a href="#s4"><span class="tno">4 · Sell-through</span><div class="tt">Did the stock sell after moving?</div><div class="th">System stock sells 2× faster — weekly cohort curves, ₹80 Cr revenue attribution, and the budget-balancing verdict with a truce date.</div></a>
+    <a href="#s5"><span class="tno">5 · Ping-pong</span><div class="tt">Stock that travelled for nothing</div><div class="th">150 t made round trips — 27,000 truck-km wasted. ~15 SKUs a month cause 80% of it; every name and cause is listed.</div></a>
+    <a href="#s6"><span class="tno">6 · Facilities</span><div class="tt">Who feeds the network, who consumes it</div><div class="th">Aurangabad ships a fifth of everything; Pune absorbs 13× what it sends — plus the typos silently breaking reports.</div></a>
+    <a href="#s7"><span class="tno">7 · Cancellations</span><div class="tt">Orders that died before dispatch</div><div class="th">1,711 cancelled, kept out of every other number — and the monthly rate is still climbing.</div></a>
+    <a href="#s8"><span class="tno">8 · CXO view</span><div class="tt">One page, four seats</div><div class="th">CFO's TCI ledger, COO's under-200 kg problem, CPO's freight-hog category, CTO's algorithm verdict.</div></a>
+    <a href="#s9"><span class="tno">9 · Actions</span><div class="tt">Seven moves, ranked by money</div><div class="th">From weekly lane consolidation to a 30-day cool-off rule — each tied to the tonnage it saves.</div></a>
+    <a href="#s10"><span class="tno">Appendix</span><div class="tt">Top-50 review lists</div><div class="th">The exact items to challenge: 50 biggest inter-state movers and 50 biggest factory shipments.</div></a>
+  </div>
+
+  <section id="s1">
+    <div class="eyebrow">1 · What moved, month by month</div>
+    <h2>Manual moves the bulk; the system runs steady; factories are ramping</h2>
+    <div class="tablebox"><table>
+      <tr><th>Tonnes dispatched</th><th class="num">Apr</th><th class="num">May</th><th class="num">Jun</th><th class="num">Jul (13d)</th><th class="num">Trend</th></tr>
+      <tr><td>Manual orders</td><td class="num">514</td><td class="num">897</td><td class="num">944</td><td class="num">351</td><td class="num">peaked May–Jun</td></tr>
+      <tr><td>System orders</td><td class="num">296</td><td class="num">546</td><td class="num">397</td><td class="num">311</td><td class="num">steady</td></tr>
+      <tr><td>Manufacturing TOs (all factories)</td><td class="num">61</td><td class="num">341</td><td class="num">355</td><td class="num">226</td><td class="num warn-t">heavy since May</td></tr>
+      <tr class="total"><td>Total</td><td class="num">877</td><td class="num">1,785</td><td class="num">1,707</td><td class="num">900</td><td class="num"></td></tr>
+      <tr><td>System share — of orders</td><td class="num">61%</td><td class="num">60%</td><td class="num">55%</td><td class="num warn-t">72%</td><td class="num">rising</td></tr>
+      <tr><td>System share — of tonnes</td><td class="num">34%</td><td class="num">31%</td><td class="num">23%</td><td class="num">35%</td><td class="num">stable band</td></tr>
+    </table></div>
+    <p style="margin-top:10px">Three different rhythms. <b>Manual</b> tonnage nearly doubled into the May–June season peak and is now falling. The <b>system</b> raises a near-constant ~2,600 orders a month; its July run-rate hasn't dropped — it keeps correcting placement while manual pushes wind down. <b>Factory output</b> (all manufacturing sites, whether booked as VTO or not) jumped from 61 t in April to ~350 t a month at peak and is still heavy in July — roughly a fifth of everything we move now comes straight off a production line.</p>
+    <h3>Versus the same period last year</h3>
+    <div class="tablebox"><table>
+      <tr><th>Apr 1 – Jul 13</th><th class="num">FY 25-26</th><th class="num">FY 26-27</th><th class="num">Change</th></tr>
+      <tr><td>Transfer orders dispatched</td><td class="num">8,875</td><td class="num">16,654</td><td class="num">+88%</td></tr>
+      <tr><td>Units moved</td><td class="num">30.4 lakh</td><td class="num">51 lakh</td><td class="num">+68%</td></tr>
+      <tr><td>Weight moved</td><td class="num">3,908 t</td><td class="num">5,301 t</td><td class="num">+36%</td></tr>
+      <tr><td>Inter-State share of weight</td><td class="num">37%</td><td class="num">46%</td><td class="num warn-t">hauling longer</td></tr>
+      <tr><td>Intra-FC (free) share of weight</td><td class="num">38%</td><td class="num">20%</td><td class="num warn-t">fewer free moves</td></tr>
+    </table></div>
+    <p style="margin-top:10px">The network is running much hotter than last year — nearly twice the orders, a third more weight — and a bigger share of it is paid, long-distance freight. That's the context for everything below: the freight bill isn't growing because something broke; the business is simply moving more stock, further.</p>
+  </section>
+
+  <section id="s2">
+    <div class="eyebrow">2 · How far it travelled</div>
+    <h2>Half the weight crosses state lines — and the free moves are shrinking</h2>
+    <div class="barrow"><span>Intra-FC <span class="pill">~ zero cost</span></span><div class="bartrack"><div class="barfill" style="width:42%"></div></div><span class="barval">1,043 t</span></div>
+    <div class="barrow"><span>Inter-City</span><div class="bartrack"><div class="barfill warn" style="width:74%"></div></div><span class="barval">1,819 t</span></div>
+    <div class="barrow"><span>Inter-State</span><div class="bartrack"><div class="barfill bad" style="width:100%"></div></div><span class="barval">2,457 t</span></div>
+    <p style="margin-top:14px">Intra-FC means the two buildings in the same city (like PNQ01 and PNQ02) — moving stock there is like shifting it between rooms, so it costs almost nothing.</p>
+    <h3>Month on month (tonnes)</h3>
+    <div class="tablebox"><table>
+      <tr><th>Tier</th><th class="num">Apr</th><th class="num">May</th><th class="num">Jun</th><th class="num">Jul (13d)</th><th>Read</th></tr>
+      <tr><td>Intra-FC (free)</td><td class="num">252</td><td class="num">395</td><td class="num">269</td><td class="num">118</td><td>29% of April → 13% of July</td></tr>
+      <tr><td>Inter-City</td><td class="num">169</td><td class="num">590</td><td class="num">669</td><td class="num">383</td><td>share doubled: 19% → 43%</td></tr>
+      <tr><td>Inter-State</td><td class="num">456</td><td class="num">798</td><td class="num">770</td><td class="num">399</td><td>steady ~45% share</td></tr>
+    </table></div>
+    <p style="margin-top:10px">The free share is shrinking and the paid share is growing — as the season progresses we pay for more and longer truck legs, with Inter-City (mostly hub-to-hub within a state) growing fastest.</p>
+    <h3>Who orders the moves at each distance (tonnes)</h3>
+    <div class="tablebox"><table>
+      <tr><th>Tier</th><th class="num">Manual</th><th class="num">System</th><th class="num">Manufacturing TO</th><th class="num">Other</th><th class="num">Total</th></tr>
+      <tr><td>Intra-FC (free)</td><td class="num">512</td><td class="num">455</td><td class="num">43</td><td class="num">33</td><td class="num">1,043</td></tr>
+      <tr><td>Inter-City</td><td class="num">829</td><td class="num">712</td><td class="num">279</td><td class="num">—</td><td class="num">1,819</td></tr>
+      <tr><td>Inter-State</td><td class="num bad-t">1,370</td><td class="num">396</td><td class="num">690</td><td class="num">—</td><td class="num">2,457</td></tr>
+    </table></div>
+    <p style="margin-top:10px">The pattern matters: the <b>system</b> keeps most of its movement short — 64% of its tonnage stays within a state, and it does nearly half of all the free Intra-FC moves. <b>Manual</b> orders dominate the expensive end: 1,370 of the 2,457 inter-state tonnes. <b>Manufacturing TOs</b> are inter-state heavy by nature (factories are in Gujarat, Maharashtra and Rajasthan; demand is national) — the lever there is routing to the right first destination, not avoiding the distance.</p>
+    <p>Measured against the official FC distance constants, paid movement this year adds up to a <b>TCI (distance × weight) of 17.8 lakh tonne-km</b>, covering about 69% of the freight by weight.</p>
+    <div class="callout warn"><b>Gap in our own master data:</b> even combining both constants files, two things have no distance — the Aurangabad↔Pune lane (our single biggest, 372 t this year) and every manufacturing site. Around 31% of paid tonnage moves on routes our transfer engine has no distance for.</div>
+  </section>
+
+  <section id="s3">
+    <div class="eyebrow">3 · Factory dispatches, up close</div>
+    <h2>Six factories, three stories: Panvel biggest, Bagru just launched, most output still parked</h2>
+    <p class="note">All manufacturing-origin transfers are treated as Manufacturing TOs in this report, regardless of how they were booked in WMS — ~1,012 t in total.</p>
+    <h3>Factory output month on month (tonnes)</h3>
+    <div class="tablebox"><table>
+      <tr><th>Factory</th><th>Booked as</th><th class="num">Apr</th><th class="num">May</th><th class="num">Jun</th><th class="num">Jul (13d)</th><th class="num">Total</th></tr>
+      <tr><td>Panvel (PNVL01)</td><td>UTO (should be VTO)</td><td class="num">29</td><td class="num">248</td><td class="num">197</td><td class="num">40</td><td class="num">544</td></tr>
+      <tr><td>Karjan (GJ06)</td><td>VTO</td><td class="num">18</td><td class="num">29</td><td class="num">78</td><td class="num">34</td><td class="num">159</td></tr>
+      <tr><td>Bagru (RJ06)</td><td>VTO</td><td class="num">—</td><td class="num">—</td><td class="num">5</td><td class="num">120</td><td class="num">125</td></tr>
+      <tr><td>Sanand (GJ10)</td><td>UTO (should be VTO)</td><td class="num">—</td><td class="num">47</td><td class="num">55</td><td class="num">17</td><td class="num">118</td></tr>
+      <tr><td>Anand (GJ12)</td><td>UTO (should be VTO)</td><td class="num">13</td><td class="num">17</td><td class="num">20</td><td class="num">5</td><td class="num">56</td></tr>
+      <tr><td>Panchmahal</td><td>UTO (should be VTO)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">11</td><td class="num">11</td></tr>
+    </table></div>
+    <p style="margin-top:10px">Panvel front-loaded the season (445 t in May–June, mostly water-soluble fertilizers — Calcium Nitrate, MKP, Potassium Nitrate 25 kg bags — with Raipur its single biggest destination). Bagru went from zero to 120 t in the first half of July: a genuine launch, and a well-routed one — its largest flow (43 t to RJ02 Jaipur) is a same-city, near-zero-cost move.</p>
+    <h3>Where is that factory stock now?</h3>
+    <div class="tablebox"><table>
+      <tr><th>Factory</th><th class="num">Items shipped</th><th class="num">Moved onward</th><th class="num">Sold from hub</th><th class="num">Still at hub</th></tr>
+      <tr><td>Sanand (GJ10)</td><td class="num">3.06 lakh</td><td class="num good-t">50%</td><td class="num">4%</td><td class="num">46%</td></tr>
+      <tr><td>Panvel (PNVL01)</td><td class="num">1.28 lakh</td><td class="num">25%</td><td class="num">12%</td><td class="num warn-t">63%</td></tr>
+      <tr><td>Anand (GJ12)</td><td class="num">0.19 lakh</td><td class="num">20%</td><td class="num">6%</td><td class="num warn-t">74%</td></tr>
+      <tr><td>Bagru (RJ06)</td><td class="num">1.93 lakh</td><td class="num">11%</td><td class="num">7%</td><td class="num">81% (just launched)</td></tr>
+      <tr><td>Karjan (GJ06)</td><td class="num">2.96 lakh</td><td class="num">5%</td><td class="num">2%</td><td class="num bad-t">93%</td></tr>
+    </table></div>
+    <p style="margin-top:10px">Sanand's flow works — half its output has already moved on toward selling FCs. <b>Karjan is the concern: 93% of everything it shipped this year is still sitting at the receiving hubs</b>, and what does move on waits ~54 days (its Aurangabad stock is the worst case). Bagru and Panchmahal are too recent to judge. Factory routing by final demand (action 3) is the fix.</p>
+    <p><b>Panvel and the smaller Gujarat sites book their dispatches as ordinary UTOs</b> — this report reclassifies them by origin, but the booking should be corrected in WMS so every downstream report and rule sees them as factory output.</p>
+  </section>
+
+  <section id="s4">
+    <div class="eyebrow">4 · Did the stock sell after moving?</div>
+    <h2>System transfers sell twice as fast — and both are improving</h2>
+    <p>We tracked every barcoded item from transfer to first sale. Within 60 days of moving:</p>
+    <div class="barrow"><span>System — urgent fulfilment</span><div class="bartrack"><div class="barfill" style="width:84.5%"></div></div><span class="barval good-t">84% sold</span></div>
+    <div class="barrow"><span>Manual — fulfilment</span><div class="bartrack"><div class="barfill warn" style="width:61.3%"></div></div><span class="barval warn-t">61% sold</span></div>
+    <div class="barrow"><span>Manual — bulk (BM)</span><div class="bartrack"><div class="barfill bad" style="width:46.1%"></div></div><span class="barval bad-t">46% sold</span></div>
+    <div class="barrow"><span>Manual — other</span><div class="bartrack"><div class="barfill bad" style="width:37.7%"></div></div><span class="barval bad-t">38% sold</span></div>
+    <h3>Is it getting better? Month-cohort view (% sold within 30 days of transfer)</h3>
+    <div class="tablebox"><table>
+      <tr><th>Stock transferred in…</th><th class="num">April</th><th class="num">May</th><th class="num">June</th><th>Read</th></tr>
+      <tr><td>System — urgent fulfilment</td><td class="num">73%</td><td class="num">85%</td><td class="num">80%</td><td>high and holding</td></tr>
+      <tr><td>Manual — fulfilment</td><td class="num">47%</td><td class="num">67%</td><td class="num">68%</td><td>big improvement</td></tr>
+      <tr><td>Manual — bulk (BM)</td><td class="num">24%</td><td class="num">33%</td><td class="num">44%</td><td>improving, still lowest</td></tr>
+      <tr><td>Manual — other</td><td class="num">19%</td><td class="num">21%</td><td class="num">19%</td><td>flat and poor</td></tr>
+    </table></div>
+    <p style="margin-top:10px" class="verdict">Every cohort improved as season demand arrived, but the ranking never changes: system-placed stock sells roughly twice as fast as manual bulk pushes, with 44% moving in the first week and 9 of 10 sales at the intended facility.</p>
+    <p>Two honest footnotes: <b>15.5% of system-placed stock is still unsold after 60 days</b> — that tail is the list of recommendations to audit — and the system is weaker on inter-state picks (47% sold vs 71–76% within a state). Factory stock is excluded — it sells only after a second hop to a selling FC.</p>
+
+    <h3>The 12-week consumption curves, cohort by cohort</h3>
+    <p>For each dispatch month: what % of that stock had sold by week 1, 2, 3… A dash means that week hasn't fully elapsed yet for that cohort — we show only what is truly observed, no projections.</p>
+    <div class="tablebox"><table>
+      <tr><th>System cohort</th><th class="num">Items</th><th class="num">W1</th><th class="num">W2</th><th class="num">W3</th><th class="num">W4</th><th class="num">W5</th><th class="num">W6</th><th class="num">W7</th><th class="num">W8</th><th class="num">W9</th><th class="num">W10</th><th class="num">W11</th><th class="num">W12</th></tr>
+      <tr><td>April</td><td class="num">1.4 L</td><td class="num">41</td><td class="num">59</td><td class="num">67</td><td class="num">73</td><td class="num">76</td><td class="num">78</td><td class="num">80</td><td class="num">82</td><td class="num">84</td><td class="num good-t">85</td><td class="num">—</td><td class="num">—</td></tr>
+      <tr><td>May</td><td class="num">1.9 L</td><td class="num">57</td><td class="num">73</td><td class="num">78</td><td class="num">82</td><td class="num">85</td><td class="num good-t">87</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+      <tr><td>June</td><td class="num">1.9 L</td><td class="num good-t">47</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+      <tr><td>July (partial)</td><td class="num">3.2 L</td><td class="num">11*</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+    </table></div>
+    <div class="tablebox"><table>
+      <tr><th>Manual cohort</th><th class="num">Items</th><th class="num">W1</th><th class="num">W2</th><th class="num">W3</th><th class="num">W4</th><th class="num">W5</th><th class="num">W6</th><th class="num">W7</th><th class="num">W8</th><th class="num">W9</th><th class="num">W10</th><th class="num">W11</th><th class="num">W12</th></tr>
+      <tr><td>April</td><td class="num">6.5 L</td><td class="num">5</td><td class="num">12</td><td class="num">17</td><td class="num">23</td><td class="num">29</td><td class="num">34</td><td class="num">40</td><td class="num">43</td><td class="num">47</td><td class="num warn-t">51</td><td class="num">—</td><td class="num">—</td></tr>
+      <tr><td>May</td><td class="num">5.9 L</td><td class="num">15</td><td class="num">28</td><td class="num">35</td><td class="num">40</td><td class="num">44</td><td class="num warn-t">49</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+      <tr><td>June</td><td class="num">9.7 L</td><td class="num warn-t">9</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+      <tr><td>July (partial)</td><td class="num">4.0 L</td><td class="num">8*</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+    </table></div>
+    <p style="margin-top:10px">The curves say it plainly: <b>every system cohort crosses ~73% sold by week 4 and the May cohort reached 87% in six weeks.</b> Manual cohorts climb to roughly half in the same time. April's manual cohort (5% in week 1) is the pre-season push — stock parked a month before demand arrived; June's manual push is tracking the same slow curve. If someone worries the system "moves stock nobody wants", these curves are the counter-evidence, month after month.</p>
+
+    <h3>What the moved stock earned</h3>
+    <p>Sales revenue (pre-GST, cancelled lines and returns excluded) from transferred stock after it reached its destination:</p>
+    <div class="tablebox"><table>
+      <tr><th>Placed by</th><th class="num">Intra-FC</th><th class="num">Inter-City</th><th class="num">Inter-State</th><th class="num">Total ₹Cr</th></tr>
+      <tr><td>Manual</td><td class="num">6.8</td><td class="num">10.8</td><td class="num">32.1</td><td class="num">49.7</td></tr>
+      <tr><td>System</td><td class="num">5.4</td><td class="num">14.6</td><td class="num">6.9</td><td class="num">26.9</td></tr>
+      <tr><td>Manufacturing TO</td><td class="num">0.1</td><td class="num">1.8</td><td class="num">1.8</td><td class="num">3.7</td></tr>
+      <tr class="total"><td>Total</td><td class="num">12.3</td><td class="num">27.2</td><td class="num">40.8</td><td class="num">80.2</td></tr>
+    </table></div>
+    <p style="margin-top:10px"><b>₹80.2 Cr — 31% of all barcoded sales revenue this year — was earned by stock that travelled on a transfer first.</b> Transfers are not just a cost line; they are how a third of revenue reaches the farmer. Manual transfers have earned more in absolute terms (they moved 73% more weight and have had longer to sell); the system earns its revenue faster, with a third of the ping-pong and a fifth of the expiry exposure. Factory revenue is small so far because most factory stock is still one hop away from a selling FC.</p>
+    <p>To keep the comparison fair, every group below is measured on identical time windows — only stock that has had a full 14 (or 30) days to sell is counted.</p>
+    <div class="tablebox"><table>
+      <tr><th>Stock placed by</th><th class="num">Sold within 14 days</th><th class="num">Sold within 30 days</th></tr>
+      <tr><td>System — urgent fulfilment</td><td class="num good-t">68%</td><td class="num good-t">79%</td></tr>
+      <tr><td>Manual — other reasons</td><td class="num">29%</td><td class="num">47%</td></tr>
+      <tr><td>Manual — bulk (BM)</td><td class="num">16%</td><td class="num">32%</td></tr>
+      <tr><td>System — budget balancing</td><td class="num" colspan="2">no stock old enough to measure — first dispatches are under 14 days old</td></tr>
+    </table></div>
+    <p style="margin-top:10px"><b>On budget balancing specifically, the honest answer is: nobody can know yet, including its critics.</b> Every one of its dispatches happened in the last two weeks. What we <i>can</i> verify today is that its pipeline is healthy — median 1 day from creation to dispatch, and zero orders stuck beyond 14 days (manual has 12 such orders). The visible "1.4% consumed" number that alarms people simply reflects stock still on trucks and in receiving bays, not stock that failed to sell.</p>
+    <div class="callout"><b>Suggested truce:</b> set the review date now — 15 August, when the first budget-balancing cohort completes 30 days. Pre-agree the bar: if less than ~50% of that cohort has sold by then (manual BM manages 32%, System-UF 79%), scale the programme back; if it clears the bar, the worry retires. Until then, the system's track record everywhere else — twice the sell-through of manual at every window, 5× less expiry exposure (5.6 t vs 27 t), lower cancellation rate (7.2% vs 11.7%), and one-third the ping-pong tonnage — has earned it the benefit of the doubt.</div>
+  </section>
+
+  <section id="s5">
+    <div class="eyebrow">5 · Ping-pong</div>
+    <h2>Stock that travelled for nothing — and June was the worst month</h2>
+    <div class="tablebox"><table>
+      <tr><th>What happened</th><th class="num">Items</th><th class="num">Weight</th><th class="num">Wasted distance*</th></tr>
+      <tr><td>Went A→B and came straight back</td><td class="num">74,358</td><td class="num">150 t</td><td class="num">71,300 t-km</td></tr>
+      <tr><td>Left the city, returned to the building next door</td><td class="num">6,365</td><td class="num">18 t</td><td class="num">15,300 t-km</td></tr>
+      <tr><td>Took a detour through another state</td><td class="num">12,785</td><td class="num">6 t</td><td class="num">5,000 t-km</td></tr>
+      <tr><td>Two-hop routing where a direct route existed</td><td class="num">~4 lakh</td><td class="num">350 t</td><td class="num">96,600 t-km</td></tr>
+    </table></div>
+    <p style="margin-top:10px">That is at least <b>1.88 lakh tonne-km of wasted movement</b> — a loaded 7-tonne truck driving ~27,000 km for nothing. The true figure is higher still, since factory routes and the Aurangabad–Pune lane have no distance constant yet.</p>
+    <h3>Month on month, who pushed the stock that came back (tonnes returned)</h3>
+    <div class="tablebox"><table>
+      <tr><th>Outbound leg raised by</th><th class="num">Apr</th><th class="num">May</th><th class="num">Jun</th><th class="num">Jul (13d)</th><th class="num">Total</th></tr>
+      <tr><td>Manual push, came back</td><td class="num">11</td><td class="num">23</td><td class="num bad-t">46</td><td class="num">8</td><td class="num">88</td></tr>
+      <tr><td>System push, came back</td><td class="num">5</td><td class="num">25</td><td class="num">30</td><td class="num">2</td><td class="num">62</td></tr>
+      <tr class="total"><td>Total</td><td class="num">16</td><td class="num">48</td><td class="num">75</td><td class="num">11</td><td class="num">150</td></tr>
+    </table></div>
+    <p style="margin-top:10px">June's spike is the bill for April–May's pre-season push: stock destinations couldn't sell came flooding back mid-season. Manual pushes drive the majority of returned weight, and by item count it's even clearer — 73% of round trips start with a manual push. In 34,000 cases the return leg was raised by the <i>system</i>, paying to bring back what a manual order had sent. Pure system flip-flops exist (13,000 items, ~30 t across May–June) and need the cool-off rule too, but they are the smaller half. July looks better on both sides so far.</p>
+    <div class="callout"><b>Timing tells a story:</b> 84% of round trips complete within 30 days, and the largest share starts and reverses <b>inside the same calendar month</b> — a pattern consistent with stock being moved to meet month-end targets and returned after.</div>
+
+    <h3>How big is ping-pong against the whole network?</h3>
+    <p>Round trips are <b>2.8% of all tonnage (150 t of 5,301 t) and ~1.5% of units (74,358 of 51 lakh)</b> — small as a share, but concentrated and cyclical:</p>
+    <div class="tablebox"><table>
+      <tr><th>Month</th><th class="num">Dispatched</th><th class="num">Bounced back</th><th class="num">% of month's tonnage</th></tr>
+      <tr><td>April</td><td class="num">877 t · 8.9 L units</td><td class="num">15.8 t · 6,955 units</td><td class="num">1.8%</td></tr>
+      <tr><td>May</td><td class="num">1,785 t · 12.1 L units</td><td class="num">48.1 t · 17,819 units</td><td class="num">2.7%</td></tr>
+      <tr><td>June</td><td class="num">1,707 t · 17.9 L units</td><td class="num bad-t">75.2 t · 40,400 units</td><td class="num bad-t">4.4%</td></tr>
+      <tr><td>July (13d)</td><td class="num">935 t · 12.4 L units</td><td class="num">10.9 t · 9,325 units</td><td class="num good-t">1.2%</td></tr>
+    </table></div>
+
+    <h3>Which products bounce — the four diseases</h3>
+    <p><b>Seeds are the ping-pong product: 79 t of the 150 t (53%)</b> despite being ~21% of moved tonnage. The biggest single offenders, full year:</p>
+    <div class="tablebox"><table>
+      <tr><th>Item</th><th class="num">Bounced</th><th>Corridor</th><th class="num">Days away</th><th>Pushed by</th><th class="num">Wasted t-km</th><th class="num">% of SKU's movement</th></tr>
+      <tr><td>Parakh Manure 20 kg</td><td class="num">15.3 t · 763 u</td><td>Raipur↔Jabalpur</td><td class="num">6</td><td>system (May) + manual (Apr)</td><td class="num">7,823</td><td class="num">4%</td></tr>
+      <tr><td>JS 9305 Soybean Seeds 30 kg</td><td class="num">15.1 t · 503 u</td><td>Akola↔Aurangabad</td><td class="num bad-t">2</td><td>96% system</td><td class="num">7,841</td><td class="num bad-t">39%</td></tr>
+      <tr><td>JS 335 Soybean Seeds 30 kg</td><td class="num">7.6 t · 254 u</td><td>Ahmedabad↔Jaipur</td><td class="num bad-t">1</td><td>94% manual</td><td class="num">6,935</td><td class="num">25%</td></tr>
+      <tr><td>1221 Maize Seeds 4 kg</td><td class="num">6.4 t · 1,592 u</td><td>Indore↔Jabalpur</td><td class="num">13</td><td>mixed</td><td class="num">3,395</td><td class="num">16%</td></tr>
+      <tr><td>Research 2221 Paddy 3 kg</td><td class="num">5.7 t · 1,885 u</td><td>LKO02↔LKO01 (same city)</td><td class="num">3</td><td>89% manual</td><td class="num">~0</td><td class="num">24%</td></tr>
+      <tr><td>G-20 Groundnut Seeds 20 kg</td><td class="num">4.3 t · 216 u</td><td>RJ02↔RJ01 (same city)</td><td class="num">1</td><td>100% manual</td><td class="num">0</td><td class="num">12%</td></tr>
+    </table></div>
+    <p style="margin-top:10px">Four distinct behaviours hide in there: <b>(1) instant rejections</b> — the soybeans came back in 1–2 days, meaning the destination refused them on arrival (fix: acceptance check); <b>(2) seed-timing misses</b> — maize/paddy bounced in 3–13 days with 200+ days of viability left, i.e., sowing-window roulette (fix: gate seed transfers on sowing/weather signals, not monthly budgets); <b>(3) heavy manure on long paid legs</b> — Parakh + Sanchaar are the wasted-kilometre champions at 20–25 kg per unit (fix: stricter inter-state threshold for heavy low-value CN); <b>(4) same-city channel shuffle</b> — ~39 t bounced between the B2B ('02') and B2C ('01') buildings of the same city: zero freight but real handling churn (fix: decide the channel split before stocking). One hypothesis died: ping-pong is <i>not</i> expiry-driven — bounced stock had 200–1,500 days of shelf life, with a single exception (G-20 Groundnut, ~80 days left, 100% near-expiry — that SKU needs liquidation, not another transfer).</p>
+
+    <h3>The monthly 80% Pareto — a shortlist, not a haystack</h3>
+    <p>Each month, <b>just 11–20 SKUs account for ~80% of all bounced weight</b>, and the list rotates with the crop calendar: manures pre-season → paddy/groundnut in May → soybean/maize at sowing → herbicides after. By product group:</p>
+    <div class="tablebox"><table>
+      <tr><th>Month</th><th>Groups covering ~80% of bounced weight</th></tr>
+      <tr><td>April</td><td>Crop Nutrition 4.6 t · 413 u → Org. Manure 3.2 t · 256 u → Biostimulants 2.1 t · 524 u → Herbicides 1.4 t · 1,525 u → Fertilizer 1.1 t</td></tr>
+      <tr><td>May</td><td>Field-crop seeds 17.0 t · 5,122 u → Crop Nutrition 12.7 t · 1,398 u → Seeds 6.4 t · 1,054 u → Org. Manure 4.6 t</td></tr>
+      <tr><td>June</td><td>Seeds 26.9 t · 1,143 u → Field-crop seeds 22.5 t · 5,003 u → Crop Protection 5.2 t · 11,277 u → Crop Nutrition 4.6 t</td></tr>
+      <tr><td>July (13d)</td><td>Field-crop seeds 5.4 t · 1,338 u → Crop Protection 2.1 t · 2,673 u → Biostimulants 0.7 t → Crop Nutrition 0.6 t</td></tr>
+    </table></div>
+
+    <h3>Every SKU to ~80%, month by month, with the cause</h3>
+    <p class="note">Cause: who raised the outbound leg → who raised the return. <b>M→S</b> = manual pushed, system paid to bring it back. <b>S→M</b> = system pushed, destination manually returned it. M→M / S→S = same side both ways.</p>
+    <div class="scrollbox"><table>
+      <tr><th>Month</th><th>#</th><th>Item</th><th class="num">Units</th><th class="num">Tonnes</th><th class="num">Cum %</th><th>Cause</th></tr>
+      <tr><td>Apr</td><td>1</td><td>Parakh Manure 20 kg</td><td class="num">166</td><td class="num">3.3</td><td class="num">21</td><td>M→S</td></tr>
+      <tr><td>Apr</td><td>2</td><td>Sanchaar Manure 10 kg</td><td class="num">222</td><td class="num">2.2</td><td class="num">35</td><td>M→S</td></tr>
+      <tr><td>Apr</td><td>3</td><td>Bhumika 4 kg Jar</td><td class="num">351</td><td class="num">1.4</td><td class="num">44</td><td>M→M</td></tr>
+      <tr><td>Apr</td><td>4</td><td>Sanchaar Manure 30 kg</td><td class="num">33</td><td class="num">1.0</td><td class="num">50</td><td>mixed→M</td></tr>
+      <tr><td>Apr</td><td>5</td><td>Selzic S+Zn 50×1 kg</td><td class="num">19</td><td class="num">0.9</td><td class="num">56</td><td>mixed</td></tr>
+      <tr><td>Apr</td><td>6</td><td>Glyclean (Glyphosate) 1 L</td><td class="num">950</td><td class="num">0.9</td><td class="num">62</td><td>S→M</td></tr>
+      <tr><td>Apr</td><td>7</td><td>Tarplus Sheet 40×30</td><td class="num">36</td><td class="num">0.7</td><td class="num">66</td><td>S→S</td></tr>
+      <tr><td>Apr</td><td>8</td><td>Bhumika Drum 30 kg</td><td class="num">15</td><td class="num">0.5</td><td class="num">69</td><td>M→S</td></tr>
+      <tr><td>Apr</td><td>9</td><td>KNO3 25 kg</td><td class="num">14</td><td class="num">0.3</td><td class="num">72</td><td>S→S</td></tr>
+      <tr><td>Apr</td><td>10</td><td>Perpendi 1 L</td><td class="num">350</td><td class="num">0.3</td><td class="num">74</td><td>S→S</td></tr>
+      <tr><td>Apr</td><td>11</td><td>Sulphur Maxx</td><td class="num">11</td><td class="num">0.3</td><td class="num">76</td><td>M→S</td></tr>
+      <tr><td>Apr</td><td>12</td><td>Sulphur 90G 30 kg</td><td class="num">10</td><td class="num">0.3</td><td class="num">78</td><td>M→S</td></tr>
+      <tr><td>Apr</td><td>13</td><td>Tarplus Sheet 24×17</td><td class="num">36</td><td class="num">0.2</td><td class="num">79</td><td>S→S</td></tr>
+      <tr><td>Apr</td><td>14</td><td>6221 SSG Fodder Seeds</td><td class="num">81</td><td class="num">0.2</td><td class="num">81</td><td>S→M</td></tr>
+      <tr><td>May</td><td>1</td><td>Parakh Manure 20 kg</td><td class="num">597</td><td class="num">11.9</td><td class="num">25</td><td>S→M</td></tr>
+      <tr><td>May</td><td>2</td><td>Research 2221 Paddy 3 kg</td><td class="num">1,876</td><td class="num">5.6</td><td class="num">37</td><td>M→S</td></tr>
+      <tr><td>May</td><td>3</td><td>PB-1509 Paddy 10 kg</td><td class="num">518</td><td class="num">5.2</td><td class="num">47</td><td>S→S</td></tr>
+      <tr><td>May</td><td>4</td><td>G-20 Groundnut 20 kg (near-expiry)</td><td class="num">200</td><td class="num">4.0</td><td class="num">56</td><td>M→M</td></tr>
+      <tr><td>May</td><td>5</td><td>Sanchaar Manure 25 kg</td><td class="num">123</td><td class="num">3.1</td><td class="num">62</td><td>S→M</td></tr>
+      <tr><td>May</td><td>6</td><td>111 Maize 4 kg</td><td class="num">480</td><td class="num">1.9</td><td class="num">66</td><td>mixed</td></tr>
+      <tr><td>May</td><td>7</td><td>Hotsure herbicide</td><td class="num">1,544</td><td class="num">1.9</td><td class="num">70</td><td>M→S</td></tr>
+      <tr><td>May</td><td>8</td><td>Res Paddy 2222 3 kg</td><td class="num">457</td><td class="num">1.4</td><td class="num">73</td><td>M→M</td></tr>
+      <tr><td>May</td><td>9</td><td>PB-1692 Paddy 10 kg</td><td class="num">135</td><td class="num">1.4</td><td class="num">76</td><td>M→S</td></tr>
+      <tr><td>May</td><td>10</td><td>101 Maize 4 kg</td><td class="num">296</td><td class="num">1.2</td><td class="num">78</td><td>M→M</td></tr>
+      <tr><td>May</td><td>11</td><td>Sanchaar Manure 30 kg</td><td class="num">37</td><td class="num">1.1</td><td class="num">80</td><td>mixed</td></tr>
+      <tr><td>Jun</td><td>1</td><td>JS 9305 CS Soybean 30 kg</td><td class="num">500</td><td class="num">15.0</td><td class="num">20</td><td>S→M</td></tr>
+      <tr><td>Jun</td><td>2</td><td>JS 335 TL Soybean 30 kg</td><td class="num">244</td><td class="num">7.3</td><td class="num">30</td><td>M→M</td></tr>
+      <tr><td>Jun</td><td>3</td><td>1221 Maize 4 kg</td><td class="num">1,592</td><td class="num">6.4</td><td class="num">38</td><td>mixed</td></tr>
+      <tr><td>Jun</td><td>4</td><td>Research 2222 Paddy 10 kg</td><td class="num">498</td><td class="num">5.0</td><td class="num">45</td><td>M→S</td></tr>
+      <tr><td>Jun</td><td>5</td><td>PB-1718 Paddy 10 kg</td><td class="num">328</td><td class="num">3.3</td><td class="num">49</td><td>mixed</td></tr>
+      <tr><td>Jun</td><td>6</td><td>111 Maize 4 kg</td><td class="num">743</td><td class="num">3.0</td><td class="num">53</td><td>S→S</td></tr>
+      <tr><td>Jun</td><td>7</td><td>1235 Maize 4 kg</td><td class="num">536</td><td class="num">2.1</td><td class="num">56</td><td>M→M</td></tr>
+      <tr><td>Jun</td><td>8</td><td>SprayStar Sprayer</td><td class="num">228</td><td class="num">1.8</td><td class="num">58</td><td>M→S</td></tr>
+      <tr><td>Jun</td><td>9</td><td>Bhumika 8N×4 kg</td><td class="num">51</td><td class="num">1.6</td><td class="num">61</td><td>M→S</td></tr>
+      <tr><td>Jun</td><td>10</td><td>NPK 8:8:8 Sugarcane 1 L</td><td class="num">1,594</td><td class="num">1.6</td><td class="num">63</td><td>M→M</td></tr>
+      <tr><td>Jun</td><td>11</td><td>Plantigain CaMg</td><td class="num">1,438</td><td class="num">1.4</td><td class="num">65</td><td>M→M</td></tr>
+      <tr><td>Jun</td><td>12</td><td>AS 1177 Soybean 25 kg</td><td class="num">56</td><td class="num">1.4</td><td class="num">66</td><td>M→S</td></tr>
+      <tr><td>Jun</td><td>13</td><td>101 Maize 4 kg</td><td class="num">342</td><td class="num">1.4</td><td class="num">68</td><td>M→S</td></tr>
+      <tr><td>Jun</td><td>14</td><td>Sanchaar Manure 25 kg</td><td class="num">54</td><td class="num">1.4</td><td class="num">70</td><td>S→M</td></tr>
+      <tr><td>Jun</td><td>15</td><td>Tarplus Sheet 24×20</td><td class="num">169</td><td class="num">1.3</td><td class="num">72</td><td>M→S</td></tr>
+      <tr><td>Jun</td><td>16</td><td>Hotsure herbicide</td><td class="num">1,284</td><td class="num">1.0</td><td class="num">73</td><td>M→S</td></tr>
+      <tr><td>Jun</td><td>17</td><td>Weedlift 50 EC</td><td class="num">2,020</td><td class="num">1.0</td><td class="num">75</td><td>M→S</td></tr>
+      <tr><td>Jun</td><td>18</td><td>Fomexa herbicide</td><td class="num">630</td><td class="num">0.9</td><td class="num">76</td><td>M→S</td></tr>
+      <tr><td>Jun</td><td>19</td><td>JS 9305 TL Soybean 30 kg</td><td class="num">27</td><td class="num">0.8</td><td class="num">77</td><td>mixed→S</td></tr>
+      <tr><td>Jun</td><td>20</td><td>Parashoot 1 L</td><td class="num">744</td><td class="num">0.7</td><td class="num">78</td><td>M→S</td></tr>
+      <tr><td>Jul</td><td>1</td><td>1235 Maize 4 kg</td><td class="num">584</td><td class="num">2.3</td><td class="num">21</td><td>M→M</td></tr>
+      <tr><td>Jul</td><td>2</td><td>1232 Maize 4 kg</td><td class="num">512</td><td class="num">2.0</td><td class="num">40</td><td>M→M</td></tr>
+      <tr><td>Jul</td><td>3</td><td>Slaytor herbicide</td><td class="num">860</td><td class="num">0.9</td><td class="num">48</td><td>M→S</td></tr>
+      <tr><td>Jul</td><td>4</td><td>Fomexa herbicide</td><td class="num">456</td><td class="num">0.7</td><td class="num">54</td><td>M→S</td></tr>
+      <tr><td>Jul</td><td>5</td><td>Bhumika 10 kg</td><td class="num">31</td><td class="num">0.3</td><td class="num">57</td><td>S→S</td></tr>
+      <tr><td>Jul</td><td>6</td><td>NutriPro Grade 2</td><td class="num">1,201</td><td class="num">0.3</td><td class="num">60</td><td>M→M</td></tr>
+      <tr><td>Jul</td><td>7</td><td>JS 335 TL Soybean 30 kg</td><td class="num">10</td><td class="num">0.3</td><td class="num">63</td><td>S→M</td></tr>
+      <tr><td>Jul</td><td>8</td><td>Bhumika Drum 30 kg</td><td class="num">10</td><td class="num">0.3</td><td class="num">65</td><td>M→S</td></tr>
+      <tr><td>Jul</td><td>9</td><td>PB-1718 Paddy 10 kg</td><td class="num">27</td><td class="num">0.3</td><td class="num">68</td><td>M→S</td></tr>
+      <tr><td>Jul</td><td>10</td><td>Maharaza Biofertilizer 1 kg</td><td class="num">260</td><td class="num">0.3</td><td class="num">70</td><td>S→S</td></tr>
+      <tr><td>Jul</td><td>11</td><td>1221 Maize 5 kg</td><td class="num">48</td><td class="num">0.2</td><td class="num">72</td><td>S→S</td></tr>
+      <tr><td>Jul</td><td>12</td><td>Hotsure herbicide</td><td class="num">273</td><td class="num">0.2</td><td class="num">74</td><td>M→mixed</td></tr>
+      <tr><td>Jul</td><td>13</td><td>101 Maize 4 kg</td><td class="num">48</td><td class="num">0.2</td><td class="num">76</td><td>M→S</td></tr>
+      <tr><td>Jul</td><td>14</td><td>Sulphur Maxx</td><td class="num">12</td><td class="num">0.2</td><td class="num">78</td><td>mixed→S</td></tr>
+      <tr><td>Jul</td><td>15</td><td>PB-1692 Paddy 10 kg</td><td class="num">18</td><td class="num">0.2</td><td class="num">80</td><td>M→S</td></tr>
+      <tr><td>Jul</td><td>16</td><td>Sulphur 90G 30 kg</td><td class="num">5</td><td class="num">0.1</td><td class="num">81</td><td>S→S</td></tr>
+    </table></div>
+    <div class="callout"><b>What is causing it — the verdict from the monthly cause map:</b> the dominant pattern in every month except May is a <b>manual push that the system later reverses (M→S)</b>. May is the system's one bad month and it is essentially one SKU — Parakh manure, which manual pushed in April (M→S) and the system pushed back out in May (S→M): the two sides ping-ponged the same product at each other across two months. June's two biggest offenders failed in opposite directions — JS 9305 soybean was a system push the destination refused in 2 days, JS 335 was a pure manual error — which is why the fix needs both the 30-day cool-off <i>and</i> the destination-acceptance check. In July the system has essentially stopped generating new ping-pong; the residue is manual maize returns as sowing windows closed. A standing monthly watchlist of ~15 SKUs (this table, regenerated monthly) would police ~80% of all ping-pong weight.</div>
+  </section>
+
+  <section id="s6">
+    <div class="eyebrow">6 · Facility balance</div>
+    <h2>Who feeds the network, who consumes it</h2>
+    <div class="tablebox"><table>
+      <tr><th>Net senders</th><th class="num">Out</th><th class="num">In</th><th>Net receivers</th><th class="num">In</th><th class="num">Out</th></tr>
+      <tr><td>MH02 Aurangabad</td><td class="num">919 t</td><td class="num">356 t</td><td>PNQ02 Pune</td><td class="num">468 t</td><td class="num">36 t</td></tr>
+      <tr><td>PNVL01 Panvel factory</td><td class="num">544 t</td><td class="num">—</td><td>AKD02 Akola</td><td class="num">510 t</td><td class="num">272 t</td></tr>
+      <tr><td>GJ06 + RJ06 factories</td><td class="num">284 t</td><td class="num">—</td><td>BAY01 Ballari</td><td class="num">194 t</td><td class="num">26 t</td></tr>
+    </table></div>
+    <p style="margin-top:10px">Aurangabad (MH02) is the de-facto national hub — it ships nearly a fifth of all tonnage. Pune (PNQ02) is the network's biggest sink: it receives 13× more than it sends onward, yet factory stock still reaches it via Aurangabad instead of directly. Around 60 t also went out to COCO retail stores.</p>
+    <div class="callout warn"><b>Data hygiene:</b> transfer headers contain facility codes typed in by hand — we found "idr02", "JBl02", "RJ01&nbsp;" (trailing space), "Lko02" and similar variants. They are small in tonnage but silently fall out of every automated report and route rule. Facility code should be a dropdown, not free text.</div>
+  </section>
+
+  <section id="s7">
+    <div class="eyebrow">7 · Cancellations (kept out of all numbers above)</div>
+    <h2>1,711 orders cancelled before dispatch — and the pace is rising</h2>
+    <p>Monthly: 279 in April, 503 in May, 557 in June, and already 367 in half of July — the run-rate is still climbing. The split is even between manual (862) and system (839). The outlier remains POS store transfers, where <span class="bad-t">36% of orders get cancelled</span>. Separately, about 3,500 system recommendation lines were rejected in CRM before ever becoming orders.</p>
+  </section>
+
+  <section id="s8">
+    <div class="eyebrow">8 · The CXO view</div>
+    <h2>One page, four seats at the table</h2>
+
+    <h3>CFO — the TCI ledger</h3>
+    <div class="tablebox"><table>
+      <tr><th>TCI, lakh tonne-km</th><th class="num">Apr</th><th class="num">May</th><th class="num">Jun</th><th class="num">Jul (13d)</th><th class="num">Avg km each tonne travels</th></tr>
+      <tr><td>Manual</td><td class="num">3.0</td><td class="num">4.3</td><td class="num">3.6</td><td class="num">0.7</td><td class="num">578 → 189 km (shortening)</td></tr>
+      <tr><td>System</td><td class="num">0.9</td><td class="num">1.8</td><td class="num">1.4</td><td class="num">1.5</td><td class="num warn-t">291 → 482 km (lengthening)</td></tr>
+    </table></div>
+    <p style="margin-top:10px">Two crossing trends: manual TCI is collapsing as the season winds down, but the system's average haul has lengthened every month — in July the <b>system is, for the first time, the biggest TCI consumer</b>, driven by its inter-state budget-balancing wave. That's the line for the CFO to watch. Factory TCI is largely unmeasurable until factory lanes get distance constants.</p>
+    <p><b>Expiry exposure on moved stock:</b> of everything transferred and still unsold, ~4 t has already expired (8,300 items) and <b>33 t expires within 90 days</b> — 27 t of it from manual pushes (37,800 items). This stock paid freight and is now racing its own label date; it should be first in line for liquidation.</p>
+
+    <h3>COO — trucks and clocks</h3>
+    <div class="tablebox"><table>
+      <tr><th>Tier</th><th class="num">Avg weight per TO</th><th class="num">TOs under 200 kg</th><th class="num">Median days to receive</th></tr>
+      <tr><td>Intra-FC</td><td class="num">192 kg</td><td class="num">84%</td><td class="num">same day</td></tr>
+      <tr><td>Inter-City</td><td class="num">387 kg</td><td class="num">77%</td><td class="num">2.3</td></tr>
+      <tr><td>Inter-State</td><td class="num">371 kg</td><td class="num bad-t">75%</td><td class="num">5.1</td></tr>
+    </table></div>
+    <p style="margin-top:10px"><b>Three out of four inter-state transfer orders weigh less than 200 kg</b> — parcel-sized loads crossing state borders one order at a time. Consolidating each lane into a weekly milk-run is likely the single biggest operational saving in this report, and it needs no algorithm — just a dispatch calendar. Receiving speed is healthy (2–5 days median).</p>
+
+    <h3>CPO — which categories consume the TCI</h3>
+    <p>Crop Nutrition is the freight hog: <b>1,215 t and 3.2 lakh tonne-km</b> — more TCI than insecticides and herbicides combined — because it's heavy and cheap per kg (25 kg fertilizer bags, manure). Field-crop seeds are second (2.6 lakh t-km) and are seasonal by nature. The CPO question: for heavy, low-value CN lines, is a second regional source or factory-direct routing cheaper than any amount of transfer optimization?</p>
+
+    <h3>CTO — the algorithm verdict</h3>
+    <p>We tested whether the two recommendation programmes fight each other (budget-balancing pushing out, UF-case pulling back). <b>They don't</b> — that overlap is tiny (1,364 items). The real defect is simpler: <b>the UF-case engine reverses itself</b> — 10,532 items went out on a UF recommendation and came back on another UF recommendation ~17 days later. The engine has no memory of its own recent moves; the fix is a cool-off feature inside the recommendation logic, not a redesign. (For symmetry: the manual world has the same disease — DRR-Fulfil reversed its own moves for 26 t.)</p>
+  </section>
+
+  <section id="s9">
+    <div class="eyebrow">9 · What we should do</div>
+    <h2>Seven actions, in order of money</h2>
+    <ol class="actions">
+      <li><b>Consolidate small inter-state shipments.</b> 75% of inter-state TOs weigh under 200 kg. A weekly dispatch calendar per lane turns parcel-sized trips into full loads — the biggest operational saving here, no algorithm needed.</li>
+      <li><b>Add a 30-day cool-off rule — including inside the UF engine.</b> Block or force-review any transfer that reverses a route the same product travelled in the past 30 days. Catches ~84% of round-trip waste, would have blunted June's 75-tonne return wave, and cures the UF engine's self-reversal (10,500 items).</li>
+      <li><b>Let the destination confirm before we ship.</b> Akola↔Aurangabad is the worst case: the system sent 29 tonnes that were manually shipped back within 6 days. One acceptance check stops it.</li>
+      <li><b>Ship factory output to its real destination.</b> Karjan stock waits ~54 days in Aurangabad before moving on; Pune receives factory goods second-hand. Route by final demand — Bagru→Jaipur shows we already know how.</li>
+      <li><b>Review manual bulk (BM) pushes.</b> Only 46% sold within 60 days, and the system reversed 30 tonnes of them at our own freight cost. Every reversal is a documented wrong call — use the list to retrain planning.</li>
+      <li><b>Book all factory dispatches as Manufacturing TOs (VTO) in WMS.</b> Panvel (544 t) and the smaller Gujarat sites currently ship under ordinary UTO numbers. This report reclassifies them by origin, but the source booking should be fixed so every system and report sees factory output correctly.</li>
+      <li><b>Fix the basics.</b> Add the Aurangabad↔Pune lane and all factory sites to the distance constants, make facility codes a dropdown, and never truck stock out of a city when a free Intra-FC move exists (35 tonnes did exactly that).</li>
+    </ol>
+  </section>
+
+  <section id="s10">
+    <div class="eyebrow">Appendix · For review</div>
+    <h2>Top 50 items on inter-state transfers</h2>
+    <p class="note">Every tonne here crossed a state border at least once. Scroll the list; sorted by weight moved.</p>
+    <div class="scrollbox"><table>
+      <tr><th>#</th><th>SKU</th><th>Item</th><th class="num">Units</th><th class="num">Tonnes</th><th class="num">TOs</th><th>Biggest lane</th></tr>
+      <tr><td>1</td><td>AGS-CN-833</td><td>Calcium Nitrate 25 kg</td><td class="num">5,304</td><td class="num">132.6</td><td class="num">39</td><td>PNVL01→BAY01</td></tr>
+      <tr><td>2</td><td>AGS-CN-831</td><td>NPK 0:52:34 (MKP) 25 kg</td><td class="num">4,400</td><td class="num">110.0</td><td class="num">27</td><td>PNVL01→BAY01</td></tr>
+      <tr><td>3</td><td>AGS-CN-971</td><td>Parakh (P-Rich Organic Manure) 20 kg</td><td class="num">4,881</td><td class="num">97.6</td><td class="num">10</td><td>AHM02→BAY01</td></tr>
+      <tr><td>4</td><td>AGS-CN-952</td><td>Bhumika BioActiv 3 kg</td><td class="num">27,667</td><td class="num">83.0</td><td class="num">25</td><td>GJ12→IDR02</td></tr>
+      <tr><td>5</td><td>AGS-CN-828</td><td>NPK 12:61:0 (MAP) 25 kg</td><td class="num">2,556</td><td class="num">63.9</td><td class="num">37</td><td>JBL02→BAY01</td></tr>
+      <tr><td>6</td><td>AGS-CN-830</td><td>NPK 13:0:45 (Potassium Nitrate) 25 kg</td><td class="num">2,442</td><td class="num">61.0</td><td class="num">28</td><td>PNVL01→BAY01</td></tr>
+      <tr><td>7</td><td>AGS-CN-860</td><td>Bhumika 8N×4 kg Drum</td><td class="num">1,525</td><td class="num">48.8</td><td class="num">19</td><td>PAR01→RJ02</td></tr>
+      <tr><td>8</td><td>AGS-CN-004</td><td>Power Gel 500 g</td><td class="num">91,344</td><td class="num">45.7</td><td class="num">83</td><td>MH02→AHM02</td></tr>
+      <tr><td>9</td><td>AGS-S-4844</td><td>AS-2288 Paddy Seeds 10 kg</td><td class="num">4,572</td><td class="num">45.7</td><td class="num">12</td><td>LKO02→JBL02</td></tr>
+      <tr><td>10</td><td>AGS-S-4524</td><td>1232 Maize Seeds 4 kg</td><td class="num">11,016</td><td class="num">44.1</td><td class="num">9</td><td>HYD01→BAY01</td></tr>
+      <tr><td>11</td><td>AGS-CP-1157</td><td>Atraz (Atrazine 50% WP) 500 g</td><td class="num">87,540</td><td class="num">43.8</td><td class="num">50</td><td>MH02→BAY01</td></tr>
+      <tr><td>12</td><td>AGS-CN-978</td><td>Calcium Nitrate 10 kg</td><td class="num">4,311</td><td class="num">43.1</td><td class="num">28</td><td>MH01→AHM02</td></tr>
+      <tr><td>13</td><td>AGS-CP-937</td><td>Arex 505 1 L</td><td class="num">38,200</td><td class="num">38.2</td><td class="num">36</td><td>GJ06→RJ02</td></tr>
+      <tr><td>14</td><td>AGS-CN-737</td><td>Faster (Biostimulant) 500 ml</td><td class="num">75,109</td><td class="num">37.6</td><td class="num">54</td><td>IDR02→AGR02</td></tr>
+      <tr><td>15</td><td>AGS-CN-730</td><td>Bhumika Drum 30 kg</td><td class="num">1,219</td><td class="num">36.6</td><td class="num">32</td><td>PAR01→RJ02</td></tr>
+      <tr><td>16</td><td>AGS-CP-971</td><td>Agronil GR (Fipronil 0.3%) 5 kg</td><td class="num">7,305</td><td class="num">36.5</td><td class="num">19</td><td>RJ02→BAY01</td></tr>
+      <tr><td>17</td><td>AGS-CN-942</td><td>Maharaza (Mycorrhiza) 4 kg</td><td class="num">9,054</td><td class="num">36.2</td><td class="num">19</td><td>BAY01→GNT01</td></tr>
+      <tr><td>18</td><td>AGS-S-4660</td><td>1235 Maize Seeds 4 kg</td><td class="num">7,767</td><td class="num">31.1</td><td class="num">15</td><td>MH02→IDR02</td></tr>
+      <tr><td>19</td><td>AGS-CN-627</td><td>Bhumika 2 kg</td><td class="num">15,111</td><td class="num">30.2</td><td class="num">26</td><td>HYD01→GNT01</td></tr>
+      <tr><td>20</td><td>AGS-CN-824</td><td>NPK 0:52:34 (MKP) 1 kg</td><td class="num">29,728</td><td class="num">29.7</td><td class="num">44</td><td>AHM02→JBL02</td></tr>
+      <tr><td>21</td><td>AGS-CP-1147</td><td>Glyclean (Glyphosate 41%) 1 L</td><td class="num">28,110</td><td class="num">28.1</td><td class="num">32</td><td>RJ02→HSR01</td></tr>
+      <tr><td>22</td><td>AGS-CN-950</td><td>Bhumika 4 kg pouch</td><td class="num">6,921</td><td class="num">27.7</td><td class="num">35</td><td>IDR02→MH01</td></tr>
+      <tr><td>23</td><td>AGS-CN-443</td><td>Bhumika 4 kg Jar</td><td class="num">6,935</td><td class="num">27.7</td><td class="num">30</td><td>AHM02→PNQ02</td></tr>
+      <tr><td>24</td><td>AGS-CN-826</td><td>Calcium Nitrate 1 kg</td><td class="num">27,073</td><td class="num">27.1</td><td class="num">41</td><td>RJ02→LKO02</td></tr>
+      <tr><td>25</td><td>AGS-CP-935</td><td>Hexza (Hexaconazole 5% SC) 1 L</td><td class="num">26,130</td><td class="num">26.1</td><td class="num">34</td><td>RJ02→LKO02</td></tr>
+      <tr><td>26</td><td>AGS-CN-943</td><td>Maharaza (Mycorrhiza) 1 kg</td><td class="num">25,407</td><td class="num">25.4</td><td class="num">35</td><td>RJ02→LKO02</td></tr>
+      <tr><td>27</td><td>AGS-CN-827</td><td>NPK 19:19:19 (TE) 25 kg</td><td class="num">863</td><td class="num">21.6</td><td class="num">15</td><td>HYD01→RPR01</td></tr>
+      <tr><td>28</td><td>AGS-CN-818</td><td>Sanchaar Organic Manure 25 kg</td><td class="num">793</td><td class="num">19.8</td><td class="num">22</td><td>AKD02→AHM02</td></tr>
+      <tr><td>29</td><td>AGS-CN-612</td><td>Bhumika 10 kg</td><td class="num">1,984</td><td class="num">19.8</td><td class="num">17</td><td>JBL02→AGROSTARWAREHOUSE</td></tr>
+      <tr><td>30</td><td>AGS-S-4520</td><td>Research 2222 Paddy Seeds 10 kg</td><td class="num">1,959</td><td class="num">19.6</td><td class="num">2</td><td>LKO02→JBL02</td></tr>
+      <tr><td>31</td><td>AGS-CP-1841</td><td>Heliox 1 L</td><td class="num">19,090</td><td class="num">19.1</td><td class="num">30</td><td>AHM02→IDR02</td></tr>
+      <tr><td>32</td><td>AGS-S-4488</td><td>JS 335 TL Soybean Seeds 30 kg</td><td class="num">636</td><td class="num">19.1</td><td class="num">3</td><td>AHM02→RJ01</td></tr>
+      <tr><td>33</td><td>AGS-CP-1232</td><td>Arex 505 500 ml</td><td class="num">38,054</td><td class="num">19.0</td><td class="num">42</td><td>AGROSTARWAREHOUSE→JBL01</td></tr>
+      <tr><td>34</td><td>AGS-CP-1310</td><td>Paraquit (Paraquat 24% SL) 1 L</td><td class="num">18,912</td><td class="num">18.9</td><td class="num">42</td><td>HYD01→GNT01</td></tr>
+      <tr><td>35</td><td>AGS-CN-713</td><td>Humic Power NX 200 g</td><td class="num">92,606</td><td class="num">18.5</td><td class="num">65</td><td>AHM02→BAY01</td></tr>
+      <tr><td>36</td><td>AGS-CN-820</td><td>NPK 19:19:19 (TE) 1 kg</td><td class="num">18,138</td><td class="num">18.1</td><td class="num">38</td><td>HYD01→AKD01</td></tr>
+      <tr><td>37</td><td>AGS-S-4851</td><td>PB-1885 OP Paddy Seeds 4 kg</td><td class="num">4,336</td><td class="num">17.3</td><td class="num">3</td><td>HSR01→AGR01</td></tr>
+      <tr><td>38</td><td>AGS-CP-1448</td><td>Rapigen GR 4 kg</td><td class="num">4,145</td><td class="num">16.6</td><td class="num">17</td><td>AGR02→JBL02</td></tr>
+      <tr><td>39</td><td>AGS-CN-861</td><td>Bhumika 15N×2 kg Drum</td><td class="num">534</td><td class="num">16.0</td><td class="num">10</td><td>AKD01→AGROSTARWAREHOUSE</td></tr>
+      <tr><td>40</td><td>AGS-CN-821</td><td>NPK 12:61:0 (MAP) 1 kg</td><td class="num">15,414</td><td class="num">15.4</td><td class="num">24</td><td>LKO01→AGROSTARWAREHOUSE</td></tr>
+      <tr><td>41</td><td>AGS-CN-426</td><td>Sulphur 90G Powder 30 kg</td><td class="num">499</td><td class="num">15.0</td><td class="num">17</td><td>IDR02→PNQ02</td></tr>
+      <tr><td>42</td><td>AGS-S-4666</td><td>1221 Maize Seeds 4 kg</td><td class="num">3,752</td><td class="num">15.0</td><td class="num">2</td><td>RJ02→HSR01</td></tr>
+      <tr><td>43</td><td>AGS-CP-1943</td><td>Weedlift 50 EC 1 L</td><td class="num">13,200</td><td class="num">13.2</td><td class="num">24</td><td>LKO02→PAT02</td></tr>
+      <tr><td>44</td><td>AGS-CP-1455</td><td>Rapigen GR 2 kg</td><td class="num">6,540</td><td class="num">13.1</td><td class="num">19</td><td>RJ02→GNT01</td></tr>
+      <tr><td>45</td><td>AGS-CN-858</td><td>Faster (Biostimulant) 1 L</td><td class="num">13,020</td><td class="num">13.0</td><td class="num">41</td><td>AHM02→LKO02</td></tr>
+      <tr><td>46</td><td>AGS-CP-1559</td><td>Hexza 500 ml</td><td class="num">25,604</td><td class="num">12.8</td><td class="num">34</td><td>HYD01→MH01</td></tr>
+      <tr><td>47</td><td>AGS-CP-1209</td><td>Perpendi (Pendimethalin 30%) 1 L</td><td class="num">12,586</td><td class="num">12.6</td><td class="num">40</td><td>AHM02→AKD02</td></tr>
+      <tr><td>48</td><td>AGS-S-0050</td><td>101 Maize Seeds 4 kg</td><td class="num">2,792</td><td class="num">11.2</td><td class="num">5</td><td>RJ02→AHM02</td></tr>
+      <tr><td>49</td><td>AGS-S-4670</td><td>9231 Bajra Seeds 1.5 kg</td><td class="num">7,460</td><td class="num">11.2</td><td class="num">10</td><td>RJ02→AHM02</td></tr>
+      <tr><td>50</td><td>AGS-CP-1264</td><td>Agronil GR 1 kg</td><td class="num">10,175</td><td class="num">10.2</td><td class="num">9</td><td>HYD01→GNT01</td></tr>
+    </table></div>
+    <p class="note">Heavy 25 kg water-soluble fertilizer bags dominate, and Ballari (BAY01) is the destination of 7 of the top 16 — worth checking whether Ballari should be stocked directly from source instead of via other hubs.</p>
+
+    <h2 style="margin-top:34px">Top 50 items shipped from factories</h2>
+    <p class="note">All Manufacturing-TO dispatches, sorted by weight; main factory and its biggest destination shown.</p>
+    <div class="scrollbox"><table>
+      <tr><th>#</th><th>SKU</th><th>Item</th><th class="num">Units</th><th class="num">Tonnes</th><th>Factory</th><th>Main dest.</th></tr>
+      <tr><td>1</td><td>AGS-CN-833</td><td>Calcium Nitrate 25 kg</td><td class="num">6,480</td><td class="num">162.0</td><td>Panvel</td><td>RPR01</td></tr>
+      <tr><td>2</td><td>AGS-CN-831</td><td>NPK 0:52:34 (MKP) 25 kg</td><td class="num">5,996</td><td class="num">149.9</td><td>Panvel</td><td>RPR01</td></tr>
+      <tr><td>3</td><td>AGS-CN-830</td><td>NPK 13:0:45 (KNO3) 25 kg</td><td class="num">3,088</td><td class="num">77.2</td><td>Panvel</td><td>RPR01</td></tr>
+      <tr><td>4</td><td>AGS-CN-952</td><td>Bhumika BioActiv 3 kg</td><td class="num">18,564</td><td class="num">55.7</td><td>Anand</td><td>IDR02</td></tr>
+      <tr><td>5</td><td>AGS-CN-978</td><td>Calcium Nitrate 10 kg</td><td class="num">5,332</td><td class="num">53.3</td><td>Panvel</td><td>RPR01</td></tr>
+      <tr><td>6</td><td>AGS-CN-004</td><td>Power Gel 500 g</td><td class="num">82,144</td><td class="num">41.1</td><td>Sanand</td><td>JDH02</td></tr>
+      <tr><td>7</td><td>AGS-CP-937</td><td>Arex 505 1 L</td><td class="num">39,500</td><td class="num">39.5</td><td>Karjan</td><td>RJ02</td></tr>
+      <tr><td>8</td><td>AGS-CN-737</td><td>Faster (Biostimulant) 500 ml</td><td class="num">71,912</td><td class="num">36.0</td><td>Sanand</td><td>AHM02</td></tr>
+      <tr><td>9</td><td>AGS-CP-971</td><td>Agronil GR 5 kg</td><td class="num">6,635</td><td class="num">33.2</td><td>Bagru</td><td>IDR02</td></tr>
+      <tr><td>10</td><td>AGS-CN-824</td><td>NPK 0:52:34 (MKP) 1 kg</td><td class="num">33,000</td><td class="num">33.0</td><td>Panvel</td><td>RJ02</td></tr>
+      <tr><td>11</td><td>AGS-CN-821</td><td>NPK 12:61:0 (MAP) 1 kg</td><td class="num">26,000</td><td class="num">26.0</td><td>Panvel</td><td>AKD02</td></tr>
+      <tr><td>12</td><td>AGS-CP-935</td><td>Hexza 1 L</td><td class="num">25,390</td><td class="num">25.4</td><td>Karjan</td><td>AHM02</td></tr>
+      <tr><td>13</td><td>AGS-CN-826</td><td>Calcium Nitrate 1 kg</td><td class="num">24,000</td><td class="num">24.0</td><td>Panvel</td><td>RPR01</td></tr>
+      <tr><td>14</td><td>AGS-CP-1232</td><td>Arex 505 500 ml</td><td class="num">35,660</td><td class="num">17.8</td><td>Karjan</td><td>RJ02</td></tr>
+      <tr><td>15</td><td>AGS-CN-713</td><td>Humic Power NX 200 g</td><td class="num">85,420</td><td class="num">17.1</td><td>Sanand</td><td>JBL02</td></tr>
+      <tr><td>16</td><td>AGS-CP-1187</td><td>Sulphur Fast FWD 15 kg</td><td class="num">970</td><td class="num">14.6</td><td>Bagru</td><td>JDH02</td></tr>
+      <tr><td>17</td><td>AGS-CP-1841</td><td>Heliox 1 L</td><td class="num">14,090</td><td class="num">14.1</td><td>Bagru</td><td>RJ02</td></tr>
+      <tr><td>18</td><td>AGS-CN-858</td><td>Faster (Biostimulant) 1 L</td><td class="num">12,344</td><td class="num">12.3</td><td>Sanand</td><td>JDH02</td></tr>
+      <tr><td>19</td><td>AGS-CP-1559</td><td>Hexza 500 ml</td><td class="num">21,712</td><td class="num">10.9</td><td>Karjan</td><td>AHM02</td></tr>
+      <tr><td>20</td><td>AGS-CN-942</td><td>Maharaza (Mycorrhiza) 4 kg</td><td class="num">2,688</td><td class="num">10.8</td><td>Panchmahal</td><td>RJ02</td></tr>
+      <tr><td>21</td><td>AGS-CP-1147</td><td>Glyclean 1 L</td><td class="num">8,860</td><td class="num">8.9</td><td>Bagru</td><td>AKD02</td></tr>
+      <tr><td>22</td><td>AGS-CP-1558</td><td>TeBull 1 kg</td><td class="num">8,000</td><td class="num">8.0</td><td>Karjan</td><td>AHM02</td></tr>
+      <tr><td>23</td><td>AGS-CP-1219</td><td>Glyclean 71 (71% SG) 100 g</td><td class="num">74,000</td><td class="num">7.4</td><td>Bagru</td><td>RJ02</td></tr>
+      <tr><td>24</td><td>AGS-CP-1513</td><td>Cruzer Plus 1 L</td><td class="num">6,300</td><td class="num">6.3</td><td>Karjan</td><td>RJ02</td></tr>
+      <tr><td>25</td><td>AGS-CP-1436</td><td>Quiz Master 500 ml</td><td class="num">12,000</td><td class="num">6.0</td><td>Bagru</td><td>AKD02</td></tr>
+      <tr><td>26</td><td>AGS-CP-1509</td><td>TMT 70 500 g</td><td class="num">11,860</td><td class="num">5.9</td><td>Karjan</td><td>AGR02</td></tr>
+      <tr><td>27</td><td>AGS-CN-738</td><td>Faster (Biostimulant) 250 ml</td><td class="num">23,120</td><td class="num">5.8</td><td>Sanand</td><td>JDH02</td></tr>
+      <tr><td>28</td><td>AGS-CP-1591</td><td>Aggressor 500 g</td><td class="num">11,110</td><td class="num">5.6</td><td>Karjan</td><td>AHM02</td></tr>
+      <tr><td>29</td><td>AGS-CP-938</td><td>Arex 505 250 ml</td><td class="num">22,520</td><td class="num">5.6</td><td>Karjan</td><td>RJ02</td></tr>
+      <tr><td>30</td><td>AGS-CN-823</td><td>NPK 13:0:45 (KNO3) 1 kg</td><td class="num">5,500</td><td class="num">5.5</td><td>Panvel</td><td>MH02</td></tr>
+      <tr><td>31</td><td>AGS-CP-1508</td><td>TMT 70 1 kg</td><td class="num">5,000</td><td class="num">5.0</td><td>Karjan</td><td>AGR02</td></tr>
+      <tr><td>32</td><td>AGS-CP-1488</td><td>Parashoot 500 ml</td><td class="num">9,804</td><td class="num">4.9</td><td>Bagru</td><td>RJ02</td></tr>
+      <tr><td>33</td><td>AGS-CP-1504</td><td>Kill-X</td><td class="num">4,780</td><td class="num">4.8</td><td>Bagru</td><td>RJ02</td></tr>
+      <tr><td>34</td><td>AGS-CP-1310</td><td>Paraquit 1 L</td><td class="num">4,690</td><td class="num">4.7</td><td>Bagru</td><td>AGR02</td></tr>
+      <tr><td>35</td><td>AGS-CP-1162</td><td>Cruzer Plus 250 ml</td><td class="num">16,920</td><td class="num">4.2</td><td>Karjan</td><td>RJ02</td></tr>
+      <tr><td>36</td><td>AGS-CN-307</td><td>NutriPro Boron 20%</td><td class="num">4,000</td><td class="num">4.0</td><td>Panvel</td><td>RJ02</td></tr>
+      <tr><td>37</td><td>AGS-CP-1437</td><td>Quiz Master 1 L</td><td class="num">4,000</td><td class="num">4.0</td><td>Bagru</td><td>AKD02</td></tr>
+      <tr><td>38</td><td>AGS-CP-926</td><td>TeBull 500 g</td><td class="num">7,904</td><td class="num">4.0</td><td>Karjan</td><td>RJ02</td></tr>
+      <tr><td>39</td><td>AGS-CP-1582</td><td>Roztam</td><td class="num">7,560</td><td class="num">3.8</td><td>Bagru</td><td>AKD02</td></tr>
+      <tr><td>40</td><td>AGS-CP-1505</td><td>Capasity 500 g</td><td class="num">6,440</td><td class="num">3.2</td><td>Karjan</td><td>MH02</td></tr>
+      <tr><td>41</td><td>AGS-CP-1217</td><td>Glyclean 500 ml</td><td class="num">6,200</td><td class="num">3.1</td><td>Bagru</td><td>LKO02</td></tr>
+      <tr><td>42</td><td>AGS-CP-1510</td><td>TMT 70 250 g</td><td class="num">12,480</td><td class="num">3.1</td><td>Karjan</td><td>AGR02</td></tr>
+      <tr><td>43</td><td>AGS-CN-880</td><td>Faster (Biostimulant) 100 ml</td><td class="num">29,320</td><td class="num">2.9</td><td>Sanand</td><td>AHM02</td></tr>
+      <tr><td>44</td><td>AGS-CP-1506</td><td>Capasity 250 g</td><td class="num">11,200</td><td class="num">2.8</td><td>Karjan</td><td>MH02</td></tr>
+      <tr><td>45</td><td>AGS-CN-864</td><td>Humic Power NX 2 kg</td><td class="num">1,344</td><td class="num">2.7</td><td>Sanand</td><td>MH02</td></tr>
+      <tr><td>46</td><td>AGS-CP-1720</td><td>Quiz Master Plus 250 ml</td><td class="num">10,560</td><td class="num">2.6</td><td>Bagru</td><td>RJ02</td></tr>
+      <tr><td>47</td><td>AGS-CP-1840</td><td>Heliox 500 ml</td><td class="num">5,000</td><td class="num">2.5</td><td>Bagru</td><td>AHM02</td></tr>
+      <tr><td>48</td><td>AGS-CN-306</td><td>NutriPro Boron</td><td class="num">5,000</td><td class="num">2.5</td><td>Panvel</td><td>AKD02</td></tr>
+      <tr><td>49</td><td>AGS-CP-1610</td><td>Smart (Ametryn 80% WG) 500 g</td><td class="num">4,980</td><td class="num">2.5</td><td>Bagru</td><td>PNQ02</td></tr>
+      <tr><td>50</td><td>AGS-CP-1609</td><td>Smart (Ametryn 80% WG) 1 kg</td><td class="num">2,500</td><td class="num">2.5</td><td>Bagru</td><td>PNQ02</td></tr>
+    </table></div>
+    <p class="note">Panvel's water-soluble fertilizer bags to Raipur are the single biggest factory flow — five of the top 13 rows. Karjan concentrates on Jaipur and Ahmedabad; Bagru serves Rajasthan plus Akola.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Fine print</div>
+    <div class="fine">
+      <p><b>Definitions.</b> TCI = travel distance × weight (tonne-km), computed from the official FC distance constants. Intra-FC = both facilities in the same city (distance constant 0). Inter-City = same state, different cities. Inter-State = across states. System = transfer orders created from CRM recommendations ("System TO"); Manual = orders raised by planners; Manufacturing TO = any transfer originating at a manufacturing site (classified by origin, since Panvel and some Gujarat sites currently book under UTO numbers instead of VTO).</p>
+      <p><b>Method.</b> WMS transfer invoices joined to transfer headers and sales invoices, 1 Apr – 13 Jul 2026. Cancelled orders and lines are excluded everywhere except section 7. "Sold within 60 days" tracks barcoded serials only, on cohorts with a full 60-day window (transfers to 14 May); the month-cohort table uses a 30-day window so April–June are comparable. Consumption counts only clean sales — cancelled sales lines (0.9% of the sales table) and returns are excluded. Revenue = pre-GST sales value of the first sale of each transferred barcoded item. Wasted distance uses only routes present in the official constants files.</p>
+      <p><b>Caveats.</b> The year is 3.5 months old; recent transfers haven't had time to sell. July figures cover 13 days. Manufacturing-TO stock is excluded from sell-through because it moves onward before reaching farmers; most June–July factory stock is still at hubs, so its dwell numbers will grow.</p>
+    </div>
+  </section>
+
+  <footer>Prepared 13 July 2026 · Sources: pristine_wms_prod_db (transfer_header, invoiced_transfer_report, invoiced_report, location_mst), catalog CRM transfer orders, TransferOrder Inter State Constants (FC Distance, base + 22 Jun update with MH01/MH02).</footer>
+</div>
