@@ -1,71 +1,82 @@
 """Prompt templates for the pitch pipeline's headless `claude -p` calls."""
 
-LANGS = ["English", "Gujarati", "Marathi", "Telugu", "Kannada"]
+ALL_LANGS = ["Hindi", "English", "Gujarati", "Marathi", "Telugu", "Kannada"]
 
 
-def translate_prompt(product, ksp_hindi, oh_hindi, output_path):
-    return f"""Read the following Hindi agri-input sales pitch content for the product "{product}":
+def target_langs_for(source_lang):
+    """English (Hinglish transliteration of the source language) plus every
+    native-script language other than the source itself — these need full
+    ksp/oh translation. The source language itself only needs a displayName."""
+    return ["English"] + [l for l in ALL_LANGS if l not in (source_lang, "English")]
 
-KEY SELLING POINTS (Hindi):
-{ksp_hindi}
 
-OBJECTION HANDLING (Hindi, pairs of a warning-symbol objection line and a check-mark answer line):
-{oh_hindi}
+def translate_prompt(product, source_lang, ksp_src, oh_src, output_path):
+    targets = target_langs_for(source_lang)
 
-TASK: Translate/transliterate this into 5 language variants and also produce a short
-transliterated product display name for each, then save everything as one JSON file
+    shape_lines = [f'  "{source_lang}": {{"displayName": "..."}}']
+    shape_lines += [
+        f'  "{lang}": {{"ksp": "...", "oh": "...", "displayName": "..."}}'
+        for lang in targets
+    ]
+    shape = f'{{\n  "product": "{product}",\n' + ",\n".join(shape_lines) + "\n}"
+
+    return f"""Read the following {source_lang} agri-input sales pitch content for the product "{product}":
+
+KEY SELLING POINTS ({source_lang}):
+{ksp_src}
+
+OBJECTION HANDLING ({source_lang}, pairs of a warning-symbol objection line and a check-mark answer line):
+{oh_src}
+
+TASK: Translate/transliterate this into these {len(targets)} language variants —
+{', '.join(targets)} — and also produce a short transliterated product display name
+for each of those PLUS for {source_lang} itself (a {source_lang}-script rendering of
+the product name "{product}", since {source_lang} needs a display name too even
+though its pitch content doesn't need translating). Save everything as one JSON file
 to {output_path} using the Write tool.
 
 RULES (follow exactly):
-1. "English" variant = Romanized Hinglish, NOT an English translation. Write the SAME
-   Hindi words/meaning using Roman/English letters (transliteration), light grammar
-   cleanup only. Do NOT translate the meaning into actual English prose.
-2. "Gujarati" / "Marathi" / "Telugu" / "Kannada" variants = translate the Hindi meaning
-   into that language's own native script. Full translation, not transliteration.
-3. In ALL 5 variants, do NOT translate or transliterate: technical/chemical/agronomy
+1. "English" variant = Romanized "{source_lang}-lish" (e.g. Hinglish if source is
+   Hindi, Marathi-in-Roman if source is Marathi), NOT an English translation. Write
+   the SAME {source_lang} words/meaning using Roman/English letters (transliteration),
+   light grammar cleanup only. Do NOT translate the meaning into actual English prose.
+2. Every other listed variant = translate the {source_lang} meaning into that
+   language's own native script. Full translation, not transliteration.
+3. In ALL variants, do NOT translate or transliterate: technical/chemical/agronomy
    terms already in English in the source (e.g. Insecticide, Fungicide, Systemic,
    Broad-Spectrum, IGR, NPK, any English agronomy/chemistry term present), and the
    product name "{product}" itself. Keep these exactly as written, in Roman English,
    in every variant.
-4. Keep every number and dosage unchanged. Always render "एकड़"/"एकर" as "acre"
-   (Roman English) in every language variant.
+4. Keep every number and dosage unchanged. Always render "acre" (in whichever
+   source-language word/script it appears, e.g. "एकड़"/"एकर") as "acre" (Roman
+   English) in every language variant.
 5. Preserve the warning/checkmark symbols exactly as they appear in the source
    (⚠/✓ or ⚠️/✅ — whichever variant is used), the objection/answer pairing
    structure, and every line break and blank line exactly as in the source text.
 6. Do not add, remove, merge, or reorder any objection/answer pairs.
-7. displayName_<lang>: a SHORT transliteration of just the product name "{product}"
-   into that language's script (phonetic, like a brand name would be written on
+7. displayName: a SHORT transliteration of just the product name "{product}" into
+   that language's script (phonetic, like a brand name would be written on
    packaging) — not a translation, not a sentence. Keep pure codes/model numbers/
-   abbreviations (e.g. "NX", "70", numbers) in Roman as-is. Produce this for Hindi
-   too (Devanagari transliteration of "{product}"), even though Hindi ksp/oh are
-   not needed here (the Hindi pitch content already exists elsewhere).
+   abbreviations (e.g. "NX", "70", numbers) in Roman as-is.
 
 OUTPUT: valid JSON (no markdown fences), exactly this shape:
-{{
-  "product": "{product}",
-  "Hindi":    {{"displayName": "..."}},
-  "English":  {{"ksp": "...", "oh": "...", "displayName": "..."}},
-  "Gujarati": {{"ksp": "...", "oh": "...", "displayName": "..."}},
-  "Marathi":  {{"ksp": "...", "oh": "...", "displayName": "..."}},
-  "Telugu":   {{"ksp": "...", "oh": "...", "displayName": "..."}},
-  "Kannada":  {{"ksp": "...", "oh": "...", "displayName": "..."}}
-}}
+{shape}
 Use \\n for line breaks inside strings. After writing the file, reply with just the word DONE.
 """
 
 
-def roleplay_prompt(product, ksp_hindi, oh_hindi, output_path):
-    return f"""Here is Hindi agri-input sales pitch content for the product "{product}":
+def roleplay_prompt(product, source_lang, ksp_src, oh_src, output_path):
+    return f"""Here is {source_lang} agri-input sales pitch content for the product "{product}":
 
-KEY SELLING POINTS (Hindi):
-{ksp_hindi}
+KEY SELLING POINTS ({source_lang}):
+{ksp_src}
 
-OBJECTION HANDLING (Hindi, pairs of a warning-symbol objection line and a check-mark answer line):
-{oh_hindi}
+OBJECTION HANDLING ({source_lang}, pairs of a warning-symbol objection line and a check-mark answer line):
+{oh_src}
 
-TASK: Write a Field-vs-Retailer roleplay training script in Hinglish (Hindi meaning
-written in Roman/English script — transliteration, NOT English translation) and save
-it to {output_path} using the Write tool.
+TASK: Write a Field-vs-Retailer roleplay training script in Hinglish (the {source_lang}
+meaning written in Roman/English script — transliteration, NOT English translation)
+and save it to {output_path} using the Write tool.
 
 FORMAT (follow exactly):
 - Two speakers. Speaker 1 = Rahul (AgroStar SM). Speaker 2 = Brij ji (retailer).
@@ -74,10 +85,10 @@ FORMAT (follow exactly):
   stock has arrived, wants him to actively pitch it.
 - Then the dialogue as alternating "Speaker 1:" / "Speaker 2:" lines.
 - Rahul opens warmly, mentions the product and that stock has arrived.
-- Brij ji raises the real objections from the Hindi objection-handling content above,
-  ONE AT A TIME, in his own retailer/farmer-facing words (paraphrase naturally into
-  spoken Hinglish, don't copy-paste Hindi). Go through every objection/answer pair,
-  in order, don't skip any.
+- Brij ji raises the real objections from the {source_lang} objection-handling content
+  above, ONE AT A TIME, in his own retailer/farmer-facing words (paraphrase naturally
+  into spoken Hinglish, don't copy-paste the source script verbatim). Go through every
+  objection/answer pair, in order, don't skip any.
 - Rahul rebuts each objection using that pair's actual answer content, and uses the
   product's USPs from the key selling points naturally through the conversation.
 - End with Rahul giving a single "bas yeh ek line bolo" summary pitch (one punchy
@@ -95,8 +106,8 @@ HARD RULES:
 - NO negative framing — never "maangega tabhi dunga", "bikta hai kya", "risk itna
   chota hai", or anything that puts the retailer/farmer down.
 - Keep technical/chemical/formulation terms and the product name in Roman English
-  exactly as in the source. Keep all dosages/numbers unchanged. Render "एकड़" as
-  "acre" in Roman.
+  exactly as in the source. Keep all dosages/numbers unchanged. Render the source
+  language's word for "acre" in Roman as "acre".
 - Do NOT mention billing price, farmer-count stats, call recordings, Convin, or any
   internal data source.
 - If an objection is technical, have Rahul explain it simply and conversationally,

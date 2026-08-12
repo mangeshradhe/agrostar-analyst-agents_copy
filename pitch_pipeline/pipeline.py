@@ -41,11 +41,11 @@ import openpyxl
 from openpyxl.styles import Alignment, Font
 
 from claude_cli import run_claude, ClaudeCliError
-from prompts import translate_prompt, roleplay_prompt, thumbnail_prompt, LANGS
+from prompts import translate_prompt, roleplay_prompt, thumbnail_prompt, ALL_LANGS
 
-ALL_LANGS = ["Hindi"] + LANGS  # Hindi, English, Gujarati, Marathi, Telugu, Kannada
 LANG_CODES = {"English": "en", "Hindi": "hi", "Gujarati": "gu",
               "Marathi": "mr", "Telugu": "te", "Kannada": "kn"}
+DEFAULT_SOURCE_LANG = "Hindi"
 
 COLUMNS = ["Product Name", "Pitch Type", "Pitch Text", "Source of Pitch",
            "Language", "Key Selling Points", "Objection Handling"]
@@ -75,14 +75,22 @@ def extract_products(xlsx_path):
         if not name or name in seen:
             continue
         seen.add(name)
+        language = row[idx["Language"]] if "Language" in idx else None
         products.append({
             "product": name,
+            "language": language or DEFAULT_SOURCE_LANG,
             "pitch_type": row[idx.get("Pitch Type", -1)] if "Pitch Type" in idx else "PRODUCT",
             "pitch_text": row[idx.get("Pitch Text", -1)] if "Pitch Text" in idx else "",
             "source_of_pitch": row[idx.get("Source of Pitch", -1)] if "Source of Pitch" in idx else "",
             "ksp": row[idx["Key Selling Points"]] or "",
             "oh": row[idx["Objection Handling"]] or "",
         })
+    unknown = sorted({p["language"] for p in products} - set(ALL_LANGS))
+    if unknown:
+        raise ValueError(
+            f"Source xlsx has products in language(s) not in {ALL_LANGS}: {unknown}. "
+            "Add support for that language or fix the Language column."
+        )
     return products
 
 
@@ -95,11 +103,29 @@ def translate_one(product, out_dir):
     if os.path.exists(out_path):
         log(f"translate: {product['product']} already done, skipping")
         return out_path
-    prompt = translate_prompt(product["product"], product["ksp"], product["oh"], out_path)
+    prompt = translate_prompt(product["product"], product["language"], product["ksp"], product["oh"], out_path)
     run_claude(prompt, allowed_tools=["Write"], timeout=600)
     if not os.path.exists(out_path):
         raise ClaudeCliError(f"translate: expected output not found for {product['product']}")
     return out_path
+
+
+def load_rows_by_lang(product, translations_dir):
+    """{lang: {"ksp":..., "oh":...}} for all 6 ALL_LANGS, combining the
+    product's own source-language content with its translation JSON."""
+    tpath = os.path.join(translations_dir, f"{slug(product['product'])}.json")
+    if not os.path.exists(tpath):
+        return None, None
+    with open(tpath, encoding="utf-8") as f:
+        t = json.load(f)
+
+    source_lang = product["language"]
+    rows_by_lang = {source_lang: {"ksp": product["ksp"], "oh": product["oh"]}}
+    for lang in ALL_LANGS:
+        if lang == source_lang:
+            continue
+        rows_by_lang[lang] = {"ksp": t[lang]["ksp"], "oh": t[lang]["oh"]}
+    return rows_by_lang, t
 
 
 def stage_translate(products, out_dir, jobs):
@@ -136,16 +162,10 @@ def stage_merge_xlsx(products, translations_dir, pitches_xlsx):
 
     added = 0
     for p in products:
-        tpath = os.path.join(translations_dir, f"{slug(p['product'])}.json")
-        if not os.path.exists(tpath):
+        rows_by_lang, _ = load_rows_by_lang(p, translations_dir)
+        if rows_by_lang is None:
             log(f"merge-xlsx: no translation for {p['product']}, skipping")
             continue
-        with open(tpath, encoding="utf-8") as f:
-            t = json.load(f)
-
-        rows_by_lang = {"Hindi": {"ksp": p["ksp"], "oh": p["oh"]}}
-        for lang in LANGS:
-            rows_by_lang[lang] = {"ksp": t[lang]["ksp"], "oh": t[lang]["oh"]}
 
         for lang in ALL_LANGS:
             r = rows_by_lang[lang]
@@ -175,7 +195,7 @@ def script_one(product, scripts_dir):
     if os.path.exists(out_path):
         log(f"scripts: {product['product']} already done, skipping")
         return out_path
-    prompt = roleplay_prompt(product["product"], product["ksp"], product["oh"], out_path)
+    prompt = roleplay_prompt(product["product"], product["language"], product["ksp"], product["oh"], out_path)
     run_claude(prompt, allowed_tools=["Write"], timeout=600)
     if not os.path.exists(out_path):
         raise ClaudeCliError(f"scripts: expected output not found for {product['product']}")
@@ -236,15 +256,9 @@ def stage_build_json(products, translations_dir, json_dir):
     os.makedirs(json_dir, exist_ok=True)
     written = 0
     for p in products:
-        tpath = os.path.join(translations_dir, f"{slug(p['product'])}.json")
-        if not os.path.exists(tpath):
+        rows_by_lang, _ = load_rows_by_lang(p, translations_dir)
+        if rows_by_lang is None:
             continue
-        with open(tpath, encoding="utf-8") as f:
-            t = json.load(f)
-
-        rows_by_lang = {"Hindi": {"ksp": p["ksp"], "oh": p["oh"]}}
-        for lang in LANGS:
-            rows_by_lang[lang] = {"ksp": t[lang]["ksp"], "oh": t[lang]["oh"]}
 
         uname = slug(p["product"])
         for lang in ALL_LANGS:
