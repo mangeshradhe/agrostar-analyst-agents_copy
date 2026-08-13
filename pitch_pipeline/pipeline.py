@@ -14,6 +14,8 @@ row per product), this:
   4. build-json  -> one JSON file per (product, language) row for the app
   5. thumbnails  -> searches the web and downloads a product photo per product
   6. productlist -> appends new entries to productlist_<lang>.json
+  7. consolidate-scripts -> rebuilds roleplay_scripts_all.xlsx from scripts/*.txt
+  8. tracker     -> rebuilds audio_thumbnail_tracker.csv/.xlsx from json/*.json
 
 Everything is driven by headless `claude -p` calls (your existing Claude Code
 login — no separate ANTHROPIC_API_KEY needed) for the language-dependent
@@ -30,6 +32,7 @@ pitches_final.xlsx, scripts/, json/, assets/, and productlist_*.json — e.g.
 """
 import argparse
 import csv
+import glob
 import json
 import os
 import re
@@ -369,6 +372,95 @@ def stage_productlist(products, translations_dir, workdir, assets_dir):
 
 
 # ---------------------------------------------------------------------------
+# Stage 7: consolidate all roleplay scripts into one xlsx (full rebuild)
+# ---------------------------------------------------------------------------
+
+def stage_consolidate_scripts(workdir):
+    scripts_dir = os.path.join(workdir, "scripts")
+    out_path = os.path.join(workdir, "roleplay_scripts_all.xlsx")
+    if not os.path.isdir(scripts_dir):
+        log(f"consolidate-scripts: {scripts_dir} not found, skipping")
+        return
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Roleplay Scripts"
+    ws.append(["Product Name", "Roleplay Script"])
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    files = sorted(glob.glob(os.path.join(scripts_dir, "*.txt")))
+    for f in files:
+        product = os.path.splitext(os.path.basename(f))[0]
+        with open(f, encoding="utf-8") as fh:
+            content = fh.read()
+        ws.append([product, content])
+
+    for row in ws.iter_rows(min_row=2):
+        for cell in row:
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.column_dimensions["A"].width = 20
+    ws.column_dimensions["B"].width = 100
+    for i in range(2, ws.max_row + 1):
+        ws.row_dimensions[i].height = 400
+
+    wb.save(out_path)
+    log(f"consolidate-scripts: wrote {len(files)} products -> {out_path}")
+
+
+# ---------------------------------------------------------------------------
+# Stage 8: audio/thumbnail tracker (full rebuild from json/)
+# ---------------------------------------------------------------------------
+
+def stage_tracker(workdir):
+    json_dir = os.path.join(workdir, "json")
+    if not os.path.isdir(json_dir):
+        log(f"tracker: {json_dir} not found, skipping")
+        return
+
+    lang_order = ["English", "Hindi", "Gujarati", "Marathi", "Telugu", "Kannada"]
+    lang_names_by_code = {v: k for k, v in LANG_CODES.items()}
+
+    rows = []
+    for fp in sorted(glob.glob(os.path.join(json_dir, "*.json"))):
+        with open(fp, encoding="utf-8") as f:
+            d = json.load(f)
+        fname = os.path.basename(fp)
+        langcode = fname.rsplit("_", 1)[1].replace(".json", "")
+        rows.append({
+            "File Name": fname,
+            "Name": d["name"],
+            "Audio": d["audio"],
+            "Language": lang_names_by_code[langcode],
+            "Thumbnail": d["thumbnail"],
+        })
+
+    rows.sort(key=lambda r: (r["Name"], lang_order.index(r["Language"])))
+    fields = ["File Name", "Name", "Audio", "Language", "Thumbnail"]
+
+    csv_path = os.path.join(workdir, "audio_thumbnail_tracker.csv")
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Tracker"
+    ws.append(fields)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+    for r in rows:
+        ws.append([r[k] for k in fields])
+    widths = {"A": 30, "B": 20, "C": 35, "D": 12, "E": 30}
+    for col, w in widths.items():
+        ws.column_dimensions[col].width = w
+    wb.save(os.path.join(workdir, "audio_thumbnail_tracker.xlsx"))
+
+    log(f"tracker: wrote {len(rows)} rows -> audio_thumbnail_tracker.csv/.xlsx")
+
+
+# ---------------------------------------------------------------------------
 # Audio matching helper (semi-manual, since Drive filenames aren't predictable)
 # ---------------------------------------------------------------------------
 
@@ -437,7 +529,8 @@ def match_audio(drive_dir, workdir):
 # CLI
 # ---------------------------------------------------------------------------
 
-STAGE_ORDER = ["translate", "merge-xlsx", "scripts", "build-json", "thumbnails", "productlist"]
+STAGE_ORDER = ["translate", "merge-xlsx", "scripts", "build-json", "thumbnails", "productlist",
+               "consolidate-scripts", "tracker"]
 
 
 def run(args):
@@ -465,6 +558,10 @@ def run(args):
         stage_thumbnails(products, assets_dir, args.jobs)
     if "productlist" in only:
         stage_productlist(products, translations_dir, workdir, assets_dir)
+    if "consolidate-scripts" in only:
+        stage_consolidate_scripts(workdir)
+    if "tracker" in only:
+        stage_tracker(workdir)
 
     log("pipeline run complete.")
 

@@ -35,7 +35,7 @@ python3 pipeline.py run New_product_additions.xlsx --workdir ~/claude_workspace 
 ```
 
 Stages, in order: `translate`, `merge-xlsx`, `scripts`, `build-json`,
-`thumbnails`, `productlist`.
+`thumbnails`, `productlist`, `consolidate-scripts`, `tracker`.
 
 Control parallelism (default 6 concurrent `claude -p` calls):
 
@@ -72,6 +72,8 @@ batch.
 | `build-json` | deterministic | `json/<slug>_<lang>.json` per row, for the app |
 | `thumbnails` | `claude -p` (WebSearch+Bash), parallel | `assets/<slug>.jpg` — real product photo where found, generic placeholder (clearly flagged) otherwise |
 | `productlist` | deterministic | appends new entries to `productlist_<lang>.json`, `category: "New Products"`; warns if any `thumbnail` path doesn't resolve to a real file |
+| `consolidate-scripts` | deterministic | rebuilds `roleplay_scripts_all.xlsx` from every file in `scripts/*.txt` (full rebuild, not just this batch) |
+| `tracker` | deterministic | rebuilds `audio_thumbnail_tracker.csv`/`.xlsx` from every file in `json/*.json` (full rebuild) — the sheet you use to track down thumbnails/audio to source |
 
 ## Files
 
