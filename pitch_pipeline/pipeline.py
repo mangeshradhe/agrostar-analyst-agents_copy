@@ -160,8 +160,14 @@ def stage_merge_xlsx(products, translations_dir, pitches_xlsx):
         for cell in ws[1]:
             cell.font = Font(bold=True)
 
+    existing_names = {row[0] for row in ws.iter_rows(min_row=2, values_only=True)}
+
     added = 0
     for p in products:
+        if p["product"] in existing_names:
+            log(f"merge-xlsx: {p['product']} already present, skipping")
+            continue
+
         rows_by_lang, _ = load_rows_by_lang(p, translations_dir)
         if rows_by_lang is None:
             log(f"merge-xlsx: no translation for {p['product']}, skipping")
@@ -290,6 +296,8 @@ def thumbnail_one(product, assets_dir):
     context = (product["ksp"] or "")[:200]
     prompt = thumbnail_prompt(product["product"], f"an agri-input product. Context: {context}", asset_path)
     run_claude(prompt, allowed_tools=["WebSearch", "Bash"], timeout=300)
+    if not os.path.exists(asset_path) or os.path.getsize(asset_path) < 5000:
+        raise ClaudeCliError(f"thumbnails: expected output not found (or too small) for {product['product']}")
     return asset_path
 
 
