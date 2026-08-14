@@ -117,6 +117,52 @@ After writing the file, reply with just the word DONE.
 """
 
 
+def roleplay_prompt_ksp_only(product, source_lang, ksp_src, output_path):
+    return f"""Here is {source_lang} content describing a feature/process for "{product}":
+
+KEY SELLING POINTS ({source_lang}):
+{ksp_src}
+
+TASK: Write a Field-vs-Retailer training script in Hinglish (the {source_lang} meaning
+written in Roman/English script — transliteration, NOT English translation) and save
+it to {output_path} using the Write tool. There is NO objection-handling content for
+this topic — do not invent objections.
+
+FORMAT (follow exactly):
+- Two speakers. Speaker 1 = Rahul (AgroStar SM). Speaker 2 = Brij ji (retailer).
+- Start with a short header block: topic name, "Speaker 1 = Rahul (AgroStar Rep)",
+  "Speaker 2 = Brij ji (Retailer)", and a one-line context: Rahul calls Brij ji to
+  walk him through this.
+- Then the dialogue as alternating "Speaker 1:" / "Speaker 2:" lines.
+- Rahul opens warmly and explains each key point from the list above, one at a time,
+  in his own natural spoken words (paraphrase, don't copy-paste the source verbatim).
+- Brij ji does NOT raise objections (there are none to work from). Instead he responds
+  with natural conversational fillers and light acknowledgment/clarifying questions —
+  things like "Achha", "Theek hai", "Samajh gaya", "Ye kaise karna hai?", "Aur kuch?" —
+  short, natural, spoken reactions that keep the conversation flowing, not objections
+  or pushback.
+- Rahul answers any clarifying question Brij ji asks, using only the content above.
+- End with Rahul giving a single "bas yeh ek line bolo" summary line capturing the
+  core point, then a warm close. Brij ji acknowledges positively.
+
+STYLE: Roman script Hinglish, the way a real AgroStar Sales Manager talks on a phone
+call — conversational, warm, not stiff. Use em-dashes ( — ) and ".." for natural
+spoken pauses. Do NOT write [pause] or any bracket/stage-direction tags — this gets
+read aloud by a TTS system. Use "ji"/"aap" — Brij ji is addressed with respect.
+
+HARD RULES:
+- Every claim must trace to the content above. Invent NOTHING — no made-up
+  percentages, numbers, or details not present in the source.
+- NO negative framing — never anything that puts the retailer/farmer down.
+- Keep technical terms, app/feature names, and the topic name in Roman English
+  exactly as in the source. Keep all numbers unchanged.
+- Do NOT mention billing price, farmer-count stats, call recordings, Convin, or any
+  internal data source.
+
+After writing the file, reply with just the word DONE.
+"""
+
+
 def thumbnail_prompt(product, description, asset_path):
     return f"""Find a real product image for the AgroStar (Indian agri-input company)
 product "{product}" — {description}.

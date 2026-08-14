@@ -44,7 +44,7 @@ import openpyxl
 from openpyxl.styles import Alignment, Font
 
 from claude_cli import run_claude, ClaudeCliError
-from prompts import translate_prompt, roleplay_prompt, thumbnail_prompt, ALL_LANGS
+from prompts import translate_prompt, roleplay_prompt, roleplay_prompt_ksp_only, thumbnail_prompt, ALL_LANGS
 
 LANG_CODES = {"English": "en", "Hindi": "hi", "Gujarati": "gu",
               "Marathi": "mr", "Telugu": "te", "Kannada": "kn"}
@@ -204,7 +204,10 @@ def script_one(product, scripts_dir):
     if os.path.exists(out_path):
         log(f"scripts: {product['product']} already done, skipping")
         return out_path
-    prompt = roleplay_prompt(product["product"], product["language"], product["ksp"], product["oh"], out_path)
+    if (product["oh"] or "").strip():
+        prompt = roleplay_prompt(product["product"], product["language"], product["ksp"], product["oh"], out_path)
+    else:
+        prompt = roleplay_prompt_ksp_only(product["product"], product["language"], product["ksp"], out_path)
     run_claude(prompt, allowed_tools=["Write"], timeout=600)
     if not os.path.exists(out_path):
         raise ClaudeCliError(f"scripts: expected output not found for {product['product']}")
