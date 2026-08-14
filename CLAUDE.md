@@ -52,7 +52,8 @@ Use this to quickly decide which table to query:
 | Daily sales summary, AOP vs actuals         | `dwh_views.consolidate_sale_order` or `revenue_and_growth_team.daily_sales`      |
 | Inventory, stock levels                     | `prod_db_views.agrostar_inventory_snapshot`                                      |
 | Coupon/promo usage                          | `offer_management_couponusage`, `offer_management_offerusage`                    |
-| Call center / CRM calls                     | `dwh_views.call_master` or `prod_db_views.call_record`                           |
+| Call recordings, call quality, QA scoring, disposition, sentiment | `genesys_db.disposition_data` (primary) — see schema below                       |
+| Call volume / duration / telephony CDR only | `dwh_views.call_master` (basic CDR, no quality data)                             |
 | Farmer app sessions, engagement             | `farmer_app_views.sessionLog`, `farmer_app_views.app_user_stat`                  |
 
 ---
@@ -245,6 +246,44 @@ Shipping package records linking orders to logistics.
 
 ---
 
+### `genesys_db.disposition_data`
+Call recording quality/disposition data from the CC's Genesys system. **Use this for any question about call quality, agent QA scores, call disposition, sentiment, or AI-generated call summaries.**
+Partitioned by `created_on` (TIMESTAMP). ~17M rows, ~11GB long-term storage.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | STRING | Row/call ID |
+| `created_on` | TIMESTAMP | **Partition key — always filter on this** |
+| `meta_data_call_id` | STRING | Unique call ID |
+| `meta_data_agent_id` | STRING | Agent username — joins to `auth_user.username` |
+| `meta_data_client_id` | STRING | Caller's mobile — **AEAD-encrypted**, join via `` `agrostar-data.AEAD_encryption_keys.ENCRYPT`(mobile_number) `` |
+| `meta_data_call_duration` | STRING | Call length |
+| `meta_data_call_direction` | STRING | Inbound/outbound |
+| `meta_data_recording_url` | STRING | Link to the actual audio recording |
+| `call_score` | FLOAT | Overall QA score |
+| `disposition_levels_level_1/2/3` | STRING | Call outcome/disposition hierarchy |
+| `lead_interest` | STRING | Farmer's interest level |
+| `ai_summary` | STRING | LLM-generated call summary |
+| `ai_insights_question` / `ai_insights_answer` | STRING | Structured Q&A extracted from the call |
+| `custom_entities_*` | STRING | Extracted entities — crop discussed, product discussed, pricing concern, land holding, etc. |
+| `param_*` (~30 columns) | STRING ("Yes"/"No") | QA checklist flags — e.g. `param_farmer_care_missed`, `param_politeness_courtesy_missed`, `param_incorrect_agronomic_info`, `param_order_missed_or_duplicate` |
+| `talk_ratio`, `talk_speed`, `patience`, `interactivity`, `dead_air_duration`, `filler_rate` | FLOAT | Conversation-dynamics metrics |
+
+**Cross-joining to farmer/order data:** `meta_data_client_id` is AEAD-encrypted the same way phone fields are elsewhere — match it against an encrypted mobile number, not a raw one. There's no direct order_id link, so the established pattern (see `lmd_return_analysis/scripts/pull_call_quality_and_tenure_mix.py` in this repo) is a 3-way match: encrypted mobile + agent + same calendar date.
+
+```sql
+-- Join disposition_data to orders placed by CC/CSR agents, same day
+FROM `agrostar-data.prod_db_views.order_management_order` o
+JOIN `agrostar-data.genesys_db.disposition_data` d
+  ON `agrostar-data.AEAD_encryption_keys.ENCRYPT`(d.meta_data_client_id) = o.notification_mobile
+  AND d.meta_data_agent_id = <agent_username_from_order>
+  AND DATE(d.created_on) = DATE(o.created_on)
+```
+
+**Note:** `genesys_db.call_audit_data` is a newer, richer QA table (per-parameter evidence quotes + reasoning, sentiment, disposition confidence) with the same `meta_data_*` join keys — but as of writing it only has ~1,600 rows, so treat it as an early pilot, not yet a reliable population-level source.
+
+---
+
 ## Other Available Datasets
 
 | Dataset | Use For |
@@ -254,6 +293,7 @@ Shipping package records linking orders to logistics.
 | `farmer_app_views` | App engagement — sessions, posts, notifications |
 | `galaxy_views` | Credit/lending — `creditwallet`, `underwritingdetails`, `institution` |
 | `clevertap_views` | Marketing campaign events |
+| `genesys_db` | Call center telephony + call quality/recording data — see `disposition_data` schema above |
 | `static_tables` / `static_tables_views` | Reference/lookup tables |
 | `supply_management` | Supply chain and procurement |
 | `payment_info_views` | Payment reconciliation details |
