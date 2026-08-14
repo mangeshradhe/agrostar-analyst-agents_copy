@@ -117,6 +117,58 @@ After writing the file, reply with just the word DONE.
 """
 
 
+def backfill_objections_prompt(product, source_lang, ksp_src, output_path):
+    return f"""Here is {source_lang} content describing a feature/topic called "{product}":
+
+KEY SELLING POINTS ({source_lang}):
+{ksp_src}
+
+There is NO existing objection-handling content for this topic. Both "key selling
+points" and "objections" are mandatory fields for every topic in our app, so you
+need to generate the missing objections content.
+
+TASK: Generate 3-5 natural clarifying-question / helpful-answer pairs in
+{source_lang}, in the same ⚠ (question) / ✓ (answer) format used elsewhere, that a
+retailer would realistically ask while learning about this feature for the first
+time — e.g. how it works, where to find it, what happens in a specific situation.
+
+BE CAREFUL: these must be genuine, informative questions with substantive answers —
+NOT filler words ("theek hai", "achha") dressed up as a question, and NOT invented
+skeptical/pushback objections (price complaints, "why should I trust this") since
+there is no such content to draw from for this topic. Each answer must be fully
+grounded in the KEY SELLING POINTS above — invent nothing beyond what's stated there.
+
+Save as JSON to {output_path} using the Write tool, exactly this shape:
+{{"oh": "⚠ <question 1>\\n✓ <answer 1>\\n\\n⚠ <question 2>\\n✓ <answer 2>\\n..."}}
+Use \\n for line breaks, blank line between pairs, matching the format of existing
+objection-handling content in this app. After writing, reply with just the word DONE.
+"""
+
+
+def backfill_keypoints_prompt(product, source_lang, oh_src, output_path):
+    return f"""Here is {source_lang} content describing how to handle a scenario for
+"{product}":
+
+OBJECTION/QUERY HANDLING ({source_lang}):
+{oh_src}
+
+There is NO existing "key selling points" content for this topic. Both "key selling
+points" and "objections" are mandatory fields for every topic in our app, so you
+need to generate the missing key-points content.
+
+TASK: Generate 3-5 bullet points in {source_lang} summarizing HOW TO HANDLE this
+scenario — the core guidance/process a rep should follow — grounded entirely in the
+content above. Invent nothing beyond what's stated there; just extract and
+summarize the actual guidance into clear standalone bullet points.
+
+Save as JSON to {output_path} using the Write tool, exactly this shape:
+{{"ksp": "-<bullet 1>\\n-<bullet 2>\\n-<bullet 3>"}}
+Use \\n for line breaks, each bullet starting with "-", matching the format of
+existing key-selling-points content in this app. After writing, reply with just the
+word DONE.
+"""
+
+
 def roleplay_prompt_ksp_only(product, source_lang, ksp_src, output_path):
     return f"""Here is {source_lang} content describing a feature/process for "{product}":
 

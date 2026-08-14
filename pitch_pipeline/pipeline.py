@@ -44,7 +44,8 @@ import openpyxl
 from openpyxl.styles import Alignment, Font
 
 from claude_cli import run_claude, ClaudeCliError
-from prompts import translate_prompt, roleplay_prompt, roleplay_prompt_ksp_only, thumbnail_prompt, ALL_LANGS
+from prompts import (translate_prompt, roleplay_prompt, roleplay_prompt_ksp_only, thumbnail_prompt,
+                      backfill_objections_prompt, backfill_keypoints_prompt, ALL_LANGS)
 
 LANG_CODES = {"English": "en", "Hindi": "hi", "Gujarati": "gu",
               "Marathi": "mr", "Telugu": "te", "Kannada": "kn"}
@@ -94,6 +95,82 @@ def extract_products(xlsx_path):
             f"Source xlsx has products in language(s) not in {ALL_LANGS}: {unknown}. "
             "Add support for that language or fix the Language column."
         )
+    return products
+
+
+# ---------------------------------------------------------------------------
+# Stage 0.5: backfill missing ksp/oh (both are mandatory fields for the app)
+# ---------------------------------------------------------------------------
+
+def backfill_one(product, out_dir):
+    out_path = os.path.join(out_dir, f"{slug(product['product'])}.json")
+    if os.path.exists(out_path):
+        return out_path
+
+    has_ksp = bool((product["ksp"] or "").strip())
+    has_oh = bool((product["oh"] or "").strip())
+    if has_ksp and has_oh:
+        return None  # nothing to backfill
+
+    result = {}
+    if not has_oh:
+        prompt = backfill_objections_prompt(product["product"], product["language"], product["ksp"], out_path)
+        run_claude(prompt, allowed_tools=["Write"], timeout=300)
+    if not has_ksp:
+        # If both were missing we'd need two separate output files; in practice
+        # only one side is ever missing, but guard with a distinct temp path.
+        ksp_out_path = out_path if has_oh else out_path + ".ksp"
+        prompt = backfill_keypoints_prompt(product["product"], product["language"], product["oh"], ksp_out_path)
+        run_claude(prompt, allowed_tools=["Write"], timeout=300)
+        if ksp_out_path != out_path:
+            # merge the two partial files into one
+            with open(out_path, encoding="utf-8") as f:
+                oh_part = json.load(f)
+            with open(ksp_out_path, encoding="utf-8") as f:
+                ksp_part = json.load(f)
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump({**oh_part, **ksp_part}, f, ensure_ascii=False, indent=2)
+            os.remove(ksp_out_path)
+
+    if not os.path.exists(out_path):
+        raise ClaudeCliError(f"backfill: expected output not found for {product['product']}")
+    return out_path
+
+
+def stage_backfill(products, out_dir, jobs):
+    os.makedirs(out_dir, exist_ok=True)
+    needed = [p for p in products
+              if not (product_has_both(p))]
+    if not needed:
+        return
+    with ThreadPoolExecutor(max_workers=jobs) as ex:
+        futs = {ex.submit(backfill_one, p, out_dir): p for p in needed}
+        for fut in as_completed(futs):
+            p = futs[fut]
+            try:
+                fut.result()
+                log(f"backfill: done -> {p['product']}")
+            except Exception as e:
+                log(f"backfill: FAILED for {p['product']}: {e}")
+
+
+def product_has_both(product):
+    return bool((product["ksp"] or "").strip()) and bool((product["oh"] or "").strip())
+
+
+def apply_backfill(products, out_dir):
+    for p in products:
+        if product_has_both(p):
+            continue
+        fpath = os.path.join(out_dir, f"{slug(p['product'])}.json")
+        if not os.path.exists(fpath):
+            continue
+        with open(fpath, encoding="utf-8") as f:
+            filled = json.load(f)
+        if "oh" in filled and not (p["oh"] or "").strip():
+            p["oh"] = filled["oh"]
+        if "ksp" in filled and not (p["ksp"] or "").strip():
+            p["ksp"] = filled["ksp"]
     return products
 
 
@@ -532,7 +609,7 @@ def match_audio(drive_dir, workdir):
 # CLI
 # ---------------------------------------------------------------------------
 
-STAGE_ORDER = ["translate", "merge-xlsx", "scripts", "build-json", "thumbnails", "productlist",
+STAGE_ORDER = ["backfill", "translate", "merge-xlsx", "scripts", "build-json", "thumbnails", "productlist",
                "consolidate-scripts", "tracker"]
 
 
@@ -544,10 +621,15 @@ def run(args):
     only = set(args.only.split(",")) if args.only else set(STAGE_ORDER)
 
     translations_dir = os.path.join(workdir, "pipeline_out", "translations")
+    backfill_dir = os.path.join(workdir, "pipeline_out", "backfill")
     scripts_dir = os.path.join(workdir, "scripts")
     json_dir = os.path.join(workdir, "json")
     assets_dir = os.path.join(workdir, "assets")
     pitches_xlsx = os.path.join(workdir, args.pitches_xlsx)
+
+    if "backfill" in only:
+        stage_backfill(products, backfill_dir, args.jobs)
+    products = apply_backfill(products, backfill_dir)
 
     if "translate" in only:
         stage_translate(products, translations_dir, args.jobs)
