@@ -338,6 +338,21 @@ def parse_objections(cell):
         if not objection and not rebuttal:
             continue
         objections.append({"objection": objection, "rebuttal": rebuttal})
+
+    if not objections:
+        # Fallback: some rows use a "Partner: ... / Employee: ..." dialogue
+        # format instead of the standard warning/checkmark markers.
+        pairs = re.findall(
+            r"Partner:\s*(.+?)\s*\n\s*Employee:\s*(.+?)(?=\n\s*Partner:|\Z)",
+            text, re.S,
+        )
+        quote_chars = "\"'“”\n\t "
+        for q, a in pairs:
+            objection = q.strip(quote_chars).strip()
+            rebuttal = a.strip(quote_chars).strip()
+            if objection or rebuttal:
+                objections.append({"objection": objection, "rebuttal": rebuttal})
+
     return objections
 
 
