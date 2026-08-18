@@ -80,10 +80,10 @@ and save it to {output_path} using the Write tool.
 
 FORMAT (follow exactly):
 - Two speakers. Speaker 1 = Rahul (AgroStar SM). Speaker 2 = Brij ji (retailer).
-- Start with a short header block: product name, "Speaker 1 = Rahul (AgroStar Rep)",
-  "Speaker 2 = Brij ji (Retailer)", and a one-line context: Rahul calls Brij ji,
-  stock has arrived, wants him to actively pitch it.
-- Then the dialogue as alternating "Speaker 1:" / "Speaker 2:" lines.
+- Do NOT include any header, title, product-name line, speaker-definition lines, or
+  context/scene-setting line. Output ONLY the dialogue itself, starting directly with
+  the first "Speaker 1:" line — no preamble of any kind before it.
+- The dialogue is alternating "Speaker 1:" / "Speaker 2:" lines.
 - Rahul opens warmly, mentions the product and that stock has arrived.
 - Brij ji raises the real objections from the {source_lang} objection-handling content
   above, ONE AT A TIME, in his own retailer/farmer-facing words (paraphrase naturally
@@ -182,10 +182,10 @@ this topic — do not invent objections.
 
 FORMAT (follow exactly):
 - Two speakers. Speaker 1 = Rahul (AgroStar SM). Speaker 2 = Brij ji (retailer).
-- Start with a short header block: topic name, "Speaker 1 = Rahul (AgroStar Rep)",
-  "Speaker 2 = Brij ji (Retailer)", and a one-line context: Rahul calls Brij ji to
-  walk him through this.
-- Then the dialogue as alternating "Speaker 1:" / "Speaker 2:" lines.
+- Do NOT include any header, title, topic-name line, speaker-definition lines, or
+  context/scene-setting line. Output ONLY the dialogue itself, starting directly with
+  the first "Speaker 1:" line — no preamble of any kind before it.
+- The dialogue is alternating "Speaker 1:" / "Speaker 2:" lines.
 - Rahul opens warmly and explains each key point from the list above, one at a time,
   in his own natural spoken words (paraphrase, don't copy-paste the source verbatim).
 - Brij ji does NOT raise objections (there are none to work from). Instead he responds
