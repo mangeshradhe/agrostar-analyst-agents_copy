@@ -1,0 +1,51 @@
+name: Daily sync from rudra124/agrostar-analyst-agents
+
+on:
+  schedule:
+    - cron: '30 1 * * *'        # every day at 07:00 IST (01:30 UTC)
+  workflow_dispatch: {}         # lets you also run it manually from the Actions tab
+
+permissions:
+  contents: write               # allow this job to commit into this repo
+
+concurrency:
+  group: daily-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this (copy) repo
+        uses: actions/checkout@v4
+
+      - name: Copy all files from the private source repo
+        env:
+          SOURCE_TOKEN: ${{ secrets.SOURCE_TOKEN }}   # your read token, stored as a repo secret
+        run: |
+          set -e
+          if [ -z "$SOURCE_TOKEN" ]; then
+            echo "ERROR: repo secret SOURCE_TOKEN is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          # 1) clone the PRIVATE source repo using the token (GitHub masks the token in these logs)
+          git clone --depth 1 "https://x-access-token:${SOURCE_TOKEN}@github.com/rudra124/agrostar-analyst-agents" /tmp/src
+          rm -rf /tmp/src/.git          # drop source git data (and the embedded token) immediately
+
+          # 2) remove old files here, but KEEP our git data and this workflow folder
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' -exec rm -rf {} +
+
+          # 3) copy the fresh source files in
+          rsync -a /tmp/src/ ./
+
+      - name: Commit and push only if something changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing changed today - skipping commit."
+          else
+            git commit -m "Daily sync from rudra124/agrostar-analyst-agents ($(date -u +%Y-%m-%d))"
+            git push
+          fi
