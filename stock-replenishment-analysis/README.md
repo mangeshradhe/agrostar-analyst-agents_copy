@@ -1,9 +1,10 @@
 # Stock Replenishment Analysis
 
-Transfer-order and stock-movement analyses on BigQuery project `agrostar-data`. Two bodies of work so far:
+Transfer-order and stock-movement analyses on BigQuery project `agrostar-data`. Three bodies of work so far:
 
 1. **Budget-balancing feature review** (snapshot Jul 8, 2026) — the System TO – Budget Balancing feature (live Jul 7), which auto-creates stock-movement TOs between FCs. Files `01`–`04` + `queries.sql`.
 2. **FY 2026-27 full transfer analysis** (Jul 13, 2026) — all transfer orders FY-to-date: classification, geography, sell-through, ping-pong waste, TCI. Report + methodology doc.
+3. **FC workload & manpower analysis** (Aug 26, 2026) — Inbound/Outbound workload growth and picker/OQC-biller efficiency for GJ/MH/RJ/MP/UP, Apr-Jul FY25-26 vs FY26-27, plus a facility-consolidation reality check (MH→PNQ real, JDH→RJ not clean, NGP→AKD pre-dates the window).
 
 Shared conventions (classification rules, metric definitions, data caveats) live in `TRANSFER_ANALYSIS_METHODOLOGY.md` — read it before reusing any number or query from this folder.
 
@@ -19,6 +20,8 @@ Shared conventions (classification rules, metric definitions, data caveats) live
 | `04-benchmarks-and-side-findings.md` | All benchmark tables (Apr–Jun manual vs Jul system, first-10-days, units & tonnes, approved-only, yield), VTO series finding, field-semantics reference |
 | `queries.sql` | Reusable BigQuery queries behind the budget-balancing tables |
 | `b2b_clearance_expiry_analysis.sql` | Side analysis: B2B (InvoiceNo `U%`) clearance-offer split + near-expiry (<150d) billing by state, FY26-27 |
+| `05-fc-workload-manpower-analysis.md` | FC workload (Inbound/Outbound units) & picker/consolidation/OQC-biller efficiency by state, Apr-Jul YoY; the `pick_header` vs `pick_header_arc_main` data-quality catch; facility-consolidation reality check; multi-angle manpower judgment; follow-on section covers the **Fulfilment Pulse** dashboard (artifact + `~/Downloads/fulfilment-pulse.html`) — picker utilization, person-level concentration, and the manpower diagnosis 2×2 (result: 0/19 facilities show a genuine "Bottleneck" hiring case) |
+| `fc_workload_manpower_queries.sql` | Reusable queries behind the FC workload/manpower analysis |
 
 ## Open commitment
 
