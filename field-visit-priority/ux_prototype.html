@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Visit Recommendations — Saathi</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #F5F5F5;
+  color: #212121;
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ── HEADER (matches Saathi dark red) ── */
+.header {
+  background: #8B1A1A;
+  padding: 14px 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.back-arrow {
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.header-title { color: #fff; font-size: 17px; font-weight: 600; }
+
+/* ── SEARCH ── */
+.search-wrap { padding: 12px 12px 8px; background: #fff; }
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #F5F5F5;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #9E9E9E;
+  border: 1px solid #E0E0E0;
+}
+
+/* ── TABS ── */
+.tabs {
+  display: flex;
+  padding: 0 12px;
+  gap: 8px;
+  background: #fff;
+  border-bottom: 1px solid #E0E0E0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #757575;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tab.active { color: #8B1A1A; border-bottom-color: #8B1A1A; font-weight: 600; }
+
+/* ── BODY ── */
+.body { padding: 12px; }
+
+/* Count row */
+.count-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.count-label { font-size: 13px; color: #616161; }
+.clear-all { font-size: 13px; color: #8B1A1A; font-weight: 500; cursor: pointer; }
+
+/* ── GEO CLUSTER CARD ── */
+.cluster-card {
+  background: #fff;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 1px solid #E0E0E0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.cluster-header {
+  background: #FFF8E1;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #FFE082;
+}
+.cluster-icon { font-size: 15px; }
+.cluster-title { font-size: 13px; font-weight: 600; color: #5D4037; flex: 1; }
+.cluster-badge {
+  background: #FF8F00;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+.cluster-partners { }
+.cluster-partner {
+  padding: 10px 14px;
+  border-bottom: 1px solid #F5F5F5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+.cluster-partner:last-child { border-bottom: none; }
+.cp-left { }
+.cp-name { font-size: 14px; font-weight: 600; color: #212121; margin-bottom: 2px; }
+.cp-location { font-size: 12px; color: #757575; }
+.cp-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.cp-tag { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+.cp-tag.ocp { background: #FFEBEE; color: #C62828; }
+.cp-tag.sales { background: #E8F5E9; color: #2E7D32; }
+.cp-tag.open { background: #E8F5E9; color: #2E7D32; }
+.cp-reason {
+  font-size: 11px;
+  color: #5D4037;
+  font-style: italic;
+  padding: 0 14px 4px;
+}
+
+.cluster-footer {
+  padding: 10px 14px;
+  background: #FAFAFA;
+  border-top: 1px solid #F0F0F0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.add-cluster-btn {
+  flex: 1;
+  background: #8B1A1A;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+.cluster-note { font-size: 11px; color: #9E9E9E; }
+
+/* ── INDIVIDUAL PARTNER CARD ── */
+.partner-card {
+  background: #fff;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 1px solid #E0E0E0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.card-header {
+  padding: 12px 14px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.partner-name { font-size: 15px; font-weight: 700; color: #212121; margin-bottom: 3px; }
+.partner-loc { font-size: 12px; color: #757575; }
+.partner-phone { font-size: 12px; color: #1565C0; text-decoration: none; }
+.badges { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; margin-top: 2px; }
+.badge { font-size: 10px; font-weight: 600; padding: 3px 7px; border-radius: 4px; display: flex; align-items: center; gap: 3px; }
+.badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+.badge.dvs { background: #E8F5E9; color: #2E7D32; border: 1px solid #A5D6A7; }
+.badge.dvs .badge-dot { background: #4CAF50; }
+.badge.ocp-blocked { background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; }
+.badge.ocp-blocked .badge-dot { background: #F44336; }
+.badge.carried { background: #FFF3E0; color: #E65100; border: 1px solid #FFCC80; font-size: 10px; }
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-top: 1px solid #F5F5F5;
+  border-bottom: 1px solid #F5F5F5;
+}
+.metric {
+  padding: 8px 4px;
+  text-align: center;
+  border-right: 1px solid #F5F5F5;
+}
+.metric:last-child { border-right: none; }
+.metric-label { font-size: 10px; color: #9E9E9E; margin-bottom: 3px; }
+.metric-value { font-size: 13px; font-weight: 700; color: #212121; }
+.metric-value.red { color: #C62828; }
+.metric-value.green { color: #2E7D32; }
+.metric-value.amber { color: #E65100; }
+
+.reason-row {
+  padding: 9px 14px;
+  background: #F8F9FA;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: #424242;
+  line-height: 1.4;
+}
+.reason-row.collection { background: #FFF8E1; color: #5D4037; }
+.reason-row.sales { background: #F3F8FF; color: #1A237E; }
+.reason-row.onboarding { background: #E8F5E9; color: #1B5E20; }
+.reason-row.carried-over { background: #FFF3E0; color: #E65100; }
+.reason-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+
+.card-footer {
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.add-btn {
+  background: #8B1A1A;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.added-btn {
+  background: #E8F5E9;
+  color: #2E7D32;
+  border: 1px solid #A5D6A7;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.brief-mini {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #616161;
+  cursor: pointer;
+}
+
+/* ── SECTION DIVIDER ── */
+.section-divider {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9E9E9E;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 6px 0 8px;
+}
+
+/* ── DAY PICKER BOTTOM SHEET ── */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+}
+.sheet {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 20px 16px 32px;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+}
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: #E0E0E0;
+  border-radius: 2px;
+  margin: 0 auto 16px;
+}
+.sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.sheet-sub { font-size: 12px; color: #757575; margin-bottom: 16px; }
+.day-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.day-pill {
+  padding: 10px 16px;
+  border-radius: 24px;
+  border: 1.5px solid #E0E0E0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #424242;
+  cursor: pointer;
+  background: #fff;
+  flex: 1;
+  text-align: center;
+}
+.day-pill.selected { background: #8B1A1A; color: #fff; border-color: #8B1A1A; }
+.day-pill.has-visits { border-color: #FFA726; color: #E65100; position: relative; }
+.day-pill.has-visits::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -6px; right: -6px;
+  background: #FFA726;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.submit-btn {
+  width: 100%;
+  background: #8B1A1A;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.submit-btn:disabled { background: #E0E0E0; color: #9E9E9E; }
+
+/* cluster sheet extras */
+.sheet-cluster-info {
+  background: #FFF8E1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: #5D4037;
+  display: flex;
+  gap: 6px;
+}
+
+/* ── VIEW TOGGLE ── */
+.view-toggle {
+  display: flex;
+  background: #F5F5F5;
+  border-radius: 8px;
+  padding: 3px;
+  margin: 8px 12px 0;
+}
+.view-btn {
+  flex: 1;
+  padding: 7px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  color: #757575;
+}
+.view-btn.active { background: #fff; color: #8B1A1A; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+
+.spacer { height: 20px; }
+</style>
+</head>
+<body>
+
+<!-- SCREEN: RECOMMENDATIONS — ALL TAB (with geo-cluster) -->
+<div id="screen-all">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="back-arrow">←</div>
+    <div class="header-title">Visit Recommendations</div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-wrap">
+    <div class="search-box">🔍 &nbsp;Search Partners</div>
+  </div>
+
+  <!-- View toggle: Today's cluster / All -->
+  <div class="view-toggle">
+    <div class="view-btn active">📍 Today's Cluster</div>
+    <div class="view-btn">All Partners</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" style="margin-top:8px;">
+    <div class="tab active">All</div>
+    <div class="tab">Collection</div>
+    <div class="tab">Sales</div>
+    <div class="tab">Onboarding</div>
+    <div class="tab">Calls</div>
+  </div>
+
+  <div class="body">
+    <div class="count-row">
+      <div class="count-label">20 partners recommended for visit</div>
+      <div class="clear-all">Clear All</div>
+    </div>
+
+    <!-- GEO CLUSTER GROUP -->
+    <div class="section-divider">📍 Nearby — Visit Together</div>
+
+    <div class="cluster-card">
+      <div class="cluster-header">
+        <div class="cluster-icon">🗺️</div>
+        <div class="cluster-title">Gonda area · 4 partners within 12 km</div>
+        <div class="cluster-badge">TODAY</div>
+      </div>
+
+      <!-- Partner 1 in cluster -->
+      <div class="cluster-partner">
+        <div class="cp-left">
+          <div class="cp-name">M/S YES BEEJ BHANDAR</div>
+          <div class="cp-location">Gonda, UP · 9 km away</div>
+        </div>
+        <div class="cp-right">
+          <div class="cp-tag ocp">● OCP Blocked</div>
+          <div style="font-size:12px;font-weight:700;color:#C62828;">₹2,68,157 OCP</div>
+        </div>
+      </div>
+      <div class="cp-reason">💡 Rs.2,68,157 overdue — 239 days past due</div>
+
+      <!-- Partner 2 in cluster -->
+      <div class="cluster-partner">
+        <div class="cp-left">
+          <div class="cp-name">CHAUDHARY BEEJ BHANDAR</div>
+          <div class="cp-location">Gonda, UP · 7 km away</div>
+        </div>
+        <div class="cp-right">
+          <div class="cp-tag ocp">● OCP Blocked</div>
+          <div style="font-size:12px;font-weight:700;color:#C62828;">₹18,234 OCP</div>
+        </div>
+      </div>
+      <div class="cp-reason">💡 Rs.18,234 overdue — 44 days past due</div>
+
+      <!-- Partner 3 in cluster -->
+      <div class="cluster-partner">
+        <div class="cp-left">
+          <div class="cp-name">SINGH KHAD BHANDAR</div>
+          <div class="cp-location">Gonda, UP · 11 km away</div>
+        </div>
+        <div class="cp-right">
+          <div class="cp-tag ocp">● OCP Blocked</div>
+          <div style="font-size:12px;font-weight:700;color:#C62828;">₹2,09,952 OCP</div>
+        </div>
+      </div>
+      <div class="cp-reason">💡 Rs.2,09,952 overdue — 132 days past due</div>
+
+      <!-- Partner 4 in cluster -->
+      <div class="cluster-partner">
+        <div class="cp-left">
+          <div class="cp-name">Aman beej Bhandar</div>
+          <div class="cp-location">Gonda, UP · 5 km away</div>
+        </div>
+        <div class="cp-right">
+          <div class="cp-tag ocp">● OCP Blocked</div>
+          <div style="font-size:12px;font-weight:700;color:#C62828;">₹17,029 OCP</div>
+        </div>
+      </div>
+      <div class="cp-reason">💡 Rs.17,029 overdue — 27 days past due</div>
+
+      <!-- Cluster footer -->
+      <div class="cluster-footer">
+        <button class="add-cluster-btn" onclick="showClusterSheet()">Add cluster to plan</button>
+        <div class="cluster-note">or add individually ↓</div>
+      </div>
+    </div>
+
+    <!-- INDIVIDUAL PARTNERS (outside the cluster) -->
+    <div class="section-divider" style="margin-top:4px;">Other Recommendations</div>
+
+    <!-- Carried-over card -->
+    <div class="partner-card">
+      <div class="card-header">
+        <div>
+          <div class="partner-name">KUNTI AGRICLINIC & AGRIBUSINESS</div>
+          <div class="partner-loc">Aligarh, UP &nbsp;·&nbsp; <a class="partner-phone">9012345678</a></div>
+        </div>
+        <div class="badges">
+          <div class="badge dvs"><div class="badge-dot"></div>DVS</div>
+          <div class="badge carried">↩ From Mon</div>
+        </div>
+      </div>
+      <div class="metrics-row">
+        <div class="metric">
+          <div class="metric-label">Total Outstanding</div>
+          <div class="metric-value">₹5,635</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">OCP</div>
+          <div class="metric-value">₹0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Available Limit</div>
+          <div class="metric-value green">₹3,72,000</div>
+        </div>
+      </div>
+      <div class="reason-row carried-over">
+        <div class="reason-icon">↩</div>
+        Carried from Monday — Revenue down 98% vs last year, not yet visited
+      </div>
+      <div class="card-footer">
+        <div class="brief-mini">▶ Pre-visit Brief &nbsp;—&nbsp; 00:00</div>
+        <button class="add-btn" onclick="showDaySheet('individual')">Add to Plan</button>
+      </div>
+    </div>
+
+    <!-- Normal card — Sales signal -->
+    <div class="partner-card">
+      <div class="card-header">
+        <div>
+          <div class="partner-name">Locus Kalkoti Test</div>
+          <div class="partner-loc">Chhatrapati Sambhajinagar &nbsp;·&nbsp; <a class="partner-phone">8788553916</a></div>
+        </div>
+        <div class="badges">
+          <div class="badge dvs"><div class="badge-dot"></div>DVS</div>
+          <div class="badge" style="background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;"><div class="badge-dot" style="background:#4CAF50;"></div>Open</div>
+        </div>
+      </div>
+      <div class="metrics-row">
+        <div class="metric">
+          <div class="metric-label">Total Outstanding</div>
+          <div class="metric-value">₹25,537</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">OCP</div>
+          <div class="metric-value">₹0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Available Limit</div>
+          <div class="metric-value green">₹2,08,173</div>
+        </div>
+      </div>
+      <div class="reason-row sales">
+        <div class="reason-icon">💡</div>
+        Not visited in 105 days — order frequency slowing this season
+      </div>
+      <div class="card-footer">
+        <div class="brief-mini">▶ Pre-visit Brief &nbsp;—&nbsp; 00:00</div>
+        <button class="add-btn" onclick="showDaySheet('individual')">Add to Plan</button>
+      </div>
+    </div>
+
+    <!-- Onboarding card -->
+    <div class="partner-card">
+      <div class="card-header">
+        <div>
+          <div class="partner-name">Rajesh Agro Centre</div>
+          <div class="partner-loc">Gonda, UP &nbsp;·&nbsp; <a class="partner-phone">9876543210</a></div>
+        </div>
+        <div class="badges">
+          <div class="badge" style="background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;">🌱 New Lead</div>
+        </div>
+      </div>
+      <div class="metrics-row">
+        <div class="metric">
+          <div class="metric-label">Lead Stage</div>
+          <div class="metric-value" style="font-size:11px;">Pending 1st Order</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Last Visit</div>
+          <div class="metric-value amber">Never</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Credit Limit</div>
+          <div class="metric-value">₹1,00,000</div>
+        </div>
+      </div>
+      <div class="reason-row onboarding">
+        <div class="reason-icon">🌱</div>
+        Almost ready to become a customer — help push them over the line
+      </div>
+      <div class="card-footer">
+        <div class="brief-mini">▶ Pre-visit Brief &nbsp;—&nbsp; 00:00</div>
+        <button class="add-btn" onclick="showDaySheet('individual')">Add to Plan</button>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+  </div>
+</div>
+
+<!-- DAY PICKER — CLUSTER -->
+<div class="sheet-overlay" id="cluster-sheet" style="display:none;" onclick="hideSheets()">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Add cluster to plan</div>
+    <div class="sheet-sub">All 4 nearby partners will be added to the same day</div>
+
+    <div class="sheet-cluster-info">
+      🗺️ &nbsp;<div>Gonda area · 4 partners · 12 km apart · Approx. 2–3 hrs</div>
+    </div>
+
+    <div class="day-pills">
+      <div class="day-pill" onclick="selectDay(this)">Mon</div>
+      <div class="day-pill has-visits" data-count="2" onclick="selectDay(this)">Tue</div>
+      <div class="day-pill" onclick="selectDay(this)">Wed</div>
+      <div class="day-pill" onclick="selectDay(this)">Thu</div>
+      <div class="day-pill" onclick="selectDay(this)">Fri</div>
+      <div class="day-pill" onclick="selectDay(this)">Sat</div>
+    </div>
+
+    <div style="font-size:11px;color:#9E9E9E;margin-bottom:14px;">
+      ⚠️ Tue already has 2 visits — adding 4 more may be heavy for one day
+    </div>
+
+    <button class="submit-btn" id="cluster-submit" disabled>Select a day</button>
+  </div>
+</div>
+
+<!-- DAY PICKER — INDIVIDUAL -->
+<div class="sheet-overlay" id="individual-sheet" style="display:none;" onclick="hideSheets()">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Select day to visit</div>
+    <div class="sheet-sub">Kunti Agriclinic & Agribusiness</div>
+
+    <div class="day-pills">
+      <div class="day-pill" onclick="selectDay(this)">Mon</div>
+      <div class="day-pill has-visits" data-count="2" onclick="selectDay(this)">Tue</div>
+      <div class="day-pill" onclick="selectDay(this)">Wed</div>
+      <div class="day-pill" onclick="selectDay(this)">Thu</div>
+      <div class="day-pill" onclick="selectDay(this)">Fri</div>
+      <div class="day-pill" onclick="selectDay(this)">Sat</div>
+    </div>
+
+    <button class="submit-btn" id="individual-submit" disabled>Select a day</button>
+  </div>
+</div>
+
+<script>
+function showClusterSheet() {
+  document.getElementById('cluster-sheet').style.display = 'flex';
+}
+function showDaySheet(type) {
+  document.getElementById(type === 'individual' ? 'individual-sheet' : 'cluster-sheet').style.display = 'flex';
+}
+function hideSheets() {
+  document.querySelectorAll('.sheet-overlay').forEach(s => s.style.display = 'none');
+  document.querySelectorAll('.day-pill').forEach(p => p.classList.remove('selected'));
+  document.querySelectorAll('.submit-btn').forEach(b => {
+    b.disabled = true;
+    b.textContent = b.id === 'cluster-submit' ? 'Select a day' : 'Select a day';
+  });
+}
+function selectDay(el) {
+  const sheet = el.closest('.sheet');
+  sheet.querySelectorAll('.day-pill').forEach(p => p.classList.remove('selected'));
+  el.classList.add('selected');
+  const btn = sheet.querySelector('.submit-btn');
+  btn.disabled = false;
+  btn.textContent = 'Add to ' + el.textContent;
+}
+</script>
+</body>
+</html>
