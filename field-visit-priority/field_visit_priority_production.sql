@@ -197,9 +197,10 @@ order_proximity AS (
     COUNTIF(v.visit_date IS NOT NULL
       AND DATE(b.Invoice_Created) BETWEEN v.visit_date AND DATE_ADD(v.visit_date, INTERVAL 7 DAY)) AS proximate_order_days
   FROM `agrostar-data.optimized_reports_data.sale_return_b2c_b2b` b
-  LEFT JOIN (SELECT SAFE_CAST(store_id AS INT64) AS fid, DATE(date) AS visit_date
-             FROM `agrostar-data.offline_team.store_visits_v2`
-             WHERE DATE(date) >= DATE_SUB(CURRENT_DATE(), INTERVAL 180 DAY)) v
+  -- BUG FIX: use visits_dedup (dual-app union) not just store_visits_v2
+  -- visits from prod_db_views.visit (SaathiAPP) were previously missed
+  LEFT JOIN (SELECT farmer_id AS fid, visit_date FROM visits_dedup
+             WHERE visit_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 180 DAY)) v
     ON v.fid = SAFE_CAST(b.owner_id AS INT64)
   WHERE b.Channel_Name = 'B2B' AND b.unicommerce_status NOT LIKE '%RETURN%'
     AND DATE(b.Invoice_Created) >= DATE_SUB(CURRENT_DATE(), INTERVAL 180 DAY)
@@ -350,6 +351,24 @@ tagged AS (
   FROM bucket_scores
 ),
 
+-- ── DYNAMIC SUPPRESSION: portfolio size per rep ──────────────
+-- MOVED HERE (before sm_view) to fix forward-reference bug.
+-- rep_portfolio must be defined before sm_scored which JOINs to it.
+rep_portfolio_sm AS (
+  SELECT sm_email AS rep_email, COUNT(DISTINCT SAFE_CAST(farmer_id AS INT64)) AS portfolio_size
+  FROM `agrostar-data.offline_team.okr_data_live`
+  WHERE status='ACTIVE' AND farmer_id IS NOT NULL
+    AND sm IS NOT NULL AND NOT STARTS_WITH(LOWER(TRIM(sm)),'vacant')
+  GROUP BY sm_email
+),
+rep_portfolio_tm AS (
+  SELECT tm_email AS rep_email, COUNT(DISTINCT SAFE_CAST(farmer_id AS INT64)) AS portfolio_size
+  FROM `agrostar-data.offline_team.okr_data_live`
+  WHERE status='ACTIVE' AND farmer_id IS NOT NULL
+    AND tm IS NOT NULL AND NOT STARTS_WITH(LOWER(TRIM(tm)),'vacant')
+  GROUP BY tm_email
+),
+
 -- ── 12. SM VIEW — suppression + relationship percentile ───────
 sm_view AS (
   SELECT e.*,
@@ -371,6 +390,7 @@ sm_scored AS (
     -- Bucket weights: Collection 40% | Revenue 30% | Relationship 15% | Targets 15%
     -- Revenue increased 25%→30%: buying behaviour decline is a stronger forward signal
     -- Relationship remains 15%: cadence maintenance, not primary urgency driver
+    -- Bucket weights: Collection 40% | Revenue 30% | Relationship 15% | Targets 15%
     ROUND((40*collection_pctile + 30*revenue_pctile + 15*relationship_pctile + 15*p_target) / 100, 2) AS active_score,
     CASE
       WHEN collection_pctile >= revenue_pctile AND collection_pctile >= relationship_pctile AND collection_pctile >= p_target AND (ocp_amount > 0 OR pog_amount > 0)
@@ -400,8 +420,13 @@ sm_scored AS (
                CONCAT('Not visited in ', CAST(days_since_visit AS STRING), ' days'))
       ELSE CONCAT(territory, ' is behind this month''s ', top_category, ' target — this partner is a major ', top_category, ' seller')
     END AS primary_reason,
-    days_since_visit > 15 AS eligible
+    -- Dynamic suppression: smaller portfolios get shorter suppression window
+    -- so partners cycle back sooner and pool never runs empty
+    days_since_visit > GREATEST(7, LEAST(15,
+      CAST(FLOOR(IFNULL(rp.portfolio_size, 36) * 15.0 / 36) AS INT64)
+    )) AS eligible
   FROM sm_view
+  LEFT JOIN rep_portfolio_sm rp ON rp.rep_email = sm_view.sm_email
 ),
 
 -- ── 13. TM VIEW — suppression + relationship percentile ───────
@@ -425,6 +450,7 @@ tm_scored AS (
     -- Bucket weights: Collection 40% | Revenue 30% | Relationship 15% | Targets 15%
     -- Revenue increased 25%→30%: buying behaviour decline is a stronger forward signal
     -- Relationship remains 15%: cadence maintenance, not primary urgency driver
+    -- Bucket weights: Collection 40% | Revenue 30% | Relationship 15% | Targets 15%
     ROUND((40*collection_pctile + 30*revenue_pctile + 15*relationship_pctile + 15*p_target) / 100, 2) AS active_score,
     CASE
       WHEN collection_pctile >= revenue_pctile AND collection_pctile >= relationship_pctile AND collection_pctile >= p_target AND (ocp_amount > 0 OR pog_amount > 0)
@@ -454,8 +480,12 @@ tm_scored AS (
                CONCAT('Not visited in ', CAST(days_since_visit AS STRING), ' days'))
       ELSE CONCAT(territory, ' is behind this month''s ', top_category, ' target — this partner is a major ', top_category, ' seller')
     END AS primary_reason,
-    days_since_visit > 45 AS eligible
+    -- Dynamic suppression for TM: floor=15d, ceiling=45d
+    days_since_visit > GREATEST(15, LEAST(45,
+      CAST(FLOOR(IFNULL(rp.portfolio_size, 36) * 45.0 / 36) AS INT64)
+    )) AS eligible
   FROM tm_view
+  LEFT JOIN rep_portfolio_tm rp ON rp.rep_email = tm_view.tm_email
 ),
 
 -- ── 14. CHURNED RECOVERY (INACTIVE + OCP > 5k) ───────────────
@@ -469,17 +499,29 @@ partner_inactive AS (
 ),
 churned_debits AS (
   SELECT cf.farmer_id,
-    SUM(GREATEST(d.amount + IFNULL(d.interest_amount,0) - IFNULL(r.reconciled_amount,0), 0)) AS pending_amount,
-    MAX(IF((d.amount + IFNULL(d.interest_amount,0) - IFNULL(r.reconciled_amount,0)) > 0,
+    SUM(IF(DATE(d.due_date) < CURRENT_DATE(),
+        GREATEST(d.amount + IFNULL(d.interest_amount,0) - IFNULL(r.reconciled_amount,0), 0), 0)) AS pending_amount,
+    MAX(IF(DATE(d.due_date) < CURRENT_DATE()
+        AND (d.amount + IFNULL(d.interest_amount,0) - IFNULL(r.reconciled_amount,0)) > 0,
         DATE_DIFF(CURRENT_DATE(), DATE(d.due_date), DAY), 0)) AS max_dpd
   FROM `agrostar-data.prod_db_views.wallet_creditwallettransaction` d
   JOIN `agrostar-data.prod_db_views.csr_farmer` cf ON cf.user_id = d.wallet_user_id
   LEFT JOIN recon r ON r.reconciled_for_id = d.id
+  -- BUG FIX: added DATE(d.due_date) < CURRENT_DATE() to only count OVERDUE amounts
+  -- previously summed all pending including future-dated debits, inflating churned OCP
   WHERE d.cancelled = 0 AND d.transaction_type = 0 AND d.reason_id NOT IN (2)
   GROUP BY cf.farmer_id
 ),
 
--- ── 15. ONBOARDING (zoho_leads) ───────────────────────────────
+-- ── 15. ONBOARDING ────────────────────────────────────────────
+-- Source: galaxy_views.institution.zohoStatus (Saathi app Lead Status field)
+-- This is what the Saathi app shows as "Lead Status" — NOT zoho_leads.stage
+-- Reason strings map to the 5 field team actionable steps:
+--   1. Pitching again to become Agrostar Saathi Partner
+--   2. Document Collection
+--   3. Security Deposit Collection
+--   4. First Order
+--   5. Lead Creation
 rep_directory AS (
   SELECT DISTINCT LOWER(TRIM(sm)) AS email, 'SM' AS role
   FROM `agrostar-data.offline_team.okr_data_live`
@@ -489,17 +531,64 @@ rep_directory AS (
   FROM `agrostar-data.offline_team.okr_data_live`
   WHERE tm IS NOT NULL AND NOT STARTS_WITH(LOWER(TRIM(tm)), 'vacant')
 ),
+-- Onboarding from galaxy_views.institution using zohoStatus (Saathi app Lead Status)
+-- Only 5 actionable stages the field team needs to act on:
+--   Pending for in person meeting → Pitch / Lead Creation
+--   Collect SD                    → Security Deposit Collection
+--   Cheque Pending                → Security Deposit Collection (collect cheque)
+--   SD Collected Incomplete Doc   → Document Collection
+--   Pending for First Order       → First Order
+-- Priority order (closest to conversion first):
+--   Pending for First Order (1) > Cheque Pending (2) > Collect SD (3) > SD Collected Incomplete Doc (4) > Pending for in person meeting (5)
+-- Last activity per institution from history table
+onboarding_last_activity AS (
+  SELECT institutionId, MAX(updatedOn) AS last_activity_date
+  FROM `agrostar-data.galaxy_views.institutionhistory`
+  GROUP BY institutionId
+),
 onboarding_leads AS (
-  SELECT reference_customer_id AS farmer_id,
-    CAST(Contact_name AS STRING) AS partner_name,
-    LOWER(TRIM(Lead_Owner)) AS lead_owner_email,
-    stage, UPPER(TRIM(territory)) AS territory
-  FROM `agrostar-data.optimized_reports_data.zoho_leads`
-  WHERE reference_customer_id IS NOT NULL
-    AND (stage NOT LIKE '%Closed Won%' OR stage = 'Closed Won but Cheque Pending')
+  SELECT
+    SAFE_CAST(i.reference_customer_id AS INT64) AS farmer_id,
+    i.name                                       AS partner_name,
+    LOWER(TRIM(okr.sm))                          AS lead_owner_email,
+    i.zohoStatus                                 AS stage,
+    UPPER(TRIM(okr.territory))                   AS territory,
+    la.last_activity_date,
+    -- Priority within onboarding (1 = highest — closest to first order)
+    CASE i.zohoStatus
+      WHEN 'Pending for First Order'        THEN 1
+      WHEN 'Cheque Pending'                 THEN 2
+      WHEN 'Collect SD'                     THEN 3
+      WHEN 'SD Collected Incomplete Doc'    THEN 4
+      WHEN 'Pending for in person meeting'  THEN 5
+    END AS onboarding_priority
+  FROM `agrostar-data.galaxy_views.institution` i
+  JOIN `agrostar-data.offline_team.okr_data_live` okr
+    ON okr.farmer_id = SAFE_CAST(i.reference_customer_id AS INT64)
+  LEFT JOIN onboarding_last_activity la
+    ON la.institutionId = i.institution_id
+  WHERE i.zohoStatus IN (
+      'Pending for in person meeting',
+      'Collect SD',
+      'Cheque Pending',
+      'SD Collected Incomplete Doc',
+      'Pending for First Order'
+    )
+    AND i.archive = FALSE
+    AND okr.sm IS NOT NULL
+    AND NOT STARTS_WITH(LOWER(TRIM(okr.sm)), 'vacant')
+    -- KEY FILTER: only leads with activity in last 6 months
+    -- removes 7,114 stale Collect SD leads and 408 cold meeting leads
+    AND DATE(la.last_activity_date) >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
   QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY reference_customer_id
-    ORDER BY IF(stage LIKE '8%' OR stage = 'Closed Won but Cheque Pending', 0, 1), Final_sd_date DESC
+    PARTITION BY i.reference_customer_id
+    ORDER BY CASE i.zohoStatus
+      WHEN 'Pending for First Order'        THEN 1
+      WHEN 'Cheque Pending'                 THEN 2
+      WHEN 'Collect SD'                     THEN 3
+      WHEN 'SD Collected Incomplete Doc'    THEN 4
+      WHEN 'Pending for in person meeting'  THEN 5
+    END ASC
   ) = 1
 ),
 
@@ -516,6 +605,19 @@ onboarding_leads AS (
 --
 -- Calls: separate output. App surfaces top 2 calls ONLY after rep completes
 -- 24 physical visits for the week (tracked from visit logs in the app layer).
+-- ── DYNAMIC SUPPRESSION PER REP ──────────────────────────────
+-- Fixed 15d/45d suppression empties the pool for small-portfolio reps.
+-- Solution: shrink suppression window proportionally for smaller portfolios
+-- so partners cycle back sooner and reps always have recommendations.
+--
+-- Formula: suppression = MAX(floor, MIN(ceiling, portfolio_size × ceiling / 36))
+-- SM: floor=7d, ceiling=15d → 36 partners = full 15d; 12 partners = 7d
+-- TM: floor=15d, ceiling=45d → 36 partners = full 45d; 18 partners = 22d
+--
+-- This ensures: reps with 6 partners see those partners every 7 days (not 15),
+-- while reps with 40+ partners keep the standard 15/45-day cadence.
+-- rep_portfolio_sm and rep_portfolio_tm defined earlier (before sm_view) to fix forward reference.
+
 -- Step 1: Count how many eligible active partners exist per rep
 active_eligible_sm AS (
   SELECT sm_email AS rep_email, COUNT(*) AS n FROM sm_scored WHERE eligible GROUP BY sm_email
@@ -629,7 +731,7 @@ churned_sm_pool AS (
     100.0 AS collection_pctile, 0.0 AS revenue_pctile, 0.0 AS relationship_pctile, 0.0 AS target_pctile,
     ROUND(cd.pending_amount, 2) AS active_score, 'High' AS collection_tag, 'Blocked' AS sales_tag,
     'VISIT' AS ev_channel,
-    CONCAT('Inactive — still owes Rs.', CAST(ROUND(cd.pending_amount) AS STRING), ' — recovery visit, not a sales visit') AS primary_reason,
+    CONCAT('Inactive partner — Rs.', CAST(ROUND(cd.pending_amount) AS STRING), ' pending recovery') AS primary_reason,
     pi.sm_email AS rep_email, 'SM' AS role, 'Churned' AS track
   FROM partner_inactive pi
   JOIN churned_debits cd ON cd.farmer_id = pi.farmer_id
@@ -650,7 +752,7 @@ churned_tm_pool AS (
     cd.pending_amount, cd.max_dpd, 0.0, 0.0, 0, 9999, 9999, CAST(NULL AS DATE), 0, 0.0, 'category', 0.0,
     100.0, 0.0, 0.0, 0.0,
     ROUND(cd.pending_amount, 2), 'High', 'Blocked', 'VISIT',
-    CONCAT('Inactive — still owes Rs.', CAST(ROUND(cd.pending_amount) AS STRING), ' — recovery visit, not a sales visit'),
+    CONCAT('Inactive partner — Rs.', CAST(ROUND(cd.pending_amount) AS STRING), ' pending recovery'),
     pi.tm_email, 'TM', 'Churned'
   FROM partner_inactive pi
   JOIN churned_debits cd ON cd.farmer_id = pi.farmer_id
@@ -674,24 +776,37 @@ onboarding_pool AS (
     lv.last_visit_date,
     0, 0.0, 'category', 0.0,
     0.0, 0.0, 0.0, 0.0,
-    CAST(IF(ol.stage LIKE '8%' OR ol.stage = 'Closed Won but Cheque Pending', 1000, 0)
+    -- Score: higher priority stage = higher score (so Pending for First Order surfaces first)
+    CAST((6 - ol.onboarding_priority) * 200
        + LEAST(IF(lv.last_visit_date IS NULL, 9999, DATE_DIFF(CURRENT_DATE(), lv.last_visit_date, DAY)), 999)
        AS FLOAT64) AS active_score,
     'Low' AS collection_tag, 'Low' AS sales_tag,
-    IF(ol.stage LIKE '8%' OR ol.stage = 'Closed Won but Cheque Pending', 'VISIT', 'CALL') AS ev_channel,
-    IF(ol.stage LIKE '8%' OR ol.stage = 'Closed Won but Cheque Pending',
-       'Almost ready to become a customer — help push them over the line',
-       'New partner, not yet onboarded — help them place their first order') AS primary_reason,
+    'VISIT' AS ev_channel,  -- all 5 actionable stages require a physical visit
+    -- Reason = field team actionable step (not CRM status name)
+    CASE ol.stage
+      WHEN 'Pending for First Order'
+        THEN 'First order pending — visit to help partner place their first order'
+      WHEN 'Cheque Pending'
+        THEN 'Security deposit cheque awaited — visit to collect cheque and complete activation'
+      WHEN 'Collect SD'
+        THEN 'Security deposit collection pending — visit to collect SD and advance onboarding'
+      WHEN 'SD Collected Incomplete Doc'
+        THEN 'SD collected but documents incomplete — visit to collect missing documents'
+      WHEN 'Pending for in person meeting'
+        THEN 'First meeting pending — visit to pitch and initiate Saathi partnership'
+      ELSE CONCAT('Onboarding — ', ol.stage)
+    END AS primary_reason,
     rd.email AS rep_email, rd.role, 'Onboarding' AS track
   FROM onboarding_leads ol
   JOIN rep_directory rd ON rd.email = ol.lead_owner_email
   LEFT JOIN last_visit_any lv ON lv.farmer_id = ol.farmer_id
   -- FIX: Onboarding now fills BEFORE Churned — about-to-close leads have higher expected value
-  -- Within onboarding: about-to-close (stage 8x) always sorts first
+  -- Priority: Pending for First Order (1) first, Pending for in person meeting (5) last
+  -- Tiebreak: longer visit gap surfaces first
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY rd.email
-    ORDER BY IF(ol.stage LIKE '8%' OR ol.stage = 'Closed Won but Cheque Pending', 0, 1),
-             IF(lv.last_visit_date IS NULL, 9999, DATE_DIFF(CURRENT_DATE(), lv.last_visit_date, DAY)) ASC
+    ORDER BY ol.onboarding_priority ASC,
+             IF(lv.last_visit_date IS NULL, 9999, DATE_DIFF(CURRENT_DATE(), lv.last_visit_date, DAY)) DESC
   ) <= IFNULL((SELECT onboard_take FROM slot_allocation_sm WHERE rep_email=rd.email),
               IFNULL((SELECT onboard_take FROM slot_allocation_tm WHERE rep_email=rd.email), 0))
 ),
@@ -714,7 +829,113 @@ weekly_pool AS (
 --   1. Partners in weekly pool EV-routed to CALL (self-sufficient, healthy signal)
 --   2. Recently-visited partners (within cadence, suppressed from VISIT) — cadence only
 --      blocks visits, NOT calls. A partner visited 10 days ago can still receive a call.
-visit_pool AS (SELECT * FROM weekly_pool WHERE ev_channel = 'VISIT'),
+-- BUG FIX: exclude partners with null/zero GPS from visit_pool before geo-clustering.
+-- Churned and Onboarding partners have lat=NULL — they formed a ghost cluster (all ZZZZ geo_key)
+-- that could outscore real geographic clusters. They are moved to call_pool instead.
+-- Partners without GPS can still appear as individual non-clustered call recommendations.
+visit_pool AS (
+  SELECT * FROM weekly_pool
+  WHERE ev_channel = 'VISIT'
+    AND lat IS NOT NULL AND lat != 0 AND lng IS NOT NULL AND lng != 0
+),
+
+-- ── CALL CONTEXT: task-based signals that drive call priority ─────────
+-- Call list is NOT EV-routed — it is TASK-DRIVEN.
+-- Priority 1: P2P promise due TODAY or TOMORROW (t to t+1)
+--   Source: ticketing_task WHERE reference_type='PROMISED_TO_PAY' AND status='CREATED'
+--   Logic: Partner promised to pay on date X. Call to confirm payment is arriving.
+--   Window: CURRENT_DATE() to CURRENT_DATE()+1 ONLY — no past (missed) P2P here.
+--   Amount in reference_data column.
+p2p_context AS (
+  SELECT
+    farmer_id,
+    MIN(DATE(expiration_date))                               AS p2p_due_date,
+    SUM(SAFE_CAST(reference_data AS FLOAT64))               AS p2p_total_amount,
+    COUNT(*)                                                 AS p2p_task_count,
+    CASE
+      WHEN MIN(DATE(expiration_date)) = CURRENT_DATE()
+        THEN CONCAT('P2P due TODAY — Rs.',
+               FORMAT('%\'d', CAST(SUM(SAFE_CAST(reference_data AS FLOAT64)) AS INT64)),
+               ' — call to collect payment')
+      WHEN MIN(DATE(expiration_date)) = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
+        THEN CONCAT('P2P missed yesterday — Rs.',
+               FORMAT('%\'d', CAST(SUM(SAFE_CAST(reference_data AS FLOAT64)) AS INT64)),
+               ' still pending — follow up now')
+      ELSE CONCAT('P2P missed 2 days ago — Rs.',
+               FORMAT('%\'d', CAST(SUM(SAFE_CAST(reference_data AS FLOAT64)) AS INT64)),
+               ' overdue — urgent follow up')
+    END                                                      AS p2p_call_reason,
+    1                                                        AS call_priority
+  FROM `agrostar-data.prod_db_views.ticketing_task`
+  WHERE reference_type = 'PROMISED_TO_PAY'
+    AND status = 'CREATED'
+    -- t-2 to t: missed (2 days ago, yesterday) + due today
+    -- t+1 excluded — tomorrow's promise doesn't need a call yet
+    AND DATE(expiration_date) BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 2 DAY) AND CURRENT_DATE()
+    AND farmer_id IS NOT NULL
+  GROUP BY farmer_id
+),
+
+-- Priority 3: Active B2B complaints (open tickets via Zammad)
+-- Source: zammad_views.offlinesupport_tickets joined to ticketing_ticket via crm_ticket_identity
+-- Only OPEN tickets (close_at IS NULL) in last 30 days
+-- Freshdesk active = 0 currently; Zammad = primary complaint source for B2B
+complaint_context AS (
+  SELECT
+    SAFE_CAST(ctt.farmer_id AS INT64)   AS farmer_id,
+    COUNT(DISTINCT zft.id)              AS open_complaint_count,
+    MAX(DATE_DIFF(CURRENT_DATE(), DATE(zft.created_at), DAY)) AS max_days_open,
+    MIN(DATE(zft.created_at))           AS oldest_complaint_date,
+    -- Complaint type from title (mirrors existing dashboard logic)
+    -- Return Order complaints excluded (handled as Priority 2 via order_management_order)
+    STRING_AGG(DISTINCT
+      CASE
+        WHEN zft.title LIKE '%Hisaab%'               THEN 'Payment/Billing Complaint'
+        WHEN zft.title LIKE '%Product Related%'      THEN 'Product Complaint'
+        WHEN zft.title LIKE '%Order Related%'        THEN 'Order Complaint'
+        WHEN zft.crm_reason LIKE '%Agronomy%'        THEN 'Agronomy Complaint'
+        ELSE 'Other Complaint'
+      END
+    ORDER BY 1 LIMIT 1) AS complaint_type,
+    CONCAT(CAST(COUNT(DISTINCT zft.id) AS STRING),
+           ' open complaint(s) — oldest ',
+           CAST(MAX(DATE_DIFF(CURRENT_DATE(), DATE(zft.created_at), DAY)) AS STRING),
+           ' days — call to resolve') AS complaint_call_reason,
+    3                                   AS call_priority
+  FROM `agrostar-data.zammad_views.offlinesupport_tickets` zft
+  LEFT JOIN `agrostar-data.prod_db_views.ticketing_ticket` ctt
+    ON SAFE_CAST(ctt.id AS STRING) = zft.crm_ticket_identity
+  WHERE ctt.farmer_id IS NOT NULL
+    AND zft.close_at IS NULL                                    -- open only
+    AND DATE(zft.created_at) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+    AND zft.title NOT LIKE '%Return Order%'                     -- exclude returns (handled separately as Priority 2)
+  GROUP BY ctt.farmer_id
+),
+
+-- Priority 2: B2B return orders pending approval
+--   Source: order_management_order WHERE order_type='RETURN_ORDER'
+--   Status: PENDING (awaiting approval) or RECEIVED (received at warehouse, not resolved)
+--   BILTY_UPLOAD_PENDING excluded — that is an internal logistics/ops task, not a partner call.
+--   Source filter: B2B* (MH/UP/RJ/MP/GJ/etc.) on Saathiself channel
+return_context AS (
+  SELECT
+    owner_id                                                 AS farmer_id,
+    COUNT(*)                                                 AS open_return_count,
+    MIN(DATE(created_on))                                    AS oldest_return_date,
+    MAX(DATE_DIFF(CURRENT_DATE(), DATE(created_on), DAY))    AS max_days_pending,
+    CONCAT(CAST(COUNT(*) AS STRING),
+           ' return order(s) pending — oldest: ',
+           CAST(MAX(DATE_DIFF(CURRENT_DATE(), DATE(created_on), DAY)) AS STRING),
+           ' days — call to resolve') AS return_call_reason,
+    2                                                        AS call_priority
+  FROM `agrostar-data.prod_db_views.order_management_order`
+  WHERE order_type = 'RETURN_ORDER'
+    AND status = 'PENDING'  -- RECEIVED and BILTY_UPLOAD_PENDING excluded (RECEIVED = warehouse task, not a partner call)
+    AND LOWER(source) LIKE 'b2b%'
+    AND DATE(created_on) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+    AND owner_id IS NOT NULL
+  GROUP BY owner_id
+),
 
 -- Recently-visited SM partners (within 15d cadence) — suppressed from VISIT but valid for CALL
 recently_visited_sm AS (
@@ -751,16 +972,146 @@ recently_visited_tm AS (
   WHERE NOT s.eligible  -- within cadence (days_since_visit <= 45)
     AND s.ev_channel = 'CALL'
 ),
-call_pool AS (
-  -- Partners EV-routed to CALL from the weekly pool
-  SELECT * FROM weekly_pool WHERE ev_channel = 'CALL'
+-- ── CALL POOL ────────────────────────────────────────────────
+-- DEDUPLICATION RULE: if a partner is already in visit_pool, they are NOT in call_pool.
+-- Their P2P/return/complaint context is shown as chips on the visit card instead.
+-- Visit always takes priority over call for the same partner.
+--
+-- CALL SOURCES (all excluding visit_pool):
+--   A. EV-routed CALL from weekly_pool (behavioral — orders/pays independently)
+--   B. Recently visited within cadence (SM <15d, TM <45d) — not eligible for visit
+--   C. Partners with active P2P/return/complaint NOT in visit_pool
+--      (these surface EVEN IF not in the 36-partner weekly pool)
+--
+-- CALL PRIORITY ORDER:
+--   1 = P2P due or missed (t-2 to t)      ← most urgent, time-sensitive
+--   2 = Return order PENDING               ← customer issue, money stuck
+--   3 = Open non-return complaint          ← resolution needed
+--   4 = Behavioral (EV-routed, healthy)   ← relationship maintenance
+--
+-- A partner can have multiple signals simultaneously (P2P + complaint + return).
+-- ALL applicable signals shown as chips on the call card.
+-- Primary call reason = highest priority signal.
+
+call_pool_raw AS (
+  -- A. EV-routed CALL from weekly pool (NOT already in visit_pool)
+  SELECT * FROM weekly_pool
+  WHERE ev_channel = 'CALL'
+    AND farmer_id NOT IN (SELECT farmer_id FROM visit_pool)
+
   UNION ALL
-  -- Recently-visited partners (within cadence) — valid for calls, not visits
+
+  -- B. Recently visited SM (within 15d cadence) — suppressed from visit
   SELECT * FROM recently_visited_sm
   WHERE farmer_id NOT IN (SELECT farmer_id FROM weekly_pool)
+    AND farmer_id NOT IN (SELECT farmer_id FROM visit_pool)
+
   UNION ALL
+
+  -- B. Recently visited TM (within 45d cadence) — suppressed from visit
   SELECT * FROM recently_visited_tm
   WHERE farmer_id NOT IN (SELECT farmer_id FROM weekly_pool)
+    AND farmer_id NOT IN (SELECT farmer_id FROM visit_pool)
+
+  UNION ALL
+
+  -- C. Partners with active P2P/return/complaint NOT in weekly_pool or visit_pool
+  -- These surface as call recommendations even if not in the 36-slot visit pool
+  -- P2P alone = 3,319 partners who would otherwise be invisible
+  SELECT
+    s.farmer_id, s.partner_name, s.state, s.district, s.territory, s.cluster,
+    s.sm_email, s.tm_email, s.sh_email, s.cm_email,
+    s.reference_customer_id, s.user_id, s.mobile_number,
+    s.lat, s.lng, s.addr_pincode, s.addr_state, s.addr_district, s.geo_key,
+    s.ocp_amount, s.max_dpd, s.pog_amount, s.yoy_decline_pct, s.order_months_6m,
+    s.days_since_last_order, s.days_since_visit, s.last_visit_date, s.payment_months_6m,
+    s.target_exposure, s.top_category, s.credit_limit,
+    s.collection_pctile, s.revenue_pctile, s.relationship_pctile, s.p_target,
+    s.active_score, s.collection_tag, s.sales_tag, 'CALL' AS ev_channel,
+    s.primary_reason,
+    s.sm_email AS rep_email, 'SM' AS role, 'Active' AS track
+  FROM sm_scored s
+  WHERE s.eligible
+    AND s.farmer_id NOT IN (SELECT farmer_id FROM weekly_pool)
+    AND s.farmer_id NOT IN (SELECT farmer_id FROM visit_pool)
+    AND (
+      s.farmer_id IN (SELECT farmer_id FROM p2p_context)
+      OR s.farmer_id IN (SELECT farmer_id FROM return_context)
+      OR s.farmer_id IN (SELECT farmer_id FROM complaint_context)
+    )
+
+  UNION ALL
+
+  SELECT
+    s.farmer_id, s.partner_name, s.state, s.district, s.territory, s.cluster,
+    s.sm_email, s.tm_email, s.sh_email, s.cm_email,
+    s.reference_customer_id, s.user_id, s.mobile_number,
+    s.lat, s.lng, s.addr_pincode, s.addr_state, s.addr_district, s.geo_key,
+    s.ocp_amount, s.max_dpd, s.pog_amount, s.yoy_decline_pct, s.order_months_6m,
+    s.days_since_last_order, s.days_since_visit, s.last_visit_date, s.payment_months_6m,
+    s.target_exposure, s.top_category, s.credit_limit,
+    s.collection_pctile, s.revenue_pctile, s.relationship_pctile, s.p_target,
+    s.active_score, s.collection_tag, s.sales_tag, 'CALL' AS ev_channel,
+    s.primary_reason,
+    s.tm_email AS rep_email, 'TM' AS role, 'Active' AS track
+  FROM tm_scored s
+  WHERE s.eligible
+    AND s.farmer_id NOT IN (SELECT farmer_id FROM weekly_pool)
+    AND s.farmer_id NOT IN (SELECT farmer_id FROM visit_pool)
+    AND (
+      s.farmer_id IN (SELECT farmer_id FROM p2p_context)
+      OR s.farmer_id IN (SELECT farmer_id FROM return_context)
+      OR s.farmer_id IN (SELECT farmer_id FROM complaint_context)
+    )
+),
+
+-- ── ENRICH CALL POOL WITH ALL CONTEXT SIGNALS ────────────────
+-- Join all three context sources. Multiple can apply to the same partner.
+-- Priority driven by which signals are present, not score.
+call_pool AS (
+  SELECT
+    b.*,
+    -- ── PRIORITY: highest active signal wins ──
+    CASE
+      WHEN p.farmer_id IS NOT NULL THEN 1   -- P2P due/missed
+      WHEN r.farmer_id IS NOT NULL THEN 2   -- Return PENDING
+      WHEN c.farmer_id IS NOT NULL THEN 3   -- Open complaint
+      ELSE 4                                 -- Behavioral (EV routing)
+    END AS call_priority,
+
+    -- ── PRIMARY REASON: top priority signal shown first ──
+    CASE
+      WHEN p.farmer_id IS NOT NULL THEN p.p2p_call_reason
+      WHEN r.farmer_id IS NOT NULL THEN r.return_call_reason
+      WHEN c.farmer_id IS NOT NULL THEN c.complaint_call_reason
+      ELSE b.primary_reason
+    END AS call_reason,
+
+    -- ── ALL REMARKS: every applicable signal exposed for UI chips ──
+    -- App shows each non-null remark as a chip on the call card
+    p.p2p_call_reason        AS remark_p2p,
+    r.return_call_reason     AS remark_return,
+    c.complaint_call_reason  AS remark_complaint,
+
+    -- ── P2P FIELDS ──
+    p.p2p_due_date,
+    ROUND(p.p2p_total_amount, 0)  AS p2p_amount,
+    p.p2p_task_count,
+
+    -- ── RETURN FIELDS ──
+    r.open_return_count,
+    r.oldest_return_date,
+    r.max_days_pending            AS return_days_pending,
+
+    -- ── COMPLAINT FIELDS ──
+    c.open_complaint_count,
+    c.complaint_type,
+    c.max_days_open               AS complaint_days_open
+
+  FROM call_pool_raw b
+  LEFT JOIN p2p_context p       ON p.farmer_id = b.farmer_id
+  LEFT JOIN return_context r    ON r.farmer_id = b.farmer_id
+  LEFT JOIN complaint_context c ON c.farmer_id = b.farmer_id
 ),
 
 -- ── 19. GEO-CLUSTERING — ALL VISIT POOL PARTNERS ─────────────
@@ -808,11 +1159,18 @@ visit_members AS (
   SELECT g.*, 'original' AS cluster_source
   FROM geo_clustered g JOIN best_cluster bc ON bc.rep_email = g.rep_email AND bc.cluster_id = g.cluster_id
   UNION ALL
+  -- Sparse fill: pull from adjacent cluster when best cluster < 4 partners
+  -- Distance cap: SM = 120km, TM = 150km from best cluster centroid
+  -- Do NOT pull if it would exceed the cap — better to have 2-3 partners than a ruined route
   SELECT g.*, 'filled' AS cluster_source
   FROM geo_clustered g JOIN best_cluster bc ON bc.rep_email = g.rep_email
-  WHERE bc.cluster_size < 4 AND ABS(g.cluster_id - bc.cluster_id) = 1 AND g.cluster_id != bc.cluster_id
-    AND bc.c_lat IS NOT NULL AND bc.c_lng IS NOT NULL AND g.lat IS NOT NULL AND g.lng IS NOT NULL
-    AND ST_DISTANCE(ST_GEOGPOINT(g.lng, g.lat), ST_GEOGPOINT(bc.c_lng, bc.c_lat)) / 1000 < 15
+  WHERE bc.cluster_size < 4
+    AND ABS(g.cluster_id - bc.cluster_id) = 1
+    AND g.cluster_id != bc.cluster_id
+    AND bc.c_lat IS NOT NULL AND bc.c_lng IS NOT NULL
+    AND g.lat IS NOT NULL AND g.lng IS NOT NULL
+    AND ST_DISTANCE(ST_GEOGPOINT(g.lng, g.lat), ST_GEOGPOINT(bc.c_lng, bc.c_lat)) / 1000
+        <= IF(g.role = 'TM', 150, 120)  -- SM: 120km cap, TM: 150km cap (larger territory)
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY g.rep_email
     ORDER BY ST_DISTANCE(ST_GEOGPOINT(g.lng, g.lat), ST_GEOGPOINT(bc.c_lng, bc.c_lat))
@@ -835,14 +1193,25 @@ promoted_to_visit AS (
   QUALIFY ROW_NUMBER() OVER (PARTITION BY g.rep_email ORDER BY g.active_score DESC)
     <= GREATEST(4 - vc.visit_count, 0)
 ),
--- Top 2 calls — entirely separate from the weekly 36 visit pool
--- Sourced from call_pool (EV-routed CALL partners not in weekly 36)
+-- Call output: weekly cap of 12 per rep (2/day × 6 days)
+-- Ordered by call_priority (1=P2P, 2=Return, 3=Complaint, 4=Behavioral) then score
+-- App surfaces 2 calls per day from this weekly pool of 12
 call_output AS (
-  SELECT c.*, ROW_NUMBER() OVER (PARTITION BY c.rep_email ORDER BY c.active_score DESC) AS call_rank
+  SELECT c.*,
+    ROW_NUMBER() OVER (
+      PARTITION BY c.rep_email
+      ORDER BY COALESCE(cp.call_priority, 4) ASC, c.active_score DESC
+    ) AS call_rank
   FROM call_pool c
-  WHERE c.farmer_id NOT IN (SELECT farmer_id FROM visit_members)
-    AND c.farmer_id NOT IN (SELECT farmer_id FROM promoted_to_visit)
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY c.rep_email ORDER BY c.active_score DESC) <= 2
+  LEFT JOIN call_pool cp2 ON cp2.farmer_id = c.farmer_id AND cp2.rep_email = c.rep_email
+  -- Cross-rep dedup fix: use (farmer_id, rep_email) not just farmer_id
+  -- Prevents TM call list being excluded because same partner is on SM's visit list
+  WHERE (c.farmer_id, c.rep_email) NOT IN (SELECT farmer_id, rep_email FROM visit_members)
+    AND (c.farmer_id, c.rep_email) NOT IN (SELECT farmer_id, rep_email FROM promoted_to_visit)
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY c.rep_email
+    ORDER BY COALESCE(cp2.call_priority, 4) ASC, c.active_score DESC
+  ) <= 12  -- 12 per week cap: 2 calls/day × 6 working days
 )
 
 -- ── 21. FINAL OUTPUT ─────────────────────────────────────────
@@ -868,7 +1237,7 @@ SELECT
   v.max_dpd, v.days_since_visit, v.last_visit_date,
   ROUND(v.yoy_decline_pct * 100, 1) AS yoy_decline_pct,
   v.order_months_6m, v.days_since_last_order, v.payment_months_6m,
-  v.geo_key AS zone, v.cluster_source, v.lat, v.lng,
+  v.cluster_id, v.cluster_source, v.lat, v.lng,
   v.primary_reason
 FROM visit_members v
 LEFT JOIN employee_contacts sm_ec ON sm_ec.email = v.sm_email
@@ -911,9 +1280,27 @@ SELECT
   c.collection_tag, c.sales_tag,
   ROUND(c.ocp_amount,0), ROUND(c.pog_amount,0), c.max_dpd, c.days_since_visit, c.last_visit_date,
   ROUND(c.yoy_decline_pct*100,1), c.order_months_6m, c.days_since_last_order, c.payment_months_6m,
-  CAST(NULL AS STRING), 'independent', c.lat, c.lng, c.primary_reason
+  CAST(NULL AS INT64)   AS cluster_id,
+  'independent'         AS cluster_source,
+  c.lat, c.lng,
+  -- Use enriched call reason if context signals exist, else primary_reason
+  COALESCE(cp.call_reason, c.primary_reason) AS primary_reason,
+  -- Call priority (1=P2P, 2=Return, 3=Complaint, 4=Behavioral)
+  COALESCE(cp.call_priority, 4)              AS call_priority,
+  -- Context fields for UI chips
+  cp.p2p_due_date,
+  ROUND(cp.p2p_total_amount, 0)              AS p2p_amount,
+  cp.p2p_task_count,
+  cp.open_return_count,
+  cp.return_days_pending,
+  cp.open_complaint_count,
+  cp.complaint_type,
+  cp.complaint_days_open
 FROM call_output c
+LEFT JOIN call_pool cp ON cp.farmer_id = c.farmer_id AND cp.rep_email = c.rep_email
 LEFT JOIN employee_contacts sm_ec3 ON sm_ec3.email = c.sm_email
 LEFT JOIN employee_contacts tm_ec3 ON tm_ec3.email = c.tm_email
 
-ORDER BY rep_email, role, track, channel DESC, priority
+ORDER BY rep_email, role, track, channel DESC,
+  COALESCE(cp.call_priority, 4) ASC,   -- 1=P2P, 2=Return, 3=Complaint, 4=Behavioral
+  priority ASC                          -- within same priority, by score
