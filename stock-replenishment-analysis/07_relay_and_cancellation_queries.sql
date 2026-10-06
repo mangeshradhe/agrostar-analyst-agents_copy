@@ -1,0 +1,94 @@
+-- ============================================================================
+-- Ping-pong / quick-relay & order-cancellation analysis — reusable queries
+-- See 07-ping-pong-relay-and-cancellation-analysis.md for methodology + findings.
+-- Project: agrostar-data. Warehouse-only both ends throughout (location_mst.location_type='Warehouse').
+-- Same-city exclusion: TO2's origin city must differ from its destination city (location_mst.city).
+-- MH01/MH02->PNQ01/PNQ02 excluded separately (Aurangabad factory-shutdown migration, not local noise).
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 1. Base "legs" CTE reused by everything below: one row per TO x SKU,
+--    with city/state for the same-city filter and inward-complete timestamp.
+-- ----------------------------------------------------------------------------
+-- WITH legs AS (
+--   SELECT
+--     th.transfer_no,
+--     IFNULL(th.transfer_creation_reason,'(blank/manual)') AS transfer_creation_reason,
+--     UPPER(TRIM(th.from_location_code)) AS from_fc,
+--     UPPER(TRIM(th.to_location_code)) AS to_fc,
+--     UPPER(TRIM(lo.city)) AS from_city, UPPER(TRIM(ld.city)) AS to_city,
+--     itr.ItemSKU,
+--     CAST(SUM(itr.good_qty) AS FLOAT64) AS qty,
+--     MIN(th.created_on) AS created_ts,
+--     MIN(itr.CreatedOn) AS dispatch_ts,
+--     CASE WHEN MAX(th.is_inbound_complete) = 1 THEN MAX(th.updated_on) ELSE NULL END AS inward_ts
+--   FROM `agrostar-data.pristine_wms_prod_db.transfer_header` th
+--   JOIN `agrostar-data.pristine_wms_prod_db.invoiced_transfer_report` itr ON itr.DisplayOrderCode = th.transfer_no
+--   JOIN `agrostar-data.pristine_wms_prod_db.location_mst` lo ON UPPER(TRIM(lo.location_id)) = UPPER(TRIM(th.from_location_code))
+--   JOIN `agrostar-data.pristine_wms_prod_db.location_mst` ld ON UPPER(TRIM(ld.location_id)) = UPPER(TRIM(th.to_location_code))
+--   WHERE th.status != 'CANCELLED' AND itr.line_status != 'CANCELLED'
+--     AND lo.location_type = 'Warehouse' AND ld.location_type = 'Warehouse'
+--     AND th.from_location_code != th.to_location_code
+--     AND itr.CreatedOn >= '2026-07-01'
+--     AND NOT (UPPER(TRIM(th.from_location_code)) IN ('MH01','MH02') AND UPPER(TRIM(th.to_location_code)) IN ('PNQ01','PNQ02'))
+--   GROUP BY 1,2,3,4,5,6,7
+-- )
+
+-- ----------------------------------------------------------------------------
+-- 2. Quick Stock-Lift Pairs (no FIFO, direct 10-day window match)
+--    TO1 = inward-complete receipt. TO2 = any outbound leg from same facility+SKU,
+--    dispatched 0-10 days after TO1's receipt, TO2 must be inter-city.
+-- ----------------------------------------------------------------------------
+-- to1 AS (SELECT * FROM legs WHERE inward_ts IS NOT NULL),
+-- to2 AS (SELECT * FROM legs WHERE from_city != to_city)
+-- SELECT to1.transfer_no AS TO1_No, to1.transfer_creation_reason AS TO1_Reason, to1.from_fc AS TO1_From, to1.to_fc AS TO1_To,
+--   DATE(to1.dispatch_ts) AS TO1_Dispatch_Date, DATE(to1.inward_ts) AS TO1_Received_Date,
+--   to1.ItemSKU AS SKU, CAST(to1.qty AS INT64) AS TO1_Qty,
+--   to2.transfer_no AS TO2_No, to2.transfer_creation_reason AS TO2_Reason,
+--   DATE(to2.dispatch_ts) AS TO2_Dispatch_Date, to2.to_fc AS TO2_To, CAST(to2.qty AS INT64) AS TO2_Qty,
+--   DATE_DIFF(DATE(to2.dispatch_ts), DATE(to1.inward_ts), DAY) AS Days_Received_to_TO2_Dispatch
+-- FROM to1 JOIN to2
+--   ON to2.from_fc = to1.to_fc AND to2.ItemSKU = to1.ItemSKU
+--   AND DATE_DIFF(DATE(to2.dispatch_ts), DATE(to1.inward_ts), DAY) BETWEEN 0 AND 10
+--   AND to2.transfer_no != to1.transfer_no
+
+-- ----------------------------------------------------------------------------
+-- 3. "Real re-transferred qty" convention: ALWAYS dedupe by TO2 before quoting
+--    a headline total or %. Never sum TO1_Qty or TO2_Qty per-row directly.
+--    (client-side JS pattern used on the artifacts, same logic in SQL:)
+-- ----------------------------------------------------------------------------
+-- SELECT TO2_No, ANY_VALUE(TO2_Qty) AS qty FROM <pairs> GROUP BY TO2_No
+-- -- then SUM(qty) / COUNT(*) = real units / real distinct outbound TOs
+
+-- ----------------------------------------------------------------------------
+-- 4. TO Relay Ledger (FIFO consumption-rules version): see fifo_match JS UDF
+--    in the artifact's build history (queue of unconsumed inbound batches per
+--    facility+SKU, drawn down oldest-first on each outbound event). Same base
+--    legs CTE, gap filter <=15 days between leg1_inward_ts and leg2_created_ts.
+-- ----------------------------------------------------------------------------
+
+-- ----------------------------------------------------------------------------
+-- 5. Order-cancellation trace (UF-case TO1s only so far)
+-- ----------------------------------------------------------------------------
+-- audit_candidates AS (
+--   SELECT p.TO1_No, p.TO2_No, a.orderIds,
+--     ROW_NUMBER() OVER (PARTITION BY p.TO1_No, p.TO2_No ORDER BY ABS(TIMESTAMP_DIFF(a.createdAt, p.TO1_Created_ts, MINUTE))) AS rn
+--   FROM <ufcase_pairs> p
+--   JOIN `agrostar-data.supply_management.audittransferorderslogs` a
+--     ON a.sourceFc = p.TO1_From AND a.destinationFc = p.TO1_To AND a.skuCode = p.SKU
+--     AND a.createdAt BETWEEN TIMESTAMP_SUB(p.TO1_Created_ts, INTERVAL 5 DAY) AND TIMESTAMP_ADD(p.TO1_Created_ts, INTERVAL 1 DAY)
+-- ),
+-- order_ids_flat AS (SELECT TO1_No, TO2_No, CAST(oid AS INT64) AS order_id FROM audit_candidates WHERE rn=1, UNNEST(REGEXP_EXTRACT_ALL(orderIds, r'\d+')) AS oid),
+-- order_status AS (
+--   SELECT o.*, oo.status AS order_status, cd.created_on AS cancelled_on
+--   FROM order_ids_flat o
+--   LEFT JOIN `agrostar-data.prod_db_views.order_management_order` oo ON oo.sales_order_id = o.order_id
+--   LEFT JOIN `agrostar-data.prod_db_views.order_management_ordercancellationdata` cd ON cd.order_id = o.order_id
+-- )
+-- -- cancel-driven = order_status='CANCELLED' AND cancelled_on BETWEEN TO1_Created_ts AND TO2_Created_ts
+
+-- ----------------------------------------------------------------------------
+-- 6. Budget Protection check
+-- ----------------------------------------------------------------------------
+-- SELECT transfer_no, reject_reason FROM `agrostar-data.catalog_prod.catalog_management_transferorders`
+-- WHERE transfer_no IN (<watchlist>) AND reject_reason = 'Stock required for own FC demand (Budget fulfillment)'

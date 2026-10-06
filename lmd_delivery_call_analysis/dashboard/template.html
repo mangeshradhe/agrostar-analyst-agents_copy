@@ -1,0 +1,1413 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<title>LMD Delivery Calls — Order Journey</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #F4F5F0;
+  --surface: #FFFFFF;
+  --surface-2: #ECEDE6;
+  --text: #1B211D;
+  --text-muted: #5B655D;
+  --border: #DBDED3;
+  --brand: #9D2123;
+  --brand-soft: #F5E4E4;
+  --gold: #B9791A;
+  --gold-soft: #F5EAD4;
+  --good: #00733E;
+  --good-soft: #E1F0E8;
+  --warn: #B4601A;
+  --warn-soft: #F6E9D9;
+  --bad: #A6423A;
+  --bad-soft: #F5E1DE;
+  --neutral-data: #8A8F82;
+  --neutral-soft: #ECECE5;
+  --accent: #2a78d6;
+  --accent-soft: #E3EDFA;
+  --shadow: 0 1px 2px rgba(27,33,29,0.06), 0 4px 16px rgba(27,33,29,0.05);
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', system-ui, sans-serif; line-height: 1.5; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 32px 20px 80px; }
+h1 { font-family: 'Fraunces', Georgia, serif; text-wrap: balance; margin: 0; font-weight: 600; }
+h2 { font-family: 'IBM Plex Sans', sans-serif; font-weight: 700; margin: 0 0 14px; font-size: 16px; }
+.mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+a { color: var(--accent); }
+
+/* ---- Header ---- */
+.header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 24px; }
+.header h1 { font-size: 30px; }
+.header .sub { color: var(--text-muted); font-size: 13px; margin-top: 6px; }
+.header .sub b { color: var(--text); }
+
+/* ---- KPI tiles ---- */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 22px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+.kpi .label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi .value { font-family: 'IBM Plex Mono', monospace; font-size: 26px; font-weight: 600; margin-top: 4px; }
+.kpi .note { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+
+/* ---- Findings ---- */
+.findings { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 22px; box-shadow: var(--shadow); }
+.findings ul { margin: 0; padding-left: 18px; }
+.findings li { margin-bottom: 7px; font-size: 13.5px; }
+.findings li:last-child { margin-bottom: 0; }
+.findings b { color: var(--brand); }
+
+/* ---- Pivot ---- */
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); margin-bottom: 22px; }
+.pivot-wrap { overflow-x: auto; }
+table.pivot { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 640px; }
+table.pivot th, table.pivot td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.pivot th:first-child, table.pivot td:first-child { text-align: left; }
+table.pivot thead th { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.03em; border-bottom: 2px solid var(--border); }
+table.pivot tbody tr:hover { background: var(--surface-2); }
+table.pivot td.rowlabel { font-weight: 600; }
+table.pivot td.total { font-weight: 700; border-left: 2px solid var(--border); }
+table.pivot .cell-pct { font-size: 9.5px; color: var(--text-muted); display: block; margin-top: 1px; }
+table.pivot tfoot td { font-weight: 600; border-top: 2px solid var(--border); border-bottom: none; color: var(--text-muted); }
+.note-inline { font-size: 11.5px; color: var(--text-muted); margin: 10px 0 0; }
+
+/* ---- Filters ---- */
+.filter-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); }
+.filter-bar input[type=text] { flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 13px; font-family: inherit; }
+.filter-bar select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 12.5px; font-family: inherit; }
+.filter-bar label.chk { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.result-count { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+/* All filters stay pinned to the top; every table / KPI / finding below follows them. */
+.filter-note { font-size: 12px; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 4px 10px; margin: -4px 0 10px; display: inline-block; }
+.filter-note.none { color: var(--text-muted); background: var(--surface-2); }
+.filter-wrap { position: sticky; top: 0; z-index: 50; background: var(--bg); padding: 8px 0 8px; margin-bottom: 8px; }
+.filter-wrap .filter-bar { margin-bottom: 0; padding: 8px 12px; gap: 8px; }
+.filter-wrap .filter-bar input[type=text] { min-width: 160px; padding: 6px 10px; }
+.filter-wrap .filter-bar select { padding: 6px 8px; max-width: 220px; }
+.date-range { display: flex; align-items: center; gap: 6px; }
+.date-range input[type=date] { padding: 7px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 12.5px; font-family: inherit; }
+.date-range .to { color: var(--text-muted); font-size: 12px; }
+.quickpick { display: flex; gap: 4px; }
+.quickpick button { padding: 6px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-muted); font-size: 11.5px; cursor: pointer; font-family: inherit; }
+.quickpick button:hover { background: var(--surface); }
+.quickpick button.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+/* ---- Pills / chips ---- */
+.pill { display: inline-block; padding: 2px 9px; border-radius: 100px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.gold { background: var(--gold-soft); color: var(--gold); }
+.pill.neutral { background: var(--neutral-soft); color: var(--neutral-data); }
+.pill.accent { background: var(--accent-soft); color: var(--accent); }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 11px; background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
+
+/* ---- Product Group combobox (searchable dropdown) ---- */
+.combo { position: relative; }
+.combo input { width: 210px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 12.5px; font-family: inherit; }
+.combo .combo-panel { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 290px; max-height: 320px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); padding: 4px; }
+.combo .combo-opt { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px; font-size: 12.5px; cursor: pointer; }
+.combo .combo-opt:hover, .combo .combo-opt.sel { background: var(--accent-soft); }
+.combo .combo-opt .cnt { color: var(--text-muted); font-size: 11.5px; white-space: nowrap; }
+.combo .combo-empty { padding: 8px 10px; font-size: 12px; color: var(--text-muted); }
+
+/* ---- Sales call (the call that created the order) ---- */
+.sales-box { margin: 10px 0; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; background: var(--surface); }
+.sales-box.none { border-left-color: var(--border); color: var(--text-muted); }
+.sales-box .srow { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 6px; }
+.sales-box .ssum { color: var(--text); margin: 6px 0; line-height: 1.45; }
+.sales-box audio { width: 100%; max-width: 420px; height: 34px; margin: 4px 0; }
+.sales-box .rec { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sales-box .rec-note { color: var(--text-muted); font-size: 11.5px; }
+.sales-box .tr-btn { cursor: pointer; margin-top: 4px; padding: 4px 10px; border: 1px solid var(--accent); border-radius: 6px; background: transparent; color: var(--accent); font-weight: 600; font-size: 12px; }
+.sales-box .tr-btn:hover { background: var(--surface-2); }
+.sales-tr[hidden] { display: none; }
+.sales-tr { max-height: 320px; overflow-y: auto; margin-top: 6px; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; }
+.sales-tr p { margin: 0 0 6px; line-height: 1.4; }
+.sales-tr .spk { font-weight: 700; font-size: 11px; margin-right: 6px; }
+.sales-tr .spk.agent { color: var(--accent); }
+.sales-tr .spk.farmer { color: var(--text-muted); }
+
+/* ---- Order items ---- */
+.items-box { margin: 10px 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.items-head { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 12px; background: var(--surface-2); font-size: 12.5px; font-weight: 600; }
+.items-head .sum { color: var(--text-muted); font-weight: 500; }
+.items-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.items-tbl th { text-align: left; font-size: 11px; color: var(--text-muted); font-weight: 600; padding: 6px 12px; border-bottom: 1px solid var(--border); }
+.items-tbl td { padding: 6px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.items-tbl tr:last-child td { border-bottom: none; }
+.items-tbl .num { text-align: right; white-space: nowrap; }
+.items-tbl tr.hl td { background: var(--accent-soft); }
+
+/* ---- Order list ---- */
+.order-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; box-shadow: var(--shadow); overflow: hidden; }
+.order-head { display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer; flex-wrap: wrap; }
+.order-head:hover { background: var(--surface-2); }
+.order-head .oid { font-size: 13px; font-weight: 600; }
+.order-head .meta { font-size: 12px; color: var(--text-muted); }
+.order-head .chev { margin-left: auto; color: var(--text-muted); transition: transform 0.15s; font-size: 12px; }
+.order-card.open .chev { transform: rotate(90deg); }
+.order-body { border-top: 1px solid var(--border); padding: 4px 14px 12px; }
+
+/* ---- Package snapshot ---- */
+.pkg-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0 4px; }
+.pkg-chip { display: flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); font-size: 11.5px; }
+.pkg-chip .pkg-id { font-family: 'IBM Plex Mono', monospace; color: var(--text-muted); }
+.evidence-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; padding: 9px 12px; border-radius: 8px; margin: 4px 0 2px; background: var(--surface-2); border: 1px solid var(--border); }
+.evidence-box.bad { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+.evidence-box.good { background: var(--good-soft); border-color: var(--good); color: var(--good); }
+.evidence-box.gold { background: var(--gold-soft); border-color: var(--gold); color: var(--gold); }
+.evidence-box.neutral { background: var(--neutral-soft); border-color: var(--border); color: var(--text-muted); }
+
+/* ---- Journey timeline ---- */
+.journey { margin: 10px 0 2px; padding-left: 6px; border-left: 2px solid var(--border); }
+.jev { position: relative; padding: 11px 0 11px 4px; border-bottom: 1px dashed var(--border); }
+.jev:last-child { border-bottom: none; }
+.jev-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11.5px; }
+.jev-icon { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.jev-icon.neutral { background: var(--neutral-soft); color: var(--neutral-data); }
+.jev-icon.warn { background: var(--warn-soft); color: var(--warn); }
+.jev-icon.bad { background: var(--bad-soft); color: var(--bad); }
+.jev-icon.good { background: var(--good-soft); color: var(--good); }
+.jev-icon.call { background: var(--brand-soft); color: var(--brand); }
+.jev-badge { font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 100px; }
+.jev-badge.digital { background: var(--neutral-soft); color: var(--neutral-data); }
+.jev-badge.call { background: var(--brand-soft); color: var(--brand); }
+.jev-badge.inference { background: var(--accent-soft); color: var(--accent); }
+.tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.tag-chip.good { background: var(--good-soft); color: var(--good); }
+.tag-chip.bad { background: var(--bad-soft); color: var(--bad); }
+.tag-chip.warn { background: var(--warn-soft); color: var(--warn); }
+.tag-chip.gold { background: var(--gold-soft); color: var(--gold); }
+.tag-chip.neutral { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
+.jev-ts { font-family: 'IBM Plex Mono', monospace; color: var(--text-muted); }
+.jev-link { font-size: 11px; color: var(--text-muted); margin-top: 5px; font-style: italic; }
+.jev-body { margin-top: 6px; }
+.jev-status { font-size: 13px; font-weight: 600; }
+.jev-reason { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.jev-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+.call-row audio { width: 100%; height: 32px; margin: 6px 0 6px; display: block; }
+.call-summary { font-size: 13px; line-height: 1.5; }
+.call-conflict { font-size: 12.5px; margin-top: 6px; padding: 7px 10px; background: var(--bad-soft); color: var(--bad); border-radius: 7px; }
+.call-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.inference-block { margin-top: 9px; padding: 10px 12px; background: var(--surface-2); border-radius: 8px; }
+.inference-block .lbl { font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+
+.pager { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0; font-size: 13px; }
+.pager .pg-info { color: var(--text-muted); margin-right: auto; }
+.pg-btn { border: 1px solid var(--border, #d0d5dd); background: transparent; color: inherit; border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; }
+.pg-btn:hover:not(:disabled) { background: rgba(127,127,127,.12); }
+.pg-btn.on { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+.pg-btn:disabled { opacity: .4; cursor: default; }
+.pg-gap { color: var(--text-muted); }
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13.5px; }
+@media (max-width: 640px) {
+  .order-head .meta { display: none; }
+  table.pivot { min-width: 560px; }
+}
+</style>
+
+<div class="wrap">
+  <div class="header">
+    <div>
+      <h1>LMD Delivery Calls — Order Journey</h1>
+      <div class="sub">AgroStar Last-Mile Delivery — farmer call review, order-level · snapshot <b id="snapDate">—</b> · <b id="hdrOrders">—</b> orders / <b id="hdrCalls">—</b> calls / <b id="hdrPackages">—</b> packages</div>
+    </div>
+  </div>
+
+  <div class="filter-wrap">
+  <div class="filter-bar">
+    <input type="text" id="fSearch" placeholder="Search order ID, package ID, village, call summary…">
+    <select id="fOutcome"><option value="ALL">Outcome: all</option></select>
+    <select id="fReason"><option value="ALL">Reason: all</option></select>
+    <select id="fExec">
+      <option value="ALL">Execution: all</option>
+      <option value="MATCHED_SAME_DAY">Executed same day</option>
+      <option value="MATCHED_LATER">Executed late</option>
+      <option value="GAP">Not executed</option>
+      <option value="PENDING">Pending today</option>
+    </select>
+    <select id="fState"><option value="ALL">State: all</option></select>
+    <select id="fSalesType"><option value="ALL">Sales call type: all</option></select>
+    <div class="combo" id="groupCombo">
+      <input type="text" id="fGroup" placeholder="Product Group: all — type to search" autocomplete="off">
+      <div class="combo-panel" id="groupPanel" hidden></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="fConflict"> Conflict only</label>
+    <label class="chk"><input type="checkbox" id="fRepeat"> Multi-call orders only</label>
+    <label class="chk"><input type="checkbox" id="fGap"> Execution gap only</label>
+    <label class="chk" title="First LMD call ended 'delivery confirmed', but the order ended cancelled or returned"><input type="checkbox" id="fTurned"> Agreed first, then cancelled / returned</label>
+    <label class="chk" title="Orders where a sales call was found (matched or probable)"><input type="checkbox" id="fSales"> Has sales call only</label>
+    <div class="date-range">
+      <input type="date" id="fDateFrom"> <span class="to">to</span> <input type="date" id="fDateTo">
+    </div>
+    <div class="quickpick" id="quickpick">
+      <button data-days="0">Today</button>
+      <button data-days="3">3 days</button>
+      <button data-days="7">7 days</button>
+      <button data-days="-1" class="active">All</button>
+    </div>
+    <select id="fSort">
+      <option value="recent">Sort: most recent call</option>
+      <option value="calls">Sort: most calls first</option>
+      <option value="oid">Sort: order ID</option>
+    </select>
+  </div>
+  <div class="result-count" id="resultCount"></div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <div class="findings">
+    <h2>Key findings</h2>
+    <div class="filter-note" data-fnote></div>
+    <ul id="findingsList"></ul>
+  </div>
+
+  <div class="chart-card">
+    <h2>Order outcome × reason — why calls need action</h2>
+    <div class="filter-note" data-fnote></div>
+    <div class="pivot-wrap" id="pivotWrap"></div>
+    <div class="note-inline">Call-level counts, with the distinct <b>orders</b> behind each. In each cell the % is the share of that row (what drives that outcome); in the Total column it is the share of all calls in view. One order can have calls with different outcomes or reasons, so order counts don't add up across rows or columns.</div>
+  </div>
+
+  <div class="chart-card">
+    <h2>Call vs digital evidence — did the promised action actually happen?</h2>
+    <div class="filter-note" data-fnote></div>
+    <div class="pivot-wrap" id="evidencePivotWrap"></div>
+    <div class="note-inline">Order-level. Compares each order's last call outcome (confirmed / on hold / cancelled) against its package status history: did the matching digital action (delivered / put on hold / return initiated) actually get logged, and was it the same day (IST) as the call? "Not executed" means that day is over with nothing logged since — a real execution gap, not just a slow update. "Pending today" still has time left in the day.</div>
+  </div>
+
+  <div class="chart-card">
+    <h2>Agreed on the first call, but the order ended cancelled / returned</h2>
+    <div class="filter-note" data-fnote></div>
+    <div id="turnWrap"></div>
+    <div class="note-inline">Order-level. Population: orders whose <b>first</b> LMD call ended “delivery confirmed” (the farmer agreed to take delivery). “Turned” = the order later ended <b>cancelled or returned</b> — a package in a cancellation / return status, or the last call was a cancellation. The reason is read from the first later call that moved the order away from confirmed (on hold or cancelled); orders with no such call had the cancel / return logged without another call, so the cause isn’t on any call. Use the “Agreed first, then cancelled / returned” filter above to list these orders and open each journey.</div>
+  </div>
+
+
+  <div id="orderList"></div>
+</div>
+
+<script>window.__LMD_CALLS__ = /*__LMD_CALLS_PLACEHOLDER__*/;</script>
+<script>window.__LMD_PACKAGES__ = /*__LMD_PACKAGES_PLACEHOLDER__*/;</script>
+<script>window.__LMD_HISTORY__ = /*__LMD_HISTORY_PLACEHOLDER__*/;</script>
+<script>window.__LMD_GEO__ = /*__LMD_GEO_PLACEHOLDER__*/;</script>
+<script>window.__LMD_SALES__ = /*__LMD_SALES_PLACEHOLDER__*/;</script>
+<script>window.__LMD_ORDER_SRC__ = /*__LMD_ORDER_SRC_PLACEHOLDER__*/;</script>
+<script src="lmd_sales_transcripts.js"></script>
+<script>window.__LMD_ITEMS__ = /*__LMD_ITEMS_PLACEHOLDER__*/;</script>
+<script>window.__LMD_EXTRACTED_AT__ = "__EXTRACTED_AT_PLACEHOLDER__";</script>
+<script>
+(function(){
+  "use strict";
+  var CALLS_RAW = window.__LMD_CALLS__ || [];
+  var PACKAGES_RAW = window.__LMD_PACKAGES__ || [];
+  var HISTORY_RAW = window.__LMD_HISTORY__ || [];
+  var SNAP_DATE = "__SNAP_DATE_PLACEHOLDER__";
+  document.getElementById('snapDate').textContent = SNAP_DATE;
+
+  var LINK_WINDOW_MS = 45 * 60 * 1000; // causal-linking heuristic: call <-> status change within 45 min
+
+  // ---- Call vs digital evidence ----
+  // TIMEZONE (corrected 2026-09-29): timestamps in the source tables (lmd_call_audits.created_at,
+  // delivery_shippingpackage.updated_on, ...statushistory.created_on) are labelled UTC but are really
+  // IST wall-clock time -- about 5.5h ahead of the true instant. Evidence: the audio recording's real
+  // S3 upload time is 5.7-7.6h BEFORE the audit's created_at (median 6.1h; a genuine audit lag can't be
+  // that consistent, but 5.5h offset + a short processing delay is exactly that), and the newest
+  // package/status rows were stamped ~5h ahead of the actual clock. parseTs() therefore subtracts
+  // SOURCE_CLOCK_OFFSET_MS, so every internal timestamp below is a true UTC instant. After that,
+  // istDayKey() shifting by +5:30 is correct, and the viewer's local formatting (IST) is too.
+  // "Same day" is a business/IST calendar-day concept, so day-bucketing shifts by the IST offset
+  // before reading off calendar fields.
+  var IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  var SOURCE_CLOCK_OFFSET_MS = IST_OFFSET_MS; // source timestamps are IST wall-clock mislabelled as UTC
+  function istDayKey(ts){
+    var d = new Date(ts + IST_OFFSET_MS);
+    return d.getUTCFullYear() + '-' + (d.getUTCMonth()+1) + '-' + d.getUTCDate();
+  }
+  var EXPECTED_STATUS_BY_OUTCOME = {
+    DELIVERY_CONFIRMED: ['delivered'],
+    DELIVERY_ON_HOLD: ['hold', 'hold_by_saathi'],
+    DELIVERY_CANCELLED: ['return_requested', 'process_for_return', 'return_manifest_created', 'return_in_transit', 'cancellation_requested', 'returned', 'returned_by_lmd']
+  };
+  var EVIDENCE_GRACE_MS = 15 * 60 * 1000; // allow a status log to land up to 15 min before the call
+  var EVIDENCE_META = {
+    MATCHED_SAME_DAY: {cls:'good', label:'Executed same day'},
+    MATCHED_LATER: {cls:'gold', label:'Executed late'},
+    GAP: {cls:'bad', label:'Not executed'},
+    PENDING: {cls:'neutral', label:'Pending today'}
+  };
+
+  var AUDIT_FIELDS = [
+    ["audit_a1_greeting_done", "A1 Greeting"],
+    ["audit_a2_farmer_identity_confirmed", "A2 ID confirmed"],
+    ["audit_a3_order_confirmation_done", "A3 Order confirmed"],
+    ["audit_a4_delivery_availability_checked", "A4 Availability checked"],
+    ["audit_a5_delivery_time_confirmed", "A5 Time confirmed"],
+    ["audit_a6_delivery_location_confirmed", "A6 Location confirmed"],
+    ["audit_a7_farmer_queries_resolved", "A7 Queries resolved"],
+    ["audit_a8_professional_and_polite_communication", "A8 Polite/professional"],
+    ["audit_a9_delivery_commitment_obtained", "A9 Commitment obtained"],
+    ["audit_a10_proper_call_closing", "A10 Proper closing"]
+  ];
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function parseTs(v){
+    if (!v) return 0;
+    var t = Date.parse(v);
+    return isNaN(t) ? 0 : t - SOURCE_CLOCK_OFFSET_MS;
+  }
+  function fmtDate(ms){
+    if (!ms) return "—";
+    var d = new Date(ms);
+    return d.toLocaleDateString("en-IN", {day:"2-digit", month:"short", year:"numeric"}) + " " +
+           d.toLocaleTimeString("en-IN", {hour:"2-digit", minute:"2-digit"});
+  }
+  function fmtTime(ms){
+    if (!ms) return "—";
+    return new Date(ms).toLocaleTimeString("en-IN", {hour:"2-digit", minute:"2-digit"});
+  }
+  function durToSec(s){
+    if (!s) return 0;
+    var p = s.split(":").map(Number);
+    if (p.length !== 3) return 0;
+    return p[0]*3600 + p[1]*60 + p[2];
+  }
+  function secToDur(sec){
+    sec = Math.round(sec);
+    var m = Math.floor(sec/60), s = sec%60;
+    return m + "m " + (s<10?"0":"") + s + "s";
+  }
+  function minToDur(min){
+    min = Math.round(Math.abs(min));
+    if (min < 60) return min + "m";
+    var h = Math.floor(min/60), m = min%60;
+    return h + "h " + m + "m";
+  }
+  function outcomeMeta(o){
+    switch(o){
+      case "DELIVERY_CONFIRMED": return {cls:"good", label:"Confirmed"};
+      case "DELIVERY_ON_HOLD": return {cls:"warn", label:"On hold"};
+      case "FOLLOW_UP_REQUIRED": return {cls:"gold", label:"Follow-up"};
+      case "DELIVERY_CANCELLED": return {cls:"bad", label:"Cancelled"};
+      case "NOT_ENOUGH_DATA": return {cls:"neutral", label:"Not enough data"};
+      default: return {cls:"neutral", label: o || "Unknown"};
+    }
+  }
+  function sentimentMeta(s){
+    s = (s||"").toUpperCase();
+    if (s === "POSITIVE") return {cls:"good", label:"Positive"};
+    if (s === "NEGATIVE") return {cls:"bad", label:"Negative"};
+    if (s === "NEUTRAL") return {cls:"neutral", label:"Neutral"};
+    return {cls:"neutral", label:"—"};
+  }
+  var COLOR = {good:"var(--good)", warn:"var(--warn)", bad:"var(--bad)", gold:"var(--gold)", neutral:"var(--neutral-data)", accent:"var(--accent)"};
+
+  // A raw UUID or Mongo ObjectId is an opaque internal reference, not a reason a
+  // human wrote -- checked against every hold/return-reason lookup table we could
+  // find (orderhold, order_management_holdreasons/orderholdreason,
+  // delivery_returnrequest/returnrequesthistory/returnrequeststatus); none resolve
+  // it. Show it only when it reads like actual text (design doc: don't expose
+  // technical noise).
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var MONGOID_RE = /^[0-9a-f]{24}$/i;
+  function humanReason(r){
+    if (!r) return null;
+    r = String(r).trim();
+    if (!r || r.toLowerCase() === "none") return null;
+    if (UUID_RE.test(r) || MONGOID_RE.test(r)) return null;
+    return r;
+  }
+  // delivery_state has mixed casing and abbreviations (GUJARAT / Gujarat / UP) -- normalise for grouping
+  function normState(v){
+    if (!v) return "";
+    var t = String(v).trim();
+    if (!t) return "";
+    if (t.toUpperCase() === "UP") return "Uttar Pradesh";
+    return t.toLowerCase().replace(/\b[a-z]/g, function(m){ return m.toUpperCase(); });
+  }
+  function niceLabel(s){
+    return String(s||"").replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  }
+  function uniq(arr){ var seen = {}, out = []; arr.forEach(function(x){ if(!seen[x]){ seen[x]=1; out.push(x);} }); return out; }
+  function pct(n, d){ return d ? Math.round(n/d*100) + "%" : "—"; }
+
+  // ---- Normalize calls ----
+  var calls = CALLS_RAW.map(function(r){
+    r._ts = parseTs(r.created_at);
+    r._sentiment = (r.overall_call_sentiment||"").toUpperCase();
+    r._durSec = durToSec(r.meta_data_call_duration);
+    r._searchText = [r.package_id, r.order_id, r.delivery_village, r.delivery_taluka,
+      r.delivery_district, r.delivery_state, r.ai_delivery_summary, r.ai_conflict_summary]
+      .join(" ").toLowerCase();
+    return r;
+  });
+
+  // ---- Normalize packages + history, group by order / package ----
+  var packagesByOrder = {};
+  PACKAGES_RAW.forEach(function(p){
+    p._updatedTs = parseTs(p.updated_on);
+    var oid = p.order_id || "(unmatched)";
+    (packagesByOrder[oid] = packagesByOrder[oid] || []).push(p);
+  });
+  var historyByPackage = {};
+  HISTORY_RAW.forEach(function(h){
+    h._ts = parseTs(h.created_on);
+    (historyByPackage[h.package_id] = historyByPackage[h.package_id] || []).push(h);
+  });
+  Object.keys(historyByPackage).forEach(function(pid){
+    historyByPackage[pid].sort(function(a,b){ return a._ts - b._ts; });
+  });
+
+  var callsByOrder = {};
+  calls.forEach(function(c){
+    var oid = c.order_id || "(unmatched)";
+    (callsByOrder[oid] = callsByOrder[oid] || []).push(c);
+  });
+
+  // "As of" instant for the evidence check below -- the most recent timestamp anywhere in this
+  // extract, not the viewer's live clock (this is a static snapshot, opened who-knows-when).
+  // Prefer the real extraction instant (true UTC, from extract_meta.json). The newest row in the
+  // data is NOT a safe "now": it can only be earlier than the extraction, never later, so this only
+  // guards against a missing extraction time.
+  var geoByOrder = {};
+  (window.__LMD_GEO__ || []).forEach(function(g){ geoByOrder[g.order_id] = g; });
+  // Order line items (order_management_orderitem), each tagged with its Product Group
+  // (item_mst.sub_sub_product_group). No group -> "Unmapped".
+  var UNMAPPED = "Unmapped";
+  var itemsByOrder = {};
+  (window.__LMD_ITEMS__ || []).forEach(function(i){
+    i.group = i.product_group || UNMAPPED;
+    (itemsByOrder[i.order_id] = itemsByOrder[i.order_id] || []).push(i);
+  });
+  // Sales call that created each order (disposition_data, matched by the farmer's mobiles + call end ~ order
+  // creation) and the order's source. Transcripts live in a sibling file (window.__LMD_SALES_TR__).
+  // Recording paths in disposition_data are bare ("2026-09-16/call_....mp3"). The host is the Cloudflare R2
+  // public bucket that genesys_db_views.call_audit_data stores as full URLs. It only holds recent
+  // recordings (2026-10-01 sample of 80: every call from 24 Sep on was there, every earlier one 404), so
+  // older calls fall back to a "no longer available" note via the audio onerror handler below.
+  // A recording lives on exactly one of these hosts, and disposition_data does not say which. The player tries
+  // them in order and moves to the next on error. The four internal servers are only reachable from the
+  // office network (and, if this page is opened over https, browsers block them as mixed content).
+  var SALES_RECORDING_HOSTS = [
+    "https://pub-5db1b4d0592549d1b0a935551b006fdd.r2.dev/",   // R2 public bucket (recent calls only)
+    "http://192.168.10.105/Recording/",
+    "http://192.168.20.5:8090/Recording/",
+    "http://192.168.10.101/Recording/",
+    "http://192.168.20.6/Recording/"
+  ];
+  // "+" in the phone numbers must go out as %2B, so encode each path segment.
+  // The page never holds a farmer's number in readable form: the render step replaces each recording path
+  // (its file name contains the farmer's phone number) with an obfuscated token `rp`, decoded here only when
+  // someone presses Play. Obfuscation, not security: the request URL is still visible in the browser's
+  // Network tab once played -- hiding that needs a server-side proxy.
+  function recordingUrl(rp, i){
+    var path = atob(rp).split("").reverse().join("");
+    return SALES_RECORDING_HOSTS[i] + path.split("/").map(encodeURIComponent).join("/");
+  }
+  var salesByOrder = {}, sourceByOrder = {};
+  (window.__LMD_SALES__ || []).forEach(function(r){ salesByOrder[r.order_id] = r; });
+  (window.__LMD_ORDER_SRC__ || []).forEach(function(r){ sourceByOrder[r.order_id] = r.source || ""; });
+  function inr(n){ return "₹" + Math.round(n).toLocaleString("en-IN"); }
+  var SNAPSHOT_TS = window.__LMD_EXTRACTED_AT__ ? Date.parse(window.__LMD_EXTRACTED_AT__) : Math.max(
+    calls.reduce(function(m,c){ return Math.max(m, c._ts); }, 0),
+    PACKAGES_RAW.reduce(function(m,p){ return Math.max(m, p._updatedTs||0); }, 0),
+    HISTORY_RAW.reduce(function(m,h){ return Math.max(m, h._ts||0); }, 0)
+  );
+
+  var RETURN_STATUSES = { cancellation_requested:1, return_requested:1, process_for_return:1, return_in_transit:1, return_manifest_created:1, returned:1, returned_by_lmd:1 };
+
+  // ---- Build orders (one per order_id reachable from the package pull, which
+  // itself covers every order that has at least one call) ----
+  var orders = Object.keys(packagesByOrder).map(function(oid){
+    var pkgs = packagesByOrder[oid];
+    var oCalls = (callsByOrder[oid] || []).slice().sort(function(a,b){ return a._ts - b._ts; });
+    var o = { order_id: oid, packages: pkgs, calls: oCalls };
+    o.n_calls = oCalls.length;
+    o.n_packages = pkgs.length;
+    var last = oCalls[oCalls.length-1];
+    o.final_outcome = last ? last.call_outcome : null;
+    // Who initiated the hold/return -- clean 1:1 with outcome in this data (every ON_HOLD call has
+    // action_type=HOLD, every CANCELLED call has action_type=RETURN), each with FARMER or LMD_AGENT.
+    o.initiator = (last && (o.final_outcome === "DELIVERY_ON_HOLD" || o.final_outcome === "DELIVERY_CANCELLED") && last.action_initiated_by !== "NOT_APPLICABLE")
+      ? last.action_initiated_by : null;
+    o.last_ts = last ? last._ts : Math.max.apply(null, pkgs.map(function(p){return p._updatedTs;}).concat([0]));
+    o.first_ts = oCalls.length ? oCalls[0]._ts : o.last_ts;
+    o.has_conflict = oCalls.some(function(c){ return c.ai_conflict_detected === "YES"; });
+    o.languages = uniq(oCalls.map(function(c){ return c.language_detected; }).filter(Boolean));
+    var loc = oCalls.map(function(c){
+      var parts = [c.delivery_village, c.delivery_taluka, c.delivery_district, c.delivery_state].filter(Boolean);
+      return parts.join(", ");
+    }).find(Boolean);
+    o.location = loc || "";
+    // Order's real shipping-address geography (lmd_order_geo.json) first; the audit's own
+    // delivery_state (filled on only ~5% of calls) is just a fallback.
+    var g = geoByOrder[oid];
+    o.state = normState((g && g.state) || oCalls.map(function(c){ return c.delivery_state; }).find(Boolean));
+    if (!o.location && g){ o.location = [g.village, g.taluka, g.district, g.state].filter(Boolean).join(", "); }
+    o.reasons = uniq(oCalls.map(function(c){ return c.reason_category_known; })
+      .filter(function(r){ return r && r !== "NOT_APPLICABLE"; }));
+    o.items = (itemsByOrder[oid] || []).slice().sort(function(a,b){ return (b.total_price||0) - (a.total_price||0); });
+    o.total_value = o.items.reduce(function(s,i){ return s + (i.total_price||0); }, 0);
+    o.total_qty = o.items.reduce(function(s,i){ return s + (i.quantity||0); }, 0);
+    o.groups = uniq(o.items.map(function(i){ return i.group; }));
+    o.statusCounts = {};
+    pkgs.forEach(function(p){ o.statusCounts[p.current_status] = (o.statusCounts[p.current_status]||0) + 1; });
+    o._searchText = oCalls.map(function(c){ return c._searchText; }).join(" ") + " " + oid.toLowerCase() + " " +
+      pkgs.map(function(p){ return p.package_id + " " + p.current_status; }).join(" ").toLowerCase() + " " +
+      o.items.map(function(i){ return i.item_sku + " " + i.item_name + " " + i.group; }).join(" ").toLowerCase();
+
+    // ---- Call vs digital evidence: did the promised action actually happen? ----
+    // Grain is per-order (the order's last call overall vs. any of its packages' status history) --
+    // ~95% of orders have exactly one package, so this rarely has to average over more than one.
+    var expected = last ? EXPECTED_STATUS_BY_OUTCOME[last.call_outcome] : null;
+    if (!expected){
+      o.evidence = { category: "NO_EXPECTATION" };
+    } else {
+      var callTs = last._ts;
+      var cutoff = callTs - EVIDENCE_GRACE_MS;
+      var matchEvent = null;
+      pkgs.forEach(function(p){
+        (historyByPackage[p.package_id] || []).forEach(function(h){
+          if (h._ts >= cutoff && expected.indexOf(h.delivery_status) >= 0){
+            if (!matchEvent || h._ts < matchEvent._ts) matchEvent = h;
+          }
+        });
+      });
+      var callDay = istDayKey(callTs);
+      if (matchEvent){
+        var matchDay = istDayKey(matchEvent._ts);
+        o.evidence = matchDay === callDay
+          ? { category: "MATCHED_SAME_DAY", ts: matchEvent._ts }
+          : { category: "MATCHED_LATER", ts: matchEvent._ts, days: Math.round((matchEvent._ts - callTs) / 86400000) };
+      } else {
+        o.evidence = istDayKey(SNAPSHOT_TS) === callDay ? { category: "PENDING" } : { category: "GAP" };
+      }
+    }
+    // Agreed on the first call, but the order ended cancelled / returned.
+    o.first_outcome = oCalls.length ? oCalls[0].call_outcome : null;
+    o.ret_statuses = uniq(pkgs.map(function(p){ return p.current_status; }).filter(function(st){ return RETURN_STATUSES[st]; }));
+    o.agreed_first = o.first_outcome === "DELIVERY_CONFIRMED";
+    o.turned = o.agreed_first && (o.ret_statuses.length > 0 || o.final_outcome === "DELIVERY_CANCELLED");
+    o.turn_call = o.turned ? (oCalls.slice(1).find(function(c){ return c.call_outcome === "DELIVERY_ON_HOLD" || c.call_outcome === "DELIVERY_CANCELLED"; }) || null) : null;
+    return o;
+  });
+
+  document.getElementById('hdrOrders').textContent = orders.length.toLocaleString("en-IN");
+  document.getElementById('hdrCalls').textContent = calls.length.toLocaleString("en-IN");
+  document.getElementById('hdrPackages').textContent = PACKAGES_RAW.length.toLocaleString("en-IN");
+
+  // Everything from the KPI row to the pivots is drawn from whatever orders/calls it is handed, so it can be
+  // re-drawn for the filtered set (the parameters shadow the full-data `orders` / `calls`).
+  function renderSummary(orders, calls){
+  // ---- KPIs ----
+  var repeatOrders = orders.filter(function(o){ return o.n_calls > 1; }).length;
+  var conflictCalls = calls.filter(function(c){ return c.ai_conflict_detected === "YES"; }).length;
+  var cancelledOrders = orders.filter(function(o){ return o.final_outcome === "DELIVERY_CANCELLED"; }).length;
+  var avgDur = calls.reduce(function(s,c){ return s + c._durSec; }, 0) / (calls.length || 1);
+  var gapOrders = orders.filter(function(o){ return o.evidence && o.evidence.category === "GAP"; }).length;
+  var evaluableOrders = orders.filter(function(o){ return o.evidence && o.evidence.category !== "NO_EXPECTATION"; }).length;
+  var kpis = [
+    {label:"Orders", value: orders.length.toLocaleString("en-IN"), note: calls.length + " calls total"},
+    {label:"Repeat-contact rate", value: pct(repeatOrders, orders.length), note: repeatOrders + " orders needed >1 call"},
+    {label:"Conflict rate", value: pct(conflictCalls, calls.length), note: conflictCalls + " of " + calls.length + " calls"},
+    {label:"Order cancellation rate", value: pct(cancelledOrders, orders.length), note: cancelledOrders + " orders, last call cancelled"},
+    {label:"Execution gap rate", value: pct(gapOrders, evaluableOrders), note: gapOrders + " of " + evaluableOrders + " evaluable orders"},
+    {label:"Avg call duration", value: secToDur(avgDur), note: "across " + calls.length + " calls"}
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(function(k){
+    return '<div class="kpi"><div class="label">'+esc(k.label)+'</div><div class="value">'+esc(k.value)+'</div><div class="note">'+esc(k.note)+'</div></div>';
+  }).join('');
+
+  // ---- Findings (computed from live data, not pinned to one read) ----
+  (function(){
+    var auditYes = {};
+    AUDIT_FIELDS.forEach(function(f){ auditYes[f[0]] = calls.filter(function(c){ return c[f[0]]==="YES"; }).length; });
+    var weakest = AUDIT_FIELDS.map(function(f){ return {label:f[1], pct: auditYes[f[0]]/(calls.length||1)*100}; })
+      .sort(function(a,b){ return a.pct-b.pct; })[0];
+    var priceMismatches = calls.filter(function(c){ return c.amount_mismatch_reported_by_farmer === "YES"; }).length;
+    var multiPkgOrders = orders.filter(function(o){ return o.n_packages > 1; }).length;
+    var geoPopulated = calls.filter(function(c){ return c.delivery_state; }).length;
+    var items = [
+      '<b>Cancellations aren’t the same as conflicts.</b> ' + conflictCalls + ' of ' + calls.length + ' calls flagged an actual dispute (see the pivot below for what’s actually driving on-hold/cancelled outcomes) — most cancelled calls are calm, farmer-initiated holds or returns.',
+      '<b>Weakest audit step:</b> ' + esc(weakest.label) + ' passes only ' + Math.round(weakest.pct) + '% of calls — still the most fixable gap in call process discipline.',
+      '<b>Price-quote desync</b> flagged by the farmer in ' + priceMismatches + ' of ' + calls.length + ' calls (' + pct(priceMismatches, calls.length) + ') — rare but systemic when it happens; watch this as volume grows.',
+      '<b>' + multiPkgOrders.toLocaleString("en-IN") + ' orders (' + pct(multiPkgOrders, orders.length) + ')</b> have more than one package — the journey view below covers every package on the order, not just the one that was called.',
+      '<b>Geography fields</b> are populated in only ' + pct(geoPopulated, calls.length) + ' of calls — not reliable for regional cuts at the call level; use the package/order data for location instead.',
+      '<b>' + gapOrders.toLocaleString("en-IN") + ' orders (' + pct(gapOrders, evaluableOrders) + ' of ' + evaluableOrders.toLocaleString("en-IN") + ' evaluable)</b> had a call promise a same-day action (delivery/hold/return) that still hasn’t shown up in the package status — use the “Execution gap only” filter above to see exactly which orders.'
+    ];
+    // ---- Product Group signals (an order counts once per group it contains) ----
+    var NON_PRODUCT = { MKT:1, PKG:1, OTHER:1 };
+    NON_PRODUCT[UNMAPPED] = 1;
+    var withItems = orders.filter(function(o){ return o.items.length; });
+    var gs = {};
+    withItems.forEach(function(o){
+      o.groups.forEach(function(g){
+        var s = gs[g] = gs[g] || { g:g, n:0, qty:0, value:0, canc:0, hold:0, conf:0, nameQty:{} };
+        s.n++;
+        if (o.final_outcome === "DELIVERY_CANCELLED") s.canc++;
+        if (o.final_outcome === "DELIVERY_ON_HOLD") s.hold++;
+        if (o.has_conflict) s.conf++;
+      });
+      o.items.forEach(function(i){
+        var s = gs[i.group];
+        s.qty += i.quantity||0; s.value += i.total_price||0;
+        s.nameQty[i.item_name] = (s.nameQty[i.item_name]||0) + (i.quantity||0);
+      });
+    });
+    var glist = Object.keys(gs).map(function(k){ return gs[k]; });
+    var base = {
+      canc: withItems.filter(function(o){ return o.final_outcome === "DELIVERY_CANCELLED"; }).length / (withItems.length||1),
+      hold: withItems.filter(function(o){ return o.final_outcome === "DELIVERY_ON_HOLD"; }).length / (withItems.length||1),
+      conf: withItems.filter(function(o){ return o.has_conflict; }).length / (withItems.length||1)
+    };
+    var MIN_N = Math.max(50, Math.round(withItems.length * 0.015));
+    var rankable = glist.filter(function(s){ return s.n >= MIN_N && !NON_PRODUCT[s.g]; });
+    var LIFT = { canc:1.3, hold:1.15, conf:1.3 };   // hold starts from a ~29% base, so 1.3x would need 38%+
+    function rate(x){ var v = x*100; return (v < 10 ? v.toFixed(1) : Math.round(v)) + '%'; }
+    function topRate(key, label, verb){
+      var hits = rankable.filter(function(s){ return s[key]/s.n >= base[key]*LIFT[key]; })
+        .sort(function(a,b){ return b[key]/b.n - a[key]/a.n; }).slice(0,3);
+      if (!hits.length) return null;
+      return '<b>' + label + ':</b> ' + hits.map(function(s){
+        return esc(s.g) + ' orders ' + verb + ' ' + rate(s[key]/s.n) + ' of the time (' + s.n + ' orders)';
+      }).join('; ') + ' — vs ' + rate(base[key]) + ' across the orders in view.';
+    }
+    if (glist.length){
+      var byQty = glist.slice().sort(function(a,b){ return b.qty - a.qty; })[0];
+      var byVal = glist.filter(function(s){ return !NON_PRODUCT[s.g]; }).sort(function(a,b){ return b.value - a.value; })[0];
+      var totalVal = withItems.reduce(function(s,o){ return s + o.total_value; }, 0);
+      var share = byVal ? ' (' + inr(byVal.value) + ', ' + pct(byVal.value, totalVal) + ' of all order value)' : '';
+      items.push('<b>Product Group mix:</b> ' + (byVal && byVal.g === byQty.g
+        ? esc(byQty.g) + ' leads on both volume (' + byQty.qty.toLocaleString("en-IN") + ' units across ' + byQty.n.toLocaleString("en-IN") + ' orders) and value' + share + '.'
+        : esc(byQty.g) + ' is the highest-volume group (' + byQty.qty.toLocaleString("en-IN") + ' units across ' + byQty.n.toLocaleString("en-IN") + ' orders)' +
+          (byVal ? '; ' + esc(byVal.g) + ' carries the most value among product groups' + share : '') + '.'));
+      var mkt = gs.MKT;
+      if (mkt && mkt.n >= MIN_N){
+        var topName = Object.keys(mkt.nameQty).sort(function(a,b){ return mkt.nameQty[b]-mkt.nameQty[a]; })[0];
+        items.push('<b>MKT is an add-on, not a product:</b> it appears on ' + pct(mkt.n, withItems.length) + ' of orders (mostly “' + esc(topName) + '”), so it inflates unit counts — read the other groups for product-specific patterns.');
+      }
+      [topRate("canc", "Cancels most by Product Group", "end up cancelled"),
+       topRate("hold", "Goes on hold most by Product Group", "end up on hold"),
+       topRate("conf", "Most disputes by Product Group", "have a flagged conflict")
+      ].forEach(function(t){ if (t) items.push(t); });
+    }
+    document.getElementById('findingsList').innerHTML = items.map(function(i){ return '<li>'+i+'</li>'; }).join('');
+  })();
+
+  // ---- Pivot: outcome x reason (call level, with distinct order counts) ----
+  (function(){
+    var OUTCOMES = ["DELIVERY_CONFIRMED","DELIVERY_ON_HOLD","FOLLOW_UP_REQUIRED","DELIVERY_CANCELLED","NOT_ENOUGH_DATA"];
+    var reasonCounts = {};
+    calls.forEach(function(c){
+      var r = c.reason_category_known;
+      if (!r || r === "NOT_APPLICABLE") return;
+      reasonCounts[r] = (reasonCounts[r]||0) + 1;
+    });
+    // A raw "OTHER" reason goes into the Other column; keeping it here as well made two "Other" columns.
+    var topReasons = Object.keys(reasonCounts).filter(function(r){ return r !== "OTHER"; })
+      .sort(function(a,b){ return reasonCounts[b]-reasonCounts[a]; }).slice(0, 6);
+    var reasonCols = ["NOT_APPLICABLE"].concat(topReasons).concat(["OTHER"]);
+    var colLabel = {NOT_APPLICABLE: "No issue", OTHER: "Other"};
+
+    // matrix = call counts; ord* = the distinct orders behind them (an order can have calls with different outcomes,
+    // so order counts do not add up across rows/columns).
+    var matrix = {}, ord = {}, rowOrd = {}, colOrd = {}, allOrd = {};
+    reasonCols.forEach(function(r){ colOrd[r] = {}; });
+    OUTCOMES.forEach(function(o){
+      matrix[o] = {}; ord[o] = {}; rowOrd[o] = {};
+      reasonCols.forEach(function(r){ matrix[o][r] = 0; ord[o][r] = {}; });
+    });
+    calls.forEach(function(c){
+      var o = OUTCOMES.indexOf(c.call_outcome) >= 0 ? c.call_outcome : null;
+      if (!o) return;
+      var r = c.reason_category_known;
+      var col = r === "NOT_APPLICABLE" ? "NOT_APPLICABLE" : (topReasons.indexOf(r) >= 0 ? r : "OTHER");
+      matrix[o][col]++;
+      ord[o][col][c.order_id] = 1; rowOrd[o][c.order_id] = 1; colOrd[col][c.order_id] = 1; allOrd[c.order_id] = 1;
+    });
+    function nk(m){ return Object.keys(m).length; }
+    var colTotals = reasonCols.map(function(r){ return OUTCOMES.reduce(function(s,o){ return s+matrix[o][r]; }, 0); });
+    var grandTotal = colTotals.reduce(function(s,n){ return s+n; }, 0);
+    var grandOrders = nk(allOrd);
+    function share(n){ return grandTotal ? (n/grandTotal*100 < 10 ? (n/grandTotal*100).toFixed(1) : Math.round(n/grandTotal*100)) + '%' : '—'; }
+
+    var thead = '<tr><th>Outcome</th>' + reasonCols.map(function(r){ return '<th>'+esc(colLabel[r]||niceLabel(r))+'</th>'; }).join('') + '<th class="total">Total</th></tr>';
+    var body = OUTCOMES.map(function(o){
+      var row = matrix[o];
+      var rowTotal = reasonCols.reduce(function(s,r){ return s+row[r]; }, 0);
+      if (!rowTotal) return '';
+      var om = outcomeMeta(o);
+      var cells = reasonCols.map(function(r){
+        var n = row[r];
+        var sh = rowTotal ? n/rowTotal*100 : 0;
+        var bg = n ? 'background:color-mix(in srgb, '+COLOR.accent+' '+Math.min(sh,90).toFixed(0)+'%, var(--surface))' : '';
+        return '<td style="'+bg+'">'+ (n || '—') + (n ? '<span class="cell-pct">'+Math.round(sh)+'% · '+nk(ord[o][r]).toLocaleString("en-IN")+' orders</span>' : '') + '</td>';
+      }).join('');
+      return '<tr><td class="rowlabel"><span class="pill '+om.cls+'">'+om.label+'</span></td>'+cells+
+        '<td class="total">'+rowTotal.toLocaleString("en-IN")+'<span class="cell-pct">'+share(rowTotal)+' of calls · '+nk(rowOrd[o]).toLocaleString("en-IN")+' orders</span></td></tr>';
+    }).join('');
+    var tfoot = '<tr><td>Total</td>' + colTotals.map(function(n, i){
+      return '<td>'+n.toLocaleString("en-IN")+'<span class="cell-pct">'+share(n)+' · '+nk(colOrd[reasonCols[i]]).toLocaleString("en-IN")+' orders</span></td>';
+    }).join('') + '<td class="total">'+grandTotal.toLocaleString("en-IN")+'<span class="cell-pct">100% · '+grandOrders.toLocaleString("en-IN")+' orders</span></td></tr>';
+
+    document.getElementById('pivotWrap').innerHTML = '<table class="pivot"><thead>'+thead+'</thead><tbody>'+body+'</tbody><tfoot>'+tfoot+'</tfoot></table>';
+  })();
+
+  // ---- Pivot: call vs digital evidence (order level) ----
+  (function(){
+    var OUTCOMES = ["DELIVERY_CONFIRMED", "DELIVERY_ON_HOLD", "DELIVERY_CANCELLED"];
+    var CATS = ["MATCHED_SAME_DAY", "MATCHED_LATER", "GAP", "PENDING"];
+
+    var matrix = {};
+    OUTCOMES.forEach(function(o){ matrix[o] = {}; CATS.forEach(function(c){ matrix[o][c] = 0; }); });
+    var noExpectation = 0;
+    orders.forEach(function(o){
+      if (!o.evidence) return;
+      if (o.evidence.category === "NO_EXPECTATION"){ noExpectation++; return; }
+      if (OUTCOMES.indexOf(o.final_outcome) < 0) return;
+      matrix[o.final_outcome][o.evidence.category]++;
+    });
+
+    var grandTotal = OUTCOMES.reduce(function(g,o){ return g + CATS.reduce(function(s,c){ return s + matrix[o][c]; }, 0); }, 0);
+    function ofAll(n){ return grandTotal ? Math.round(n/grandTotal*100) + '%' : '—'; }
+    var thead = '<tr><th>Call said</th>' + CATS.map(function(c){ return '<th>'+esc(EVIDENCE_META[c].label)+'</th>'; }).join('') + '<th class="total">Total</th></tr>';
+    var body = OUTCOMES.map(function(o){
+      var row = matrix[o];
+      var rowTotal = CATS.reduce(function(s,c){ return s+row[c]; }, 0);
+      if (!rowTotal) return '';
+      var om = outcomeMeta(o);
+      var cells = CATS.map(function(c){
+        var n = row[c];
+        var share = rowTotal ? n/rowTotal*100 : 0;
+        var color = c === "GAP" ? COLOR.bad : c === "MATCHED_LATER" ? COLOR.gold : c === "PENDING" ? COLOR.neutral : COLOR.good;
+        var bg = n ? 'background:color-mix(in srgb, '+color+' '+Math.min(share,90).toFixed(0)+'%, var(--surface))' : '';
+        return '<td style="'+bg+'">'+ (n || '—') + (n ? '<span class="cell-pct">'+Math.round(share)+'%</span>' : '') + '</td>';
+      }).join('');
+      return '<tr><td class="rowlabel"><span class="pill '+om.cls+'">'+om.label+'</span></td>'+cells+'<td class="total">'+rowTotal.toLocaleString("en-IN")+'<span class="cell-pct">'+ofAll(rowTotal)+' of orders</span></td></tr>';
+    }).join('');
+    var colTotals = CATS.map(function(c){ return OUTCOMES.reduce(function(s,o){ return s+matrix[o][c]; }, 0); });
+    var tfoot = '<tr><td>Total</td>' + colTotals.map(function(n){ return '<td>'+n.toLocaleString("en-IN")+'<span class="cell-pct">'+ofAll(n)+'</span></td>'; }).join('') + '<td class="total">'+grandTotal.toLocaleString("en-IN")+'<span class="cell-pct">100%</span></td></tr>' +
+      '<tr><td colspan="'+(CATS.length+2)+'" style="text-align:left;color:var(--text-muted);font-weight:400;">+ '+noExpectation.toLocaleString("en-IN")+' orders with no clear digital expectation (last call was follow-up-required or not-enough-data)</td></tr>';
+
+    document.getElementById('evidencePivotWrap').innerHTML = '<table class="pivot"><thead>'+thead+'</thead><tbody>'+body+'</tbody><tfoot>'+tfoot+'</tfoot></table>';
+  })();
+
+
+    // ---- Agreed on the first call, then cancelled / returned ----
+    (function(){
+      var agreed = orders.filter(function(o){ return o.agreed_first; });
+      var turned = agreed.filter(function(o){ return o.turned; });
+      var wrap = document.getElementById('turnWrap');
+      if (!agreed.length){ wrap.innerHTML = '<div class="empty-state">No orders in view had a “delivery confirmed” first call.</div>'; return; }
+      var withCall = turned.filter(function(o){ return o.turn_call; });
+      var head = '<p style="margin:0 0 12px;font-size:14px;"><b>' + turned.length.toLocaleString("en-IN") + ' of ' + agreed.length.toLocaleString("en-IN") +
+        ' orders (' + pct(turned.length, agreed.length) + ')</b> whose first call was “delivery confirmed” ended cancelled / returned. ' +
+        'For ' + withCall.length.toLocaleString("en-IN") + ' of them a later call shows why; for ' + (turned.length - withCall.length).toLocaleString("en-IN") +
+        ' the cancel / return happened with no later call that explains it.</p>';
+      if (!turned.length){ wrap.innerHTML = head; return; }
+
+      // Why: the first later call that moved the order off "confirmed".
+      var why = {};
+      turned.forEach(function(o){
+        var c = o.turn_call;
+        var key = c ? (c.reason_category_known && c.reason_category_known !== "NOT_APPLICABLE" ? niceLabel(c.reason_category_known) : "No reason recorded on that call") : "No later call explains it";
+        var w = why[key] = why[key] || { n:0, farmer:0, lmd:0, other:0, cancelCall:0, holdCall:0, ret:0, nCalls:0 };
+        w.n++; w.nCalls += o.n_calls;
+        if (c){
+          if (c.action_initiated_by === "FARMER") w.farmer++; else if (c.action_initiated_by === "LMD_AGENT") w.lmd++; else w.other++;
+          if (c.call_outcome === "DELIVERY_CANCELLED") w.cancelCall++; else w.holdCall++;
+        }
+        if (o.ret_statuses.length) w.ret++;
+      });
+      var keys = Object.keys(why).sort(function(a,b){ return why[b].n - why[a].n; });
+      var rows = keys.map(function(k){
+        var w = why[k], sh = w.n / turned.length * 100;
+        return '<tr><td class="rowlabel">' + esc(k) + '</td>' +
+          '<td class="total" style="background:color-mix(in srgb, ' + COLOR.bad + ' ' + Math.min(sh * 1.2, 80).toFixed(0) + '%, var(--surface))">' + w.n.toLocaleString("en-IN") + '<span class="cell-pct">' + Math.round(sh) + '% of turned</span></td>' +
+          '<td>' + (w.farmer || '—') + '</td><td>' + (w.lmd || '—') + '</td>' +
+          '<td>' + (w.holdCall || '—') + '</td><td>' + (w.cancelCall || '—') + '</td>' +
+          '<td>' + (w.ret || '—') + '</td><td>' + (w.n ? (w.nCalls / w.n).toFixed(1) : '—') + '</td></tr>';
+      }).join('');
+      var t1 = '<table class="pivot"><thead><tr><th>Why it turned (reason on the first call that moved off “confirmed”)</th><th class="total">Orders</th><th>Farmer initiated</th><th>LMD initiated</th><th>That call: on hold</th><th>That call: cancelled</th><th>Return status logged</th><th>Avg calls on order</th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+      // Where they ended (an order with several packages can appear in more than one row).
+      var endc = {}, nostat = 0;
+      turned.forEach(function(o){
+        if (!o.ret_statuses.length){ nostat++; return; }
+        o.ret_statuses.forEach(function(st){ endc[st] = (endc[st]||0) + 1; });
+      });
+      var ends = Object.keys(endc).sort(function(a,b){ return endc[b]-endc[a]; }).map(function(st){
+        return '<span class="chip">' + esc(niceLabel(st)) + ': <b>' + endc[st] + '</b></span>';
+      }).join(' ') + (nostat ? ' <span class="chip">Last call cancelled, no return status yet: <b>' + nostat + '</b></span>' : '');
+      wrap.innerHTML = head + t1 + '<div style="margin-top:12px;font-size:12.5px;color:var(--text-muted);">Where they ended: ' + ends + '</div>';
+    })();
+  }
+
+  // ---- Sales call type (Genesys disposition of the sales call) ----
+  var SALES_TYPE_LABEL = {
+    "Agent calls with product positionining intent": "Agent-started · product pitch",
+    "Agent calls with offer positioning intent": "Agent-started · offer pitch",
+    "Agent calls up a Referral farmer to make purchase": "Agent-started · referral farmer",
+    "Customer calls with product intent": "Farmer-started · product",
+    "Customer calls with offer intent": "Farmer-started · offer",
+    "Customer calls to get Disease based advisory": "Farmer-started · disease advisory",
+    "Customer calls to get Growth based advisory": "Farmer-started · growth advisory"
+  };
+  function salesTypeOf(o){
+    var sc = salesByOrder[o.order_id];
+    if (!sc) return "__NOCALL__";
+    if (!sc.d1 && !sc.d2) return "Unclassified";
+    if (sc.d1 === "Sales Call") return SALES_TYPE_LABEL[sc.d2] || ("Sales call · " + (sc.d2 || "other"));
+    var d2 = (sc.d2 || "").replace(/ Order Related Complaint.*/, "");
+    if (/^Order Related Complaint/.test(d2)) d2 = "Order complaint (missing / damaged / wrong)";
+    return sc.d1 + (sc.d2 && sc.d2 !== sc.d1 ? " · " + d2 : "");
+  }
+  var salesTypeCount = {};
+  orders.forEach(function(o){ var k = salesTypeOf(o); salesTypeCount[k] = (salesTypeCount[k]||0) + 1; });
+  var salesTypeKeys = Object.keys(salesTypeCount).filter(function(k){ return k !== "__NOCALL__"; })
+    .sort(function(a,b){ return salesTypeCount[b]-salesTypeCount[a]; });
+  (function(){
+    var sel = document.getElementById('fSalesType');
+    salesTypeKeys.concat(["__NOCALL__"]).forEach(function(k){
+      var el = document.createElement('option'); el.value = k;
+      el.textContent = "Sales call type: " + (k === "__NOCALL__" ? "No sales call found" : k) + " (" + salesTypeCount[k].toLocaleString("en-IN") + ")";
+      sel.appendChild(el);
+    });
+  })();
+
+  // ---- Filters ----
+  var outcomeSel = document.getElementById('fOutcome');
+  ["DELIVERY_CONFIRMED","DELIVERY_ON_HOLD","FOLLOW_UP_REQUIRED","DELIVERY_CANCELLED","NOT_ENOUGH_DATA"].forEach(function(o){
+    var m = outcomeMeta(o);
+    var el = document.createElement('option'); el.value = o; el.textContent = "Outcome: " + m.label;
+    outcomeSel.appendChild(el);
+  });
+  // Reason dropdown: every real reason seen on any order (NOT_APPLICABLE excluded, same as o.reasons)
+  var reasonSel = document.getElementById('fReason');
+  var reasonCount = {};
+  orders.forEach(function(o){ o.reasons.forEach(function(r){ reasonCount[r] = (reasonCount[r]||0) + 1; }); });
+  Object.keys(reasonCount).sort(function(a,b){ return reasonCount[b]-reasonCount[a]; }).forEach(function(r){
+    var el = document.createElement('option'); el.value = r;
+    el.textContent = "Reason: " + niceLabel(r) + " (" + reasonCount[r].toLocaleString("en-IN") + ")";
+    reasonSel.appendChild(el);
+  });
+  // State dropdown: delivery_state is only filled on a small share of calls, so "Not recorded" is a real bucket
+  var stateSel = document.getElementById('fState');
+  var stateCount = {};
+  orders.forEach(function(o){ var k = o.state || "__NONE__"; stateCount[k] = (stateCount[k]||0) + 1; });
+  Object.keys(stateCount).filter(function(k){ return k !== "__NONE__"; }).sort(function(a,b){ return stateCount[b]-stateCount[a]; }).concat(["__NONE__"]).forEach(function(k){
+    if (!stateCount[k]) return;
+    var el = document.createElement('option'); el.value = k;
+    el.textContent = "State: " + (k === "__NONE__" ? "Not recorded" : k) + " (" + stateCount[k].toLocaleString("en-IN") + ")";
+    stateSel.appendChild(el);
+  });
+  // Product Group combobox: options sorted by total units ordered, highest first.
+  var groupQty = {};
+  orders.forEach(function(o){ o.items.forEach(function(i){ groupQty[i.group] = (groupQty[i.group]||0) + (i.quantity||0); }); });
+  var groupOptions = Object.keys(groupQty).sort(function(a,b){ return groupQty[b]-groupQty[a]; });
+  var groupInput = document.getElementById('fGroup'), groupPanel = document.getElementById('groupPanel');
+  function groupLabel(){ return state.group === "ALL" ? "" : state.group; }
+  function renderGroupPanel(){
+    var q = groupInput.value.trim().toLowerCase();
+    var opts = groupOptions.filter(function(g){ return !q || g.toLowerCase().indexOf(q) >= 0; });
+    groupPanel.innerHTML = (q ? '' : '<div class="combo-opt'+(state.group==="ALL"?' sel':'')+'" data-g="ALL"><span>All product groups</span></div>') +
+      (opts.length ? opts.map(function(g){
+        return '<div class="combo-opt'+(state.group===g?' sel':'')+'" data-g="'+esc(g)+'"><span>'+esc(g)+'</span><span class="cnt">'+groupQty[g].toLocaleString("en-IN")+' units</span></div>';
+      }).join('') : '<div class="combo-empty">No matching group</div>');
+  }
+  groupInput.addEventListener('focus', function(){ groupInput.select(); renderGroupPanel(); groupPanel.hidden = false; });
+  groupInput.addEventListener('input', function(){
+    if (!groupInput.value.trim() && state.group !== "ALL"){ state.group = "ALL"; applyFilters(); }
+    renderGroupPanel(); groupPanel.hidden = false;
+  });
+  groupPanel.addEventListener('mousedown', function(e){
+    var opt = e.target.closest('[data-g]'); if (!opt) return;
+    e.preventDefault();
+    state.group = opt.getAttribute('data-g');
+    groupInput.value = groupLabel(); groupPanel.hidden = true; groupInput.blur();
+    applyFilters();
+  });
+  document.addEventListener('mousedown', function(e){
+    if (!e.target.closest('#groupCombo')){ groupPanel.hidden = true; groupInput.value = groupLabel(); }
+  });
+  var state = { search:"", outcome:"ALL", reason:"ALL", exec:"ALL", stateName:"ALL", group:"ALL", conflictOnly:false, repeatOnly:false, gapOnly:false, salesOnly:false, turnedOnly:false, salesType:"ALL", sort:"recent", dateFrom:null, dateTo:null };
+  var openSet = {};
+
+  // Plain-English list of the filters in force, shown on every table so it is clear what the numbers cover.
+  function activeFiltersText(n){
+    var f = [];
+    if (state.search.trim()) f.push('Search “' + state.search.trim() + '”');
+    if (state.outcome !== "ALL") f.push('Outcome = ' + outcomeMeta(state.outcome).label);
+    if (state.reason !== "ALL") f.push('Reason = ' + niceLabel(state.reason));
+    if (state.exec !== "ALL") f.push('Execution = ' + (EVIDENCE_META[state.exec] ? EVIDENCE_META[state.exec].label : state.exec));
+    if (state.stateName !== "ALL") f.push('State = ' + (state.stateName === "__NONE__" ? "Not recorded" : state.stateName));
+    if (state.group !== "ALL") f.push('Product Group = ' + state.group);
+    if (state.salesType !== "ALL") f.push('Sales call type = ' + (state.salesType === "__NOCALL__" ? "No sales call found" : state.salesType));
+    if (state.conflictOnly) f.push('Conflict only');
+    if (state.repeatOnly) f.push('Multi-call orders only');
+    if (state.gapOnly) f.push('Execution gap only');
+    if (state.salesOnly) f.push('Has sales call only');
+    if (state.turnedOnly) f.push('Agreed first, then cancelled / returned');
+    if (state.dateFrom || state.dateTo) f.push('Last call ' + (state.dateFrom ? 'from ' + document.getElementById('fDateFrom').value : '') + (state.dateTo ? ' to ' + document.getElementById('fDateTo').value : ''));
+    var cnt = n.toLocaleString("en-IN") + ' of ' + orders.length.toLocaleString("en-IN") + ' orders';
+    if (!f.length) return { cls: 'none', html: 'No filters applied — all ' + orders.length.toLocaleString("en-IN") + ' orders' };
+    return { cls: '', html: '<b>Filtered:</b> ' + f.map(esc).join(' · ') + ' &rarr; ' + cnt + (state.group !== "ALL" ? ' (every call on those orders is counted, including for other product groups on the same order)' : '') };
+  }
+
+  function applyFilters(){
+    var q = state.search.trim().toLowerCase();
+    var filtered = orders.filter(function(o){
+      if (q && o._searchText.indexOf(q) === -1) return false;
+      if (state.outcome !== "ALL" && o.final_outcome !== state.outcome) return false;
+      if (state.reason !== "ALL" && o.reasons.indexOf(state.reason) === -1) return false;
+      if (state.exec !== "ALL" && (!o.evidence || o.evidence.category !== state.exec)) return false;
+      if (state.stateName !== "ALL" && (o.state || "__NONE__") !== state.stateName) return false;
+      if (state.group !== "ALL" && o.groups.indexOf(state.group) === -1) return false;
+      if (state.conflictOnly && !o.has_conflict) return false;
+      if (state.repeatOnly && o.n_calls <= 1) return false;
+      if (state.gapOnly && (!o.evidence || o.evidence.category !== "GAP")) return false;
+      if (state.salesOnly && !salesByOrder[o.order_id]) return false;
+      if (state.turnedOnly && !o.turned) return false;
+      if (state.salesType !== "ALL" && salesTypeOf(o) !== state.salesType) return false;
+      if (state.dateFrom && o.last_ts < state.dateFrom) return false;
+      if (state.dateTo && o.last_ts > state.dateTo) return false;
+      return true;
+    });
+    if (state.sort === "recent") filtered.sort(function(a,b){ return b.last_ts - a.last_ts; });
+    else if (state.sort === "calls") filtered.sort(function(a,b){ return b.n_calls - a.n_calls; });
+    else filtered.sort(function(a,b){ return a.order_id < b.order_id ? -1 : 1; });
+    var fCalls = [];
+    filtered.forEach(function(o){ fCalls = fCalls.concat(o.calls); });
+    var fn = activeFiltersText(filtered.length);
+    document.querySelectorAll('[data-fnote]').forEach(function(el){ el.className = 'filter-note ' + fn.cls; el.innerHTML = fn.html; });
+    renderSummary(filtered, fCalls);
+    render(filtered);
+  }
+
+  var PAGE_SIZE = 50, curPage = 1, keepPage = false, curList = [];
+
+  function pagerHtml(total, pages){
+    if (pages <= 1) return '';
+    var from = (curPage - 1) * PAGE_SIZE + 1, to = Math.min(curPage * PAGE_SIZE, total);
+    // window of page numbers: first, last, and 2 either side of the current page
+    var nums = [];
+    for (var i = 1; i <= pages; i++) if (i === 1 || i === pages || Math.abs(i - curPage) <= 2) nums.push(i);
+    var btns = '', prev = 0;
+    nums.forEach(function(n){
+      if (n - prev > 1) btns += '<span class="pg-gap">…</span>';
+      btns += '<button class="pg-btn' + (n === curPage ? ' on' : '') + '" data-page="' + n + '">' + n + '</button>';
+      prev = n;
+    });
+    return '<div class="pager"><span class="pg-info">Orders ' + from.toLocaleString("en-IN") + '–' + to.toLocaleString("en-IN") + ' of ' + total.toLocaleString("en-IN") + '</span>' +
+      '<button class="pg-btn" data-page="' + (curPage - 1) + '"' + (curPage === 1 ? ' disabled' : '') + '>‹ Prev</button>' + btns +
+      '<button class="pg-btn" data-page="' + (curPage + 1) + '"' + (curPage === pages ? ' disabled' : '') + '>Next ›</button></div>';
+  }
+
+  function render(list){
+    curList = list;
+    document.getElementById('resultCount').textContent = list.length.toLocaleString("en-IN") + " of " + orders.length.toLocaleString("en-IN") + " orders";
+    if (!list.length){
+      document.getElementById('orderList').innerHTML = '<div class="empty-state">No orders match these filters.</div>';
+      return;
+    }
+    var pages = Math.ceil(list.length / PAGE_SIZE);
+    // a filter change goes back to page 1; opening/closing an order card keeps the current page
+    curPage = keepPage ? Math.min(curPage, pages) : 1;
+    keepPage = false;
+    var shown = list.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
+    var pager = pagerHtml(list.length, pages);
+    document.getElementById('orderList').innerHTML = pager + shown.map(orderCardHtml).join('') + pager;
+  }
+
+  function statusSummary(o){
+    return Object.keys(o.statusCounts).map(function(s){
+      var n = o.statusCounts[s];
+      return (n > 1 ? n + '× ' : '') + niceLabel(s);
+    }).join(', ');
+  }
+
+  function evidenceDetail(o){
+    if (!o.evidence || o.evidence.category === "NO_EXPECTATION" || !o.calls.length) return null;
+    var last = o.calls[o.calls.length-1];
+    var om = outcomeMeta(o.final_outcome);
+    var action = o.final_outcome === "DELIVERY_CONFIRMED" ? "delivered"
+      : o.final_outcome === "DELIVERY_ON_HOLD" ? "put on hold"
+      : "a return/cancellation initiated";
+    switch (o.evidence.category){
+      case "MATCHED_SAME_DAY":
+        return "Call confirmed “" + om.label + "” at " + fmtDate(last._ts) + ", and the package was actually " + action + " the same day (IST) — matches what was promised.";
+      case "MATCHED_LATER":
+        return "Call confirmed “" + om.label + "” at " + fmtDate(last._ts) + ", but the package was only " + action + " " + o.evidence.days + " day(s) later — it happened, just not the same day as promised.";
+      case "GAP":
+        return "Call confirmed “" + om.label + "” at " + fmtDate(last._ts) + ", but no matching status change (" + action + ") has been logged since — that day is over and the LMD partner hasn't actioned it yet.";
+      case "PENDING":
+        return "Call confirmed “" + om.label + "” at " + fmtDate(last._ts) + " — still the same day (IST); not yet reflected in the package status, but there's still time today.";
+    }
+    return null;
+  }
+
+  function orderCardHtml(o){
+    var om = outcomeMeta(o.final_outcome);
+    var em = o.evidence && EVIDENCE_META[o.evidence.category];
+    var initiatorPill = o.initiator === "LMD_AGENT" ? '<span class="pill warn" title="Who initiated the hold/return">LMD initiated</span>'
+      : o.initiator === "FARMER" ? '<span class="pill neutral" title="Who initiated the hold/return">Farmer initiated</span>' : '';
+    // Package IDs starting with STORE are DVS packages; every other prefix (SIRJJ, SIMHA, UIMHP, CI…) is FC.
+    // The 42 orders with both kinds of package get both pills.
+    var hasDvs = o.packages.some(function(p){ return /^STORE/i.test(p.package_id); });
+    var hasFc = o.packages.some(function(p){ return !/^STORE/i.test(p.package_id); });
+    var fulfilPills = (hasDvs ? '<span class="pill accent" title="Package ID starts with STORE">DVS order</span>' : '') +
+      (hasFc ? '<span class="pill neutral" title="Package ID does not start with STORE">FC order</span>' : '');
+    var isOpen = !!openSet[o.order_id];
+    return '<div class="order-card'+(isOpen?' open':'')+'" data-oid="'+esc(o.order_id)+'">' +
+      '<div class="order-head" data-toggle="'+esc(o.order_id)+'">' +
+        '<span class="oid mono">'+esc(o.order_id)+'</span>' +
+        fulfilPills +
+        (o.turned ? '<span class="pill bad" title="First call: farmer agreed to take delivery. Order later ended cancelled / returned.">Agreed → cancelled/returned</span>' : '') +
+        (o.final_outcome ? '<span class="pill '+om.cls+'">'+om.label+'</span>' : '') +
+        initiatorPill +
+        (o.has_conflict ? '<span class="pill bad">Conflict</span>' : '') +
+        (em ? '<span class="pill '+em.cls+'" title="Call vs digital evidence">'+em.label+'</span>' : '') +
+        '<span class="chip">'+esc(statusSummary(o))+'</span>' +
+        (o.items.length ? '<span class="chip" title="Sum of order item total_price · item lines · units">'+inr(o.total_value)+' · '+o.items.length+' item'+(o.items.length!==1?'s':'')+' · '+o.total_qty+' qty</span>' : '') +
+        '<span class="meta">'+o.n_packages+' pkg · '+o.n_calls+' call'+(o.n_calls!==1?'s':'')+' · '+(o.languages.join(', ')||'—')+'</span>' +
+        '<span class="chev">▶</span>' +
+      '</div>' +
+      '<div class="order-body" '+(isOpen?'':'hidden')+'>' +
+        (isOpen ? orderJourneyHtml(o) : '') +
+      '</div>' +
+    '</div>';
+  }
+
+  // ---- Package snapshot ----
+  function pkgStatusCls(s){
+    if (s === 'delivered') return 'good';
+    if (s === 'hold' || s === 'return_requested' || s === 'process_for_return') return 'warn';
+    if (s === 'missing') return 'bad';
+    return 'neutral';
+  }
+
+  // ---- Timeline icon coloring ----
+  // One color = one meaning, reused everywhere it applies (package chips, timeline icons, tags):
+  // neutral = routine progress, nothing to flag; warn = needs attention/in progress; bad = actual
+  // problem; good = resolved/delivered. Deliberately NOT a different decorative color per status --
+  // see CLAUDE.md for why (a rainbow-per-status scheme was reviewed and rejected: it dilutes the one
+  // signal that matters, which is "is this fine or does it need a look").
+  var STATUS_VISUAL = {
+    missing: {cls:'bad', glyph:'!'},
+    hold: {cls:'warn', glyph:'⏸'},
+    hold_by_saathi: {cls:'warn', glyph:'⏸'},
+    return_requested: {cls:'warn', glyph:'↩'},
+    process_for_return: {cls:'warn', glyph:'↩'},
+    return_manifest_created: {cls:'warn', glyph:'↩'},
+    return_in_transit: {cls:'warn', glyph:'↩'},
+    cancellation_requested: {cls:'warn', glyph:'✕'},
+    delivered: {cls:'good', glyph:'✓'},
+    returned: {cls:'good', glyph:'✓'},
+    returned_by_lmd: {cls:'good', glyph:'✓'}
+  };
+  var CLS_PRIORITY = {bad:3, warn:2, good:1, neutral:0};
+  function digitalEventVisual(statuses){
+    var best = {cls:'neutral', glyph:'•'};
+    statuses.forEach(function(s){
+      var v = STATUS_VISUAL[s] || {cls:'neutral', glyph:'•'};
+      if (CLS_PRIORITY[v.cls] > CLS_PRIORITY[best.cls]) best = v;
+    });
+    return best;
+  }
+  function packageSnapshotHtml(o){
+    return '<div class="pkg-row">' + o.packages.map(function(p){
+      var cls = pkgStatusCls(p.current_status);
+      return '<div class="pkg-chip"><span class="pkg-id">'+esc(p.package_id)+'</span>' +
+        '<span class="pill '+cls+'">'+esc(niceLabel(p.current_status))+'</span>' +
+        (p.scheduled_date ? '<span>ETA '+esc(p.scheduled_date)+'</span>' : '') +
+        (p.attempt ? '<span>attempt '+esc(p.attempt)+'</span>' : '') +
+      '</div>';
+    }).join('') + '</div>';
+  }
+
+  // ---- Merge same-instant status rows for one package into single grouped events ----
+  function mergedDigitalEvents(pkg){
+    var rows = historyByPackage[pkg.package_id] || [];
+    var out = [];
+    rows.forEach(function(h){
+      var last = out[out.length-1];
+      if (last && last.package_id === pkg.package_id && Math.abs(h._ts - last.ts) < 2000){
+        last.statuses.push(h.delivery_status);
+        var hr = humanReason(h.reason);
+        if (hr && last.reasons.indexOf(hr) === -1) last.reasons.push(hr);
+        if (h.comment && last.comments.indexOf(h.comment) === -1) last.comments.push(h.comment);
+        return;
+      }
+      out.push({
+        type: 'DIGITAL', ts: h._ts, package_id: pkg.package_id,
+        statuses: [h.delivery_status],
+        reasons: humanReason(h.reason) ? [humanReason(h.reason)] : [],
+        comments: h.comment ? [h.comment] : [],
+        by_user: h.by_user, channel: h.channel
+      });
+    });
+    return out;
+  }
+
+  // ---- Causal-linking heuristic: nearest call<->status-change within 45 min ----
+  function linkEvents(events){
+    events.forEach(function(e){
+      if (e.type !== 'CALL') return;
+      var best = null, bestDiff = Infinity;
+      events.forEach(function(o){
+        if (o.type !== 'DIGITAL') return;
+        var diff = Math.abs(o.ts - e.ts);
+        if (diff <= LINK_WINDOW_MS && diff < bestDiff){ bestDiff = diff; best = o; }
+      });
+      if (best){
+        e.link = { ev: best, deltaMs: best.ts - e.ts };
+        (best.linkedCalls = best.linkedCalls || []).push({ ev: e, deltaMs: e.ts - best.ts });
+      }
+    });
+  }
+
+  // One plain line of what Genesys recorded for the sales call (disposition_data), only the fields that are filled.
+  function salesDispLine(sc){
+    var g = sc.g; if (!g) return '';
+    var parts = [];
+    if (g.sale) parts.push('<b>' + esc(g.sale.replace(/^(Sale Made|No Sale made) - /, '$1: ')) + '</b>');
+    if (g.price) parts.push('Pricing concern: ' + esc(niceLabel(g.price)));
+    if (g.prod) parts.push('Products: ' + esc(g.prod));
+    if (g.offer) parts.push('Offer: ' + esc(g.offer));
+    if (g.crop) parts.push('Crop: ' + esc(g.crop));
+    if (g.issue) parts.push('Crop issue: ' + esc(g.issue));
+    if (g.land) parts.push('Land: ' + esc(g.land));
+    if (g.cb) parts.push('Callback: ' + esc(g.cb));
+    return parts.length ? '<div class="ssum" style="color:var(--text-muted)"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">Genesys recorded</span> · ' + parts.join(' · ') + '</div>' : '';
+  }
+
+  function salesCallHtml(o){
+    var sc = salesByOrder[o.order_id], src = sourceByOrder[o.order_id];
+    if (!sc)   // every order source here (CSR*, APP*, SUPPORT_CSR*) is call-centre-created
+      return '<div class="sales-box none">Sales call: none found (no call from the farmer’s registered numbers ended near this order’s creation' + (src ? '; order source ' + esc(src) : '') + ').</div>';
+    var g = sc.gap_min, gapTxt = Math.abs(g) < 1 ? 'ended right as the order was created'
+      : g > 0 ? 'ended ' + minToDur(g) + ' before the order was created' : 'ended ' + minToDur(g) + ' after the order was created';
+    var tr = (window.__LMD_SALES_TR__ || {})[sc.call_id];
+    return '<div class="sales-box">' +
+      '<div class="srow"><b>Sales call</b>' +
+        '<span class="pill ' + (sc.match === "matched" ? 'good' : 'warn') + '" title="' + (sc.match === "matched" ? 'Call ended within 30 min of order creation' : 'Call ended 30 min – 6 h before order creation — likely, not certain') + '">' + (sc.match === "matched" ? 'Matched' : 'Probable') + '</span>' +
+        '<span class="mono">' + esc(fmtDate(parseTs(sc.call_start))) + '</span>' +
+        '<span>' + (sc.duration_sec != null ? secToDur(sc.duration_sec) : '—') + '</span>' +
+        (sc.agent_id ? '<span class="chip">Agent ' + esc(sc.agent_id) + '</span>' : '') +
+        '<span class="mono" style="color:var(--text-muted);font-size:11px;">call ' + esc(sc.call_id) + '</span>' +
+      '</div>' +
+      '<div style="color:var(--text-muted);font-size:11.5px;">Call ' + gapTxt + '.</div>' +
+      salesDispLine(sc) +
+      (sc.ai_summary ? '<div class="ssum">' + esc(sc.ai_summary) + '</div>' : '') +
+      (sc.rp ? '<div class="rec" data-oid="' + esc(o.order_id) + '"><button type="button" class="rec-btn">▶ Play call</button><audio controls controlsList="nodownload" disablePictureInPicture oncontextmenu="return false" hidden preload="none" data-host="0"></audio><span class="rec-note"></span></div>'
+           : '<div style="color:var(--text-muted);font-size:11.5px;">No recording path for this call.</div>') +
+      (tr && tr.length ? '<button type="button" class="tr-btn" data-n="' + tr.length + '">Show transcript (' + tr.length + ' turns)</button><div class="sales-tr" hidden>' + tr.map(function(u){
+          var agent = u[0] === "owner";
+          return '<p><span class="spk ' + (agent ? 'agent' : 'farmer') + '">' + (agent ? 'AGENT' : 'FARMER') + '</span>' + esc(u[1]) + '</p>';
+        }).join('') + '</div>' : '<div style="color:var(--text-muted);font-size:11.5px;">No transcript available for this call.</div>') +
+    '</div>';
+  }
+
+  // Recording failover: media "error" events don't bubble, so listen in the capture phase. On error, try the
+  // next host and resume playing; after the last host, say it could not be found.
+  document.addEventListener("error", function(ev){
+    var a = ev.target;
+    var box = a && a.tagName === "AUDIO" && a.closest(".rec");
+    if (!box || !a.getAttribute("src")) return;
+    var i = +a.dataset.host + 1, note = a.parentNode.querySelector(".rec-note");
+    if (i >= SALES_RECORDING_HOSTS.length){
+      if (note) note.textContent = "Recording not found on any of the " + SALES_RECORDING_HOSTS.length + " servers (are you on the office network?).";
+      return;
+    }
+    a.dataset.host = i;
+    if (note) note.textContent = "Trying server " + (i + 1) + " of " + SALES_RECORDING_HOSTS.length + "…";
+    a.src = recordingUrl(salesByOrder[box.dataset.oid].rp, i);
+    a.load();
+    var pr = a.play(); if (pr && pr.catch) pr.catch(function(){});
+  }, true);
+  document.addEventListener("playing", function(ev){
+    var a = ev.target, note = a && a.tagName === "AUDIO" && a.parentNode.querySelector(".rec-note");
+    if (note) note.textContent = "";
+  }, true);
+  document.addEventListener("click", function(ev){
+    var pb = ev.target.closest && ev.target.closest(".rec-btn");
+    if (pb){
+      var box = pb.parentNode, a = box.querySelector("audio");
+      a.src = recordingUrl(salesByOrder[box.dataset.oid].rp, 0);
+      a.hidden = false; pb.hidden = true;
+      var pr = a.play(); if (pr && pr.catch) pr.catch(function(){});
+      return;
+    }
+    var b = ev.target.closest && ev.target.closest(".tr-btn");
+    if (!b) return;
+    var box = b.nextElementSibling, show = box.hidden;
+    box.hidden = !show;
+    b.textContent = (show ? "Hide transcript (" : "Show transcript (") + b.dataset.n + " turns)";
+  });
+
+  function orderItemsHtml(o){
+    if (!o.items.length) return '';
+    return '<div class="items-box"><div class="items-head"><span>Order items</span><span class="sum">' +
+      inr(o.total_value) + ' total · ' + o.items.length + ' item' + (o.items.length!==1?'s':'') + ' · ' + o.total_qty + ' qty</span></div>' +
+      '<table class="items-tbl"><thead><tr><th>SKU</th><th>Item</th><th>Product Group</th><th class="num">Qty</th><th class="num">Total price</th></tr></thead><tbody>' +
+      o.items.map(function(i){
+        return '<tr'+(state.group !== "ALL" && i.group === state.group ? ' class="hl"' : '')+'><td class="mono">'+esc(i.item_sku)+'</td><td>'+esc(i.item_name)+'</td><td>'+esc(i.group)+'</td><td class="num">'+(i.quantity||0)+'</td><td class="num">'+inr(i.total_price||0)+'</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function orderJourneyHtml(o){
+    var events = [];
+    o.packages.forEach(function(p){ events = events.concat(mergedDigitalEvents(p)); });
+    o.calls.forEach(function(c){ events.push({ type:'CALL', ts: c._ts, call: c }); });
+    events.sort(function(a,b){ return a.ts - b.ts; });
+    linkEvents(events);
+
+    var em = o.evidence && EVIDENCE_META[o.evidence.category];
+    var detail = evidenceDetail(o);
+    var evidenceHtml = detail ? '<div class="evidence-box ' + em.cls + '"><span class="pill ' + em.cls + '">' + em.label + '</span> ' + esc(detail) + '</div>' : '';
+
+    var html = packageSnapshotHtml(o) + salesCallHtml(o) + orderItemsHtml(o) + evidenceHtml + '<div class="journey">' +
+      events.map(function(e){ return e.type === 'CALL' ? callEventHtml(e, o) : digitalEventHtml(e); }).join('') +
+    '</div>';
+    return html;
+  }
+
+  function digitalEventHtml(e){
+    var showPkg = true; // package id always shown -- cheap, and orders with >1 package need it
+    var reasonLine = e.reasons.length ? '<div class="jev-reason">' + esc(e.reasons.join('; ')) + '</div>' : '';
+    var commentLine = e.comments.length ? '<div class="jev-sub">' + esc(e.comments.join('; ')) + '</div>' : '';
+    var linkLine = '';
+    if (e.linkedCalls && e.linkedCalls.length){
+      linkLine = e.linkedCalls.map(function(l){
+        return '<div class="jev-link">' + (l.deltaMs >= 0 ? '→ followed by a call at ' + fmtTime(l.ev.ts) + ' (Δ ' + minToDur(l.deltaMs/60000) + ' later)'
+          : '← near a call at ' + fmtTime(l.ev.ts) + ' (Δ ' + minToDur(l.deltaMs/60000) + ' earlier)') + '</div>';
+      }).join('');
+    }
+    var vis = digitalEventVisual(e.statuses);
+    return '<div class="jev digital">' +
+      '<div class="jev-head"><span class="jev-icon '+vis.cls+'">'+vis.glyph+'</span><span class="jev-badge digital">Digital</span><span class="jev-ts mono">'+esc(fmtDate(e.ts))+'</span>' +
+        (showPkg ? '<span class="mono" style="color:var(--text-muted);font-size:11px;">'+esc(e.package_id)+'</span>' : '') +
+        (e.by_user ? '<span style="color:var(--text-muted);font-size:11px;">'+esc(e.by_user)+(e.channel?' · '+esc(e.channel):'')+'</span>' : '') +
+      '</div>' +
+      '<div class="jev-body"><div class="jev-status">'+esc(e.statuses.map(niceLabel).join(' → '))+'</div>'+reasonLine+commentLine+'</div>' +
+      linkLine +
+    '</div>';
+  }
+
+  function callEventHtml(e, o){
+    var c = e.call;
+    var om = outcomeMeta(c.call_outcome);
+    var sm = sentimentMeta(c._sentiment);
+    var tags = [];
+    if (c.farmer_willing_to_accept_delivery === "NO") tags.push(tag("Declined delivery", "bad"));
+    // "Willing to accept" on purpose, not "Accepted delivery" -- this field means the farmer didn't
+    // refuse the delivery in principle, not that the delivery was completed. Worded as "accepted"
+    // it read as contradicting an ON_HOLD/scheduled-later outcome; it isn't a contradiction, just an
+    // ambiguous label for "farmer is fine receiving it whenever it comes."
+    if (c.farmer_willing_to_accept_delivery === "YES") tags.push(tag("Willing to accept delivery", "good"));
+    if (c.amount_mismatch_reported_by_farmer === "YES") tags.push(tag("Price mismatch reported", "bad"));
+    if (c.farmer_denied_cancellation_otp === "YES") tags.push(tag("Denied cancellation OTP", "warn"));
+    if (c.farmer_requested_additional_discount === "YES") tags.push(tag("Requested discount", "gold"));
+    if (c.farmer_intent_to_reorder === "YES") tags.push(tag("Reorder intent", "good"));
+    if (c.lmd_asked_to_pay_online === "YES") tags.push(tag("Payment: " + niceLabel(c.agreed_payment_mode||"?"), "neutral"));
+    var linkLine = '';
+    if (e.link){
+      var l = e.link;
+      linkLine = '<div class="jev-link">' + (l.deltaMs >= 0
+        ? '→ status changed to ' + esc(niceLabel(l.ev.statuses[l.ev.statuses.length-1])) + ' at ' + fmtTime(l.ev.ts) + ' (Δ ' + minToDur(l.deltaMs/60000) + ' later)'
+        : '← followed a status change to ' + esc(niceLabel(l.ev.statuses[l.ev.statuses.length-1])) + ' at ' + fmtTime(l.ev.ts) + ' (Δ ' + minToDur(l.deltaMs/60000) + ' earlier)') + '</div>';
+    }
+    return '<div class="jev call">' +
+      '<div class="jev-head">' +
+        '<span class="jev-icon call">☎</span>' +
+        '<span class="jev-badge call">Call</span>' +
+        '<span class="jev-ts mono">'+esc(fmtDate(c._ts))+'</span>' +
+        '<span>·</span><span class="mono">'+esc(c.meta_data_call_duration||'—')+'</span>' +
+        '<span>·</span><span>'+esc(c.language_detected||'—')+'</span>' +
+        (c.call_outcome ? '<span class="pill '+om.cls+'">'+om.label+'</span>' : '') +
+        (c.action_initiated_by === "LMD_AGENT" ? '<span class="pill warn" title="Who initiated the hold/return on this call">LMD initiated</span>'
+          : c.action_initiated_by === "FARMER" ? '<span class="pill neutral" title="Who initiated the hold/return on this call">Farmer initiated</span>' : '') +
+        (c._sentiment ? '<span class="pill '+sm.cls+'">'+sm.label+'</span>' : '') +
+        '<span class="mono" style="margin-left:auto; opacity:0.6;">'+esc(c.package_id)+'</span>' +
+      '</div>' +
+      (c.meta_data_recording_url ? '<audio controls controlsList="nodownload" oncontextmenu="return false" preload="none" src="'+esc(c.meta_data_recording_url)+'"></audio>' : '<div class="note-inline" style="margin:6px 0 0;">No recording URL captured for this call.</div>') +
+      linkLine +
+      '<div class="inference-block">' +
+        '<div class="lbl">AI inference</div>' +
+        '<div class="call-summary">'+esc(c.ai_delivery_summary || "No summary extracted.")+'</div>' +
+        (c.ai_conflict_detected === "YES" && c.ai_conflict_summary ? '<div class="call-conflict">⚠ '+esc(c.ai_conflict_summary)+'</div>' : '') +
+        (tags.length ? '<div class="call-tags">'+tags.join('')+'</div>' : '') +
+      '</div>' +
+    '</div>';
+  }
+  function tag(label, cls){ return '<span class="tag-chip '+(cls||"neutral")+'">'+esc(label)+'</span>'; }
+
+  // ---- Date quick-picks ----
+  function setQuickpick(days){
+    document.querySelectorAll('#quickpick button').forEach(function(b){ b.classList.toggle('active', Number(b.dataset.days) === days); });
+    if (days < 0){
+      state.dateFrom = null; state.dateTo = null;
+      document.getElementById('fDateFrom').value = ""; document.getElementById('fDateTo').value = "";
+    } else {
+      var maxTs = calls.reduce(function(m,c){ return Math.max(m, c._ts); }, 0);
+      var to = new Date(maxTs); to.setHours(23,59,59,999);
+      var from = new Date(maxTs); from.setDate(from.getDate() - days); from.setHours(0,0,0,0);
+      state.dateFrom = from.getTime(); state.dateTo = to.getTime();
+      document.getElementById('fDateFrom').value = from.toISOString().slice(0,10);
+      document.getElementById('fDateTo').value = to.toISOString().slice(0,10);
+    }
+    applyFilters();
+  }
+
+  document.getElementById('orderList').addEventListener('click', function(e){
+    var head = e.target.closest('[data-toggle]');
+    if (!head) return;
+    var oid = head.getAttribute('data-toggle');
+    openSet[oid] = !openSet[oid];
+    keepPage = true;
+    applyFilters();
+  });
+  document.getElementById('orderList').addEventListener('click', function(e){
+    var b = e.target.closest('[data-page]');
+    if (!b || b.disabled) return;
+    curPage = +b.getAttribute('data-page');
+    keepPage = true;
+    render(curList);
+    document.getElementById('resultCount').scrollIntoView({block: 'start'});
+  });
+  document.getElementById('fSearch').addEventListener('input', function(e){ state.search = e.target.value; applyFilters(); });
+  document.getElementById('fOutcome').addEventListener('change', function(e){ state.outcome = e.target.value; applyFilters(); });
+  document.getElementById('fReason').addEventListener('change', function(e){ state.reason = e.target.value; applyFilters(); });
+  document.getElementById('fExec').addEventListener('change', function(e){ state.exec = e.target.value; applyFilters(); });
+  document.getElementById('fState').addEventListener('change', function(e){ state.stateName = e.target.value; applyFilters(); });
+  document.getElementById('fConflict').addEventListener('change', function(e){ state.conflictOnly = e.target.checked; applyFilters(); });
+  document.getElementById('fRepeat').addEventListener('change', function(e){ state.repeatOnly = e.target.checked; applyFilters(); });
+  document.getElementById('fGap').addEventListener('change', function(e){ state.gapOnly = e.target.checked; applyFilters(); });
+  document.getElementById('fSalesType').addEventListener('change', function(e){ state.salesType = e.target.value; applyFilters(); });
+  document.getElementById('fTurned').addEventListener('change', function(e){ state.turnedOnly = e.target.checked; applyFilters(); });
+  document.getElementById('fSales').addEventListener('change', function(e){ state.salesOnly = e.target.checked; applyFilters(); });
+  document.getElementById('fSort').addEventListener('change', function(e){ state.sort = e.target.value; applyFilters(); });
+  document.getElementById('fDateFrom').addEventListener('change', function(e){
+    state.dateFrom = e.target.value ? new Date(e.target.value + "T00:00:00").getTime() : null;
+    document.querySelectorAll('#quickpick button').forEach(function(b){ b.classList.remove('active'); });
+    applyFilters();
+  });
+  document.getElementById('fDateTo').addEventListener('change', function(e){
+    state.dateTo = e.target.value ? new Date(e.target.value + "T23:59:59").getTime() : null;
+    document.querySelectorAll('#quickpick button').forEach(function(b){ b.classList.remove('active'); });
+    applyFilters();
+  });
+  document.getElementById('quickpick').addEventListener('click', function(e){
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    setQuickpick(Number(btn.dataset.days));
+  });
+
+  applyFilters();
+})();
+</script>
+</body></html>
