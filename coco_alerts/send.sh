@@ -39,8 +39,19 @@ if sent_today "$STATE_FILE" && sent_today "$STATE_FILE_GCHAT"; then
     exit 0
 fi
 
-if ! /usr/bin/python3 "$DIR/run.py" >> "$LOG_FILE" 2>&1; then
-    note "run.py FAILED — will retry on next trigger"
+# Retry run.py in a FRESH process: a run frozen by laptop sleep dies right
+# after wake, and the missed 10 AM trigger is already used up by then — so
+# without this, nothing re-runs until the next day (incident 2026-11-09).
+RUN_OK=1
+for ATTEMPT in 1 2 3; do
+    if /usr/bin/python3 "$DIR/run.py" >> "$LOG_FILE" 2>&1; then
+        RUN_OK=0; break
+    fi
+    note "run.py attempt $ATTEMPT FAILED"
+    [ $ATTEMPT -lt 3 ] && sleep 60
+done
+if [ $RUN_OK -ne 0 ]; then
+    note "run.py FAILED after 3 attempts — will retry on next trigger"
     exit 1
 fi
 

@@ -175,8 +175,18 @@ def bq_client():
     return bigquery.Client(project=PROJECT)
 
 
+# Hard limits so a run frozen by laptop sleep fails fast after wake instead of
+# hanging for ~40 min and blocking launchd's next trigger (incident 2026-11-09).
+BQ_TIMEOUT_S = 120
+
+
 def fetch_rows(client, query: str) -> list:
-    return [dict(row) for row in client.query(query).result()]
+    from google.cloud import bigquery
+
+    retry = bigquery.DEFAULT_RETRY.with_deadline(BQ_TIMEOUT_S)
+    job_config = bigquery.QueryJobConfig(job_timeout_ms=BQ_TIMEOUT_S * 1000)
+    job = client.query(query, job_config=job_config, retry=retry, timeout=60)
+    return [dict(row) for row in job.result(timeout=BQ_TIMEOUT_S, retry=retry)]
 
 
 # ── Guardrail 2 matching ─────────────────────────────────────────────────────
