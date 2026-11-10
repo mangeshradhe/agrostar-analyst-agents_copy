@@ -5,7 +5,7 @@ COCO Alerts — daily guardrails for COCO (company-owned) stores.
 Guardrail 1 — STUCK ORDERS. COCO is walk-in POS: every order should reach
 DELIVERED same-day.
     CREATED    > 24h  ->  never handed to fulfillment (usually unicommerce sync failure)  -> Sales Ops to check (Google Chat)
-    DISPATCHED > 48h  ->  synced but never closed                                          -> Tech to check (Slack)
+    DISPATCHED        ->  NOT flagged — normal part of the process (user, 2026-11-10)
     any other non-terminal status > 24h  ->  unknown, flag it                              -> Tech to check (Slack, default)
 
 CREATED-status orders are a store/sales-ops action item (ask the store manager
@@ -23,7 +23,7 @@ failure, not a store-side issue).
 This script only COMPUTES. It writes two alert files (each a one-line
 all-clear when everything is clean, so the channel gets a daily heartbeat
 instead of ambiguous silence):
-    logs/latest_alert.md        Tech alert (DISPATCHED/other stuck + QR guardrail)
+    logs/latest_alert.md        Tech alert (other non-terminal stuck + QR guardrail)
     logs/latest_alert_gchat.md  Sales Ops alert (CREATED stuck orders only)
 Posting is send.sh's job — Slack goes through the user's own claude.ai Slack
 connector via `claude -p`; Google Chat goes via a plain incoming webhook.
@@ -47,7 +47,6 @@ PROJECT = "agrostar-data"
 PROGRAM_START = "2026-05-01"   # bounds the scan; COCO program has no orders before this
 
 CREATED_THRESHOLD_HRS = 24
-DISPATCHED_THRESHOLD_HRS = 48
 RED_AGE_HRS = 72               # severity marker in the message
 CAUTION_STREAK_DAYS = 5        # consecutive clean days before the "stay alert" nudge
 
@@ -111,15 +110,15 @@ WHERE o.order_type = 'COCO'
 """
 
 TERMINAL_STATUSES = ("DELIVERED", "RETURNED", "CANCELLED")
+# DISPATCHED is part of the normal COCO process — never flag it (2026-11-10).
+NOT_FLAGGED_STATUSES = TERMINAL_STATUSES + ("DISPATCHED",)
 
 
 def stuck_orders(coco_orders: list) -> list:
-    """CREATED > 24h, DISPATCHED > 48h, any other non-terminal status > 24h."""
-    def limit(status):
-        return DISPATCHED_THRESHOLD_HRS if status == "DISPATCHED" else CREATED_THRESHOLD_HRS
+    """CREATED > 24h, any other non-terminal status > 24h. DISPATCHED is skipped."""
     stuck = [
         o for o in coco_orders
-        if o["status"] not in TERMINAL_STATUSES and o["age_hours"] > limit(o["status"])
+        if o["status"] not in NOT_FLAGGED_STATUSES and o["age_hours"] > CREATED_THRESHOLD_HRS
     ]
     return sorted(stuck, key=lambda o: -o["age_hours"])
 
@@ -377,7 +376,7 @@ def main() -> int:
     else:
         streak = read_streak()  # backfill/debug run — read only, don't touch the streak
 
-    # ── Tech alert (Slack) — DISPATCHED/other stuck orders + QR guardrail ──
+    # ── Tech alert (Slack) — other non-terminal stuck orders + QR guardrail ──
     if is_clean_tech:
         qr_txt = (
             f"{len(qr_payments)}/{len(qr_payments)} QR payments reflected"

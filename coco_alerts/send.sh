@@ -5,7 +5,7 @@
 # lagging behind (e.g. a retry) never blocks or re-fires the other.
 #
 # Two independent sends, either can fail without blocking the other:
-#   Slack (Tech)             — DISPATCHED/other stuck orders + QR guardrail,
+#   Slack (Tech)             — other stuck orders (not DISPATCHED) + QR guardrail,
 #                               via the user's own claude.ai Slack connector
 #                               (`claude -p`, no bot token involved)
 #   Google Chat (Sales Ops)  — CREATED stuck orders, via a plain incoming
