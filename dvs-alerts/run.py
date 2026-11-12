@@ -31,9 +31,12 @@ orders had ledger rows posted before reconciliation (73 days earlier, a
 re-reconciled package); all others posted after. delivery_shippingpackage and
 order_management_order are not date-prunable (full scans of 2-3 columns).
 
-This script only COMPUTES. It writes the alert to logs/latest_alert.md — a
-single all-clear line when clean, otherwise every flagged order inline. (The
-Slack Canvas overflow was removed 2026-10-31: since Jul it triggered once.)
+This script only COMPUTES. It writes the alert to logs/latest_alert.md — every
+flagged order inline, or an EMPTY file on a clean day (nothing is posted; user,
+2026-11-12 — the old daily all-clear line is gone). On Fridays with no alert,
+it writes logs/weekly_recap.md instead (heartbeat so the team knows the
+schedule still runs) — see weekly_recap.py. (The Slack Canvas overflow was
+removed 2026-10-31: since Jul it triggered once.)
 Posting is send.sh's job, via the user's own claude.ai Slack connector
 (`claude -p`).
 
@@ -48,6 +51,8 @@ import os
 import sys
 from datetime import datetime, timedelta
 
+import weekly_recap
+
 # ── Config ───────────────────────────────────────────────────────────────────
 
 PROJECT = "agrostar-data"
@@ -56,6 +61,8 @@ LEDGER_LOOKBACK_DAYS = 90  # wallet ledger partition lower bound, days before st
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 ALERT_FILE = os.path.join(LOG_DIR, "latest_alert.md")
+WEEKLY_FILE = os.path.join(LOG_DIR, "weekly_recap.md")
+HISTORY_FILE = os.path.join(LOG_DIR, "history.jsonl")
 # Leftover Canvas files from the old version — deleted on every run so nothing stale is ever posted.
 STALE_CANVAS_FILES = [os.path.join(LOG_DIR, f) for f in ("canvas_ledger.md", "canvas_zone.md", "canvas_lmd.md")]
 
@@ -251,11 +258,9 @@ def main() -> int:
         if os.path.exists(f):
             os.remove(f)
 
-    if not ledger["flagged"]:
-        message = (
-            f":white_check_mark: **DVS Alerts — {label}: All clear.** "
-            f"Ledger reconciliation: 0 of {ledger['total']} reconciled order(s) missing ledger entries."
-        )
+    is_clean = not ledger["flagged"]
+    if is_clean:
+        message = ""  # clean day — nothing to post
     else:
         message = "\n\n".join(
             [
@@ -264,9 +269,28 @@ def main() -> int:
             ]
         )
 
-    with open(ALERT_FILE, "w") as f:
-        f.write(message)
-    log.info("Alert written to %s:\n%s", ALERT_FILE, message)
+    weekly_recap.write_or_clear(ALERT_FILE, message)
+    log.info("Alert written to %s:\n%s", ALERT_FILE, message or "(clean — nothing to post)")
+
+    # ── History + Friday weekly recap ──────────────────────────────────────
+    # Only real daily runs (no date override) count toward history and the recap.
+    weekly_text = ""
+    if args.start_date is None and args.end_date is None:
+        run_date = datetime.now().date()
+        note = (
+            f"{len(ledger['flagged'])} order(s) missing ledger entries "
+            f"({ledger['distinct_stores']} store(s))"
+            if not is_clean else ""
+        )
+        weekly_recap.save_run(HISTORY_FILE, run_date, start_date,
+                              {"slack": {"alert": not is_clean, "note": note}})
+        # Friday with an alert -> alert only, no recap.
+        if is_clean and weekly_recap.is_recap_day(run_date):
+            weekly_text = weekly_recap.format_weekly(
+                "DVS Alerts", "slack", weekly_recap.load_history(HISTORY_FILE), run_date)
+    weekly_recap.write_or_clear(WEEKLY_FILE, weekly_text)
+    if weekly_text:
+        log.info("Weekly recap written to %s:\n%s", WEEKLY_FILE, weekly_text)
     return 0
 
 

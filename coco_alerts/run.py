@@ -20,11 +20,13 @@ Checks YESTERDAY's payments only (strictly — no carryover); settlements are
 searched from the payment day up to now. Always -> Tech to check (payment-sync
 failure, not a store-side issue).
 
-This script only COMPUTES. It writes two alert files (each a one-line
-all-clear when everything is clean, so the channel gets a daily heartbeat
-instead of ambiguous silence):
+This script only COMPUTES. It writes two alert files — EMPTY on a clean day
+(nothing is posted; user, 2026-11-12 — the old daily all-clear is gone):
     logs/latest_alert.md        Tech alert (other non-terminal stuck + QR guardrail)
     logs/latest_alert_gchat.md  Sales Ops alert (CREATED stuck orders only)
+On Fridays, a channel with no alert gets a weekly recap instead (heartbeat so
+the team knows the schedule still runs) — see weekly_recap.py:
+    logs/weekly_recap.md / logs/weekly_recap_gchat.md
 Posting is send.sh's job — Slack goes through the user's own claude.ai Slack
 connector via `claude -p`; Google Chat goes via a plain incoming webhook.
 All table timestamps are UTC; every day boundary here converts via
@@ -41,6 +43,8 @@ import os
 import sys
 from datetime import datetime, timedelta
 
+import weekly_recap
+
 # ── Config ───────────────────────────────────────────────────────────────────
 
 PROJECT = "agrostar-data"
@@ -48,13 +52,14 @@ PROGRAM_START = "2026-05-01"   # bounds the scan; COCO program has no orders bef
 
 CREATED_THRESHOLD_HRS = 24
 RED_AGE_HRS = 72               # severity marker in the message
-CAUTION_STREAK_DAYS = 5        # consecutive clean days before the "stay alert" nudge
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 ALERT_FILE = os.path.join(LOG_DIR, "latest_alert.md")
 ALERT_FILE_GCHAT = os.path.join(LOG_DIR, "latest_alert_gchat.md")
-STREAK_FILE = os.path.join(LOG_DIR, "clean_streak.txt")
+WEEKLY_FILE = os.path.join(LOG_DIR, "weekly_recap.md")
+WEEKLY_FILE_GCHAT = os.path.join(LOG_DIR, "weekly_recap_gchat.md")
+HISTORY_FILE = os.path.join(LOG_DIR, "history.jsonl")
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 
@@ -207,25 +212,6 @@ def unmatched_qr_payments(qr_payments: list, settlements: list) -> list:
     return missing
 
 
-# ── Clean-day streak ─────────────────────────────────────────────────────────
-# Tracks consecutive clean days across runs so the all-clear message can nudge
-# the team once things have been quiet for a while. Only touched on real daily
-# runs (no --date override) so manual backfill/debug runs don't corrupt it.
-
-
-def read_streak() -> int:
-    try:
-        with open(STREAK_FILE) as f:
-            return int(f.read().strip())
-    except (FileNotFoundError, ValueError):
-        return 0
-
-
-def write_streak(n: int) -> None:
-    with open(STREAK_FILE, "w") as f:
-        f.write(str(n))
-
-
 # ── Message formatting ───────────────────────────────────────────────────────
 # Output is standard markdown (**bold**) — the claude.ai Slack MCP tool
 # converts it; this is NOT Slack mrkdwn.
@@ -300,10 +286,6 @@ def format_created_section_gchat(orders: list) -> str:
     return "\n".join(lines)
 
 
-def format_created_clean_gchat() -> str:
-    return "✅ *Stuck orders:* 0 — all COCO orders created today closed same-day."
-
-
 def format_qr_clean(qr_payments: list, day: str) -> str:
     qr_txt = (
         f"{len(qr_payments)}/{len(qr_payments)} reflected"
@@ -366,33 +348,14 @@ def main() -> int:
         len(stuck), len(stuck_created), len(stuck_tech), len(missing_qr), len(qr_payments),
     )
 
-    today = datetime.now().strftime("%d %b %Y")
+    run_date = datetime.now().date()
+    today = run_date.strftime("%d %b %Y")
     is_clean_tech = not stuck_tech and not missing_qr
     is_clean_created = not stuck_created
 
-    if args.date is None:
-        streak = read_streak() + 1 if (is_clean_tech and is_clean_created) else 0
-        write_streak(streak)
-    else:
-        streak = read_streak()  # backfill/debug run — read only, don't touch the streak
-
     # ── Tech alert (Slack) — other non-terminal stuck orders + QR guardrail ──
     if is_clean_tech:
-        qr_txt = (
-            f"{len(qr_payments)}/{len(qr_payments)} QR payments reflected"
-            if qr_payments
-            else f"no QR payments on {day}"
-        )
-        message = (
-            f":white_check_mark: **COCO Alerts — {today}: All clear.** "
-            f"0 stuck orders · {qr_txt}.\n"
-            f"Smooth day. Keep this up and COCO stores run themselves. 💪"
-        )
-        if streak >= CAUTION_STREAK_DAYS:
-            message += (
-                f"\n\n{streak} clean days in a row now — is this the calm before the storm? "
-                f"Stay sharp, don't get comfortable."
-            )
+        message = ""  # clean day — nothing to post
     else:
         # At least one guardrail fired. Still state BOTH guardrails' status —
         # a fired guardrail must not push the clean one into silence.
@@ -406,24 +369,47 @@ def main() -> int:
             f":convenience_store: **COCO Alerts — {today}**\n\n"
             f"{stuck_part}\n\n{qr_part}\n\n{reassurance}"
         )
-    with open(ALERT_FILE, "w") as f:
-        f.write(message)
-    log.info("Tech alert written to %s:\n%s", ALERT_FILE, message)
+    weekly_recap.write_or_clear(ALERT_FILE, message)
+    log.info("Tech alert written to %s:\n%s", ALERT_FILE, message or "(clean — nothing to post)")
 
     # ── Sales Ops alert (Google Chat) — CREATED stuck orders only ──────────
     if is_clean_created:
-        gchat_message = (
-            f"🏪 *COCO Alerts (Sales Ops) — {today}*\n\n"
-            f"{format_created_clean_gchat()}"
-        )
+        gchat_message = ""  # clean day — nothing to post
     else:
         gchat_message = (
             f"🏪 *COCO Alerts (Sales Ops) — {today}*\n\n"
             f"{format_created_section_gchat(stuck_created)}"
         )
-    with open(ALERT_FILE_GCHAT, "w") as f:
-        f.write(gchat_message)
-    log.info("Sales Ops alert written to %s:\n%s", ALERT_FILE_GCHAT, gchat_message)
+    weekly_recap.write_or_clear(ALERT_FILE_GCHAT, gchat_message)
+    log.info("Sales Ops alert written to %s:\n%s", ALERT_FILE_GCHAT,
+             gchat_message or "(clean — nothing to post)")
+
+    # ── History + Friday weekly recap ──────────────────────────────────────
+    # Only real daily runs (no --date) count toward history and the recap.
+    weekly_text, weekly_text_gchat = "", ""
+    if args.date is None:
+        tech_notes = []
+        if stuck_tech:
+            tech_notes.append(f"{len(stuck_tech)} stuck order(s)")
+        if missing_qr:
+            tech_notes.append(f"{len(missing_qr)} QR payment(s) not reflected")
+        weekly_recap.save_run(HISTORY_FILE, run_date, day, {
+            "slack": {"alert": not is_clean_tech, "note": " · ".join(tech_notes)},
+            "gchat": {"alert": not is_clean_created,
+                      "note": f"{len(stuck_created)} stuck order(s) in CREATED" if stuck_created else ""},
+        })
+        if weekly_recap.is_recap_day(run_date):
+            history = weekly_recap.load_history(HISTORY_FILE)
+            # Friday with an alert on a channel -> alert only, no recap there.
+            if is_clean_tech:
+                weekly_text = weekly_recap.format_weekly("COCO Alerts", "slack", history, run_date)
+            if is_clean_created:
+                weekly_text_gchat = weekly_recap.format_weekly(
+                    "COCO Alerts (Sales Ops)", "gchat", history, run_date, gchat=True)
+    weekly_recap.write_or_clear(WEEKLY_FILE, weekly_text)
+    weekly_recap.write_or_clear(WEEKLY_FILE_GCHAT, weekly_text_gchat)
+    if weekly_text or weekly_text_gchat:
+        log.info("Weekly recap written:\n%s\n---\n%s", weekly_text, weekly_text_gchat)
     return 0
 
 
