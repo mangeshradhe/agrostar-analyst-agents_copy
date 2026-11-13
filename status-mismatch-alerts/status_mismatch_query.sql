@@ -12,6 +12,8 @@
 -- Expected lags are NOT flagged: WMS staying at DISPATCHED after delivery, CRM not tracking picking,
 -- AgroEx cancellation_requested, same-stage sub-status differences (e.g. PICKED_BY_LMD vs hold),
 -- and CRM RETURNED with WMS CANCELLED (AgroEx must still agree with CRM).
+-- COCO orders delivered + reconciled in AgroEx but still DISPATCHED in CRM get their own top section
+-- (user, 2026-11-12): reconciliation means the sale is closed, so CRM must be marked DELIVERED.
 WITH o AS (
   SELECT sales_order_id, unicommerce_id, TRIM(status) AS crm_status, order_type, warehouse,
     DATETIME(created_on, 'Asia/Kolkata') AS created_ist,
@@ -39,7 +41,7 @@ o2 AS (
   FROM o
 ),
 pk AS (
-  SELECT p.order_id, p.delivery_status,
+  SELECT p.order_id, p.delivery_status, p.reconciliation_status,
     CASE
       WHEN p.delivery_status = 'archive' THEN 9
       WHEN p.delivery_status = 'hold_by_saathi' THEN 1
@@ -66,7 +68,8 @@ ax AS (  -- order-level AgroEx view; archived packages ignored when live ones ex
     MIN(IF(stg <> 9, stg, NULL)) AS ax_min,
     MAX(IF(stg <> 9, stg, NULL)) AS ax_max,
     MAX(IF(stg NOT IN (8, 9), stg, NULL)) AS ax_hi,
-    LOGICAL_OR(stg = 8) AS ax_cancel_req
+    LOGICAL_OR(stg = 8) AS ax_cancel_req,
+    LOGICAL_OR(stg <> 9 AND reconciliation_status = 'reconciliation_done') AS ax_reconciled
   FROM pk GROUP BY 1
 ),
 w AS (
@@ -86,7 +89,7 @@ w AS (
   GROUP BY uc
 ),
 j AS (
-  SELECT o2.*, ax.agroex_status, ax.live_pk, ax.ax_min, ax.ax_max, ax.ax_hi, ax.ax_cancel_req,
+  SELECT o2.*, ax.agroex_status, ax.live_pk, ax.ax_min, ax.ax_max, ax.ax_hi, ax.ax_cancel_req, ax.ax_reconciled,
          w.wms_status, w.facility, w.w_min, w.w_max, w.w_hi
   FROM o2
   LEFT JOIN ax ON ax.order_id = CAST(o2.unicommerce_id AS STRING)
@@ -124,6 +127,8 @@ flagged AS (
   SELECT chk.*,
     CASE
       WHEN crm_stage = 0 THEN '9. Unknown CRM status'
+      WHEN seg = 'COCO' AND crm_stage = 4 AND ax_min = 5 AND ax_reconciled
+        THEN '0. COCO delivered & reconciled in AgroEx, CRM still DISPATCHED — mark DELIVERED in CRM'
       WHEN crm_stage BETWEEN 1 AND 4 AND (live_pk = 0 OR (seg <> 'DVS' AND w_min = 9))
         THEN '1. Cancelled in WMS/AgroEx, still live in CRM'
       WHEN crm_stage = 9 THEN '2. Cancelled in CRM, still live in WMS/AgroEx'
