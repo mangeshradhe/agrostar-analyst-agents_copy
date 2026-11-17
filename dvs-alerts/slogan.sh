@@ -1,5 +1,5 @@
-# slogan.sh — sourced by send.sh. Shared by coco_alerts and dvs-alerts
-# (identical copy in both folders; each is deployed on its own).
+# slogan.sh — sourced by send.sh. Shared by coco_alerts, dvs-alerts and ipt-alerts
+# (identical copy in all three folders; each is deployed on its own).
 #
 # Friday weekly recap ends with a fresh encouraging line. Claude writes a new
 # one each week; every line used is kept in logs/slogans_used.tsv and passed

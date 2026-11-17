@@ -1,6 +1,6 @@
 """
-Quiet-days + Friday weekly recap — shared by coco_alerts and dvs-alerts.
-(Identical copy lives in both folders; each is deployed on its own.)
+Quiet-days + Friday weekly recap — shared by coco_alerts, dvs-alerts and ipt-alerts.
+(Identical copy lives in all three folders; each is deployed on its own.)
 
 Rule (user, 2026-11-12):
   - Alert day  -> post the alert.

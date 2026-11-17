@@ -9,15 +9,23 @@ A's return order, b_order_id = B's purchase order) -> IPT becomes COMPLETED.
 Alert 1 — DRAFT > 7 days: cart never sent for approval. No orders exist on a
           DRAFT, so it is safe to DISCARD. Every one is listed every day.
 Alert 2 — COMPLETED IPT whose partner-B order is in ERROR status.
-Alert 3 — INPROGRESS IPT, both partners APPROVED, partner-B order created and
-          in READY_TO_SHIP — the order is ready but the IPT never closed.
-          (DISPATCHED / DELIVERED B orders are valid and NOT flagged.)
+Alert 3 — INPROGRESS IPT, both partners APPROVED, partner-B order in
+          READY_TO_SHIP (ready but the IPT never closed) or ERROR (order failed,
+          usually a credit/OCP block — the reason from the IPT's `remarks` is
+          shown). Added ERROR 2026-11-17 after IPT 19538 / order 13883326 fell
+          between alerts 2 and 3. Also WMS_SUBMITTED IPT + B order ERROR (added
+          2026-11-17; IPTs 19766 / 19761). (DISPATCHED / DELIVERED B orders are
+          valid and NOT flagged.)
+
+Posting rule (2026-11-17, same as COCO + DVS alerts):
+  alert today -> post the alert; clean day -> post NOTHING;
+  Friday + clean -> weekly recap (weekly_recap.py, slogan filled by send.sh).
 
 Table: prod_db_views.order_management_interpartytransfer
        (note: NOT "orderinterpartytransfer" — that name does not exist)
 B order status: prod_db_views.order_management_order (sales_order_id = b_order_id)
 
-This script only COMPUTES. It writes the alert as one or more Slack message
+This script only COMPUTES. It writes the alert (or Friday recap) as one or more Slack message
 parts into logs/parts/part_NN.md (each <= MAX_PART_CHARS so `claude -p` can
 copy it exactly). Posting is send.sh's job.
 All table timestamps are UTC; ages are computed on IST calendar days.
@@ -28,22 +36,27 @@ Usage:
 
 import glob
 import logging
+import re
 import os
 import sys
 from collections import defaultdict
 from datetime import datetime
+
+import weekly_recap
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
 PROJECT = "agrostar-data"
 STALE_DAYS = 7                 # Alert 1: DRAFT older than this (IST days)
 OLD_DAYS = 30                  # red marker threshold
-ALERT3_B_STATUSES = ("READY_TO_SHIP",)   # DISPATCHED/DELIVERED are valid orders — excluded
+ALERT3_B_STATUSES = ("READY_TO_SHIP", "ERROR")   # DISPATCHED/DELIVERED are valid orders — excluded
+REMARKS_MAX = 160              # error reason shown on Alert 3 ERROR rows
 MAX_PART_CHARS = 6000
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 PARTS_DIR = os.path.join(LOG_DIR, "parts")
+HISTORY_FILE = os.path.join(LOG_DIR, "history.jsonl")
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 
@@ -86,7 +99,7 @@ WITH ipt AS (
     i.id, i.source, i.status, i.created_on,
     i.from_partner_a_name, i.from_partner_a_id, i.from_partner_a_approval,
     i.to_partner_b_name, i.to_partner_b_id, i.to_partner_b_approval,
-    i.b_order_id,
+    i.b_order_id, i.remarks,
     -- only these 3 columns of order_management_order are read:
     -- sales_order_id (join), status, grand_total
     ob.status      AS b_status,
@@ -94,7 +107,7 @@ WITH ipt AS (
   FROM `{PROJECT}.prod_db_views.order_management_interpartytransfer` i
   LEFT JOIN `{PROJECT}.prod_db_views.order_management_order` ob
     ON ob.sales_order_id = i.b_order_id
-  WHERE i.status IN ('DRAFT', 'COMPLETED', 'INPROGRESS')
+  WHERE i.status IN ('DRAFT', 'COMPLETED', 'INPROGRESS', 'WMS_SUBMITTED')
 ),
 flagged AS (
   SELECT
@@ -113,11 +126,14 @@ flagged AS (
          AND from_partner_a_approval = 'APPROVED'
          AND to_partner_b_approval = 'APPROVED'
          AND b_status IN ({", ".join(f"'{s}'" for s in ALERT3_B_STATUSES)}))
+     OR (status = 'WMS_SUBMITTED' AND b_status = 'ERROR')
 )
 SELECT {COMMON_COLS},
+  i.status AS ipt_status,
   i.b_order_id,
   i.b_status,
   i.b_amount,
+  i.remarks,
   i.alert
 FROM flagged i
 ORDER BY alert, state, age_days, i.id
@@ -163,6 +179,28 @@ def b_order_row(r: dict) -> str:
     )
 
 
+def error_reason(remarks) -> str:
+    """Short, one-line version of the IPT's error remarks. Remarks that are
+    not an error (e.g. 'realCash:True') are not shown as a reason."""
+    if "error" not in (remarks or "").lower():
+        return "no error reason in IPT remarks — open the B order to see why"
+    text = re.sub(r"^\s*ERRORS? in processing\s*:\s*", "", remarks or "", flags=re.I)
+    text = " · ".join(p.strip() for p in text.split("||") if p.strip())
+    text = re.sub(r"\s+", " ", text)
+    if not text:
+        return "no reason in remarks"
+    return text if len(text) <= REMARKS_MAX else text[: REMARKS_MAX - 1].rstrip() + "…"
+
+
+def alert3_row(r: dict) -> str:
+    row = b_order_row(r) + f" · **{r['b_status']}**"
+    if r["ipt_status"] != "INPROGRESS":
+        row += f" (IPT {r['ipt_status']})"
+    if r["b_status"] == "ERROR":
+        row += f"\n      ↳ _{error_reason(r['remarks'])}_"
+    return row
+
+
 def age_buckets(rows: list) -> str:
     b1 = sum(1 for r in rows if r["age_days"] <= OLD_DAYS)
     b2 = sum(1 for r in rows if OLD_DAYS < r["age_days"] <= 180)
@@ -174,20 +212,11 @@ def age_buckets(rows: list) -> str:
 
 
 def build_blocks(drafts: list, alert2: list, alert3: list, today: str) -> list:
-    """One message: the three alerts, in order. Alert 1 is counts only (no
+    """One message: the three alerts, in order (empty list on a clean day). Alert 1 is counts only (no
     per-IPT list — user asked to keep the post short); alerts 2 and 3 list
     each IPT since they are few."""
     if not (drafts or alert2 or alert3):
-        return [[
-            f":tada: **IPT Alerts — {today}: All clear!**",
-            "",
-            "1️⃣ Drafts older than 7 days: 0 :white_check_mark:",
-            "2️⃣ Completed IPTs with B order in ERROR: 0 :white_check_mark:",
-            "3️⃣ In-progress IPTs stuck at READY_TO_SHIP: 0 :white_check_mark:",
-            "",
-            "Every IPT is moving the way it should. Stock is reaching the partners who need it, "
-            "and nothing is stuck in between. Great work, team — let's keep it this clean tomorrow! :muscle:",
-        ]]
+        return []   # clean day — post nothing (Friday recap is built separately)
 
     lines = [f":arrows_counterclockwise: **IPT Alerts — {today}**", ""]
 
@@ -217,13 +246,16 @@ def build_blocks(drafts: list, alert2: list, alert3: list, today: str) -> list:
 
     if alert3:
         lines.append(
-            f"3️⃣ **In-progress IPT, both approved, B order READY_TO_SHIP: {len(alert3)} IPT(s) · "
+            f"3️⃣ **In-progress / WMS-submitted IPT, B order READY_TO_SHIP or ERROR: {len(alert3)} IPT(s) · "
             f"{inr(sum(r['b_amount'] or 0 for r in alert3))}**"
         )
-        lines += [b_order_row(r) for r in alert3]
-        lines.append(":point_right: B's order is ready to ship but the IPT never closed. Check why it is stuck and complete it (or cancel both).")
+        lines += [alert3_row(r) for r in alert3]
+        if any(r["b_status"] == "READY_TO_SHIP" for r in alert3):
+            lines.append(":point_right: READY_TO_SHIP — B's order is ready but the IPT never closed. Check why it is stuck and complete it (or cancel both).")
+        if any(r["b_status"] == "ERROR" for r in alert3):
+            lines.append(":point_right: ERROR — B's order failed. Read the reason above; if it is credit/OCP, partner B must clear dues first, then re-push the order.")
     else:
-        lines.append("3️⃣ **In-progress IPT, both approved, B order READY_TO_SHIP:** 0 :white_check_mark:")
+        lines.append("3️⃣ **In-progress / WMS-submitted IPT, B order READY_TO_SHIP or ERROR:** 0 :white_check_mark:")
 
     return [lines]
 
@@ -269,8 +301,30 @@ def main() -> int:
     drafts = [r for r in rows if r["alert"] == 1]
     alert2 = [r for r in rows if r["alert"] == 2]
     alert3 = sorted((r for r in rows if r["alert"] == 3), key=lambda r: -r["age_days"])
-    today = datetime.now().strftime("%d %b %Y")
-    parts = pack(build_blocks(drafts, alert2, alert3, today))
+    now = datetime.now()
+    today = now.strftime("%d %b %Y")
+    blocks = build_blocks(drafts, alert2, alert3, today)
+    is_clean = not blocks
+
+    # History (one row per run day; re-runs replace it) feeds the Friday recap.
+    note_parts = []
+    if alert2:
+        note_parts.append(f"{len(alert2)} completed IPT(s) with B order in ERROR")
+    if alert3:
+        note_parts.append(f"{len(alert3)} in-progress IPT(s) stuck")
+    if drafts:
+        note_parts.append(f"{len(drafts)} draft(s) older than {STALE_DAYS} days")
+    weekly_recap.save_run(HISTORY_FILE, now.date(), now.date().isoformat(),
+                          {"slack": {"alert": not is_clean, "note": " · ".join(note_parts)}})
+
+    if not is_clean:
+        parts = pack(blocks)
+    elif weekly_recap.is_recap_day(now.date()):
+        # Friday + clean -> recap (send.sh fills {{SLOGAN}}). Friday + alert -> alert only.
+        parts = [weekly_recap.format_weekly(
+            "IPT Alerts", "slack", weekly_recap.load_history(HISTORY_FILE), now.date())]
+    else:
+        parts = []   # clean day — nothing to post
 
     for old in glob.glob(os.path.join(PARTS_DIR, "part_*.md")):
         os.remove(old)
@@ -280,8 +334,9 @@ def main() -> int:
 
     log.info(
         "Alert1 drafts=%d · Alert2 B-ERROR=%d · Alert3 stuck-inprogress=%d; "
-        "wrote %d part(s) (largest %d chars)",
-        len(drafts), len(alert2), len(alert3), len(parts), max(len(p) for p in parts),
+        "wrote %d part(s) (largest %d chars)%s",
+        len(drafts), len(alert2), len(alert3), len(parts), max((len(p) for p in parts), default=0),
+        "" if not is_clean else (" — Friday recap" if parts else " — clean day, nothing to post"),
     )
     return 0
 

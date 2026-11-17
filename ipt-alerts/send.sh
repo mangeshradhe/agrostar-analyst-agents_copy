@@ -9,6 +9,11 @@
 # after a partial failure only posts the missing parts (no double-posting),
 # and the BigQuery compute is not re-run mid-day.
 #
+# What gets posted (2026-11-17, same rule as COCO + DVS alerts):
+#   alert today          -> the alert
+#   clean day            -> NOTHING (day is still marked done)
+#   Friday, no alert     -> weekly recap + fresh encouraging line (slogan.sh)
+#
 # Test without touching the team channel:
 #   IPT_ALERT_CHANNEL=U5AR2LLBZ bash ipt-alerts/send.sh   # DM to Darpan
 
@@ -23,9 +28,11 @@ SENT_PARTS="$DIR/logs/.sent_parts"          # "<date> <channel> <part file>" per
 LOG_FILE="$DIR/logs/ipt_alerts.log"
 CLAUDE_BIN="$HOME/.local/bin/claude"
 TODAY="$(date +%Y-%m-%d)"
+SLOGAN_TEAM="AgroStar Saathi inter-party transfer (IPT) team (IPTs move stock between Saathi partner stores; daily automated checks catch stale draft IPTs and IPTs whose partner-B order is stuck or failed)"
 
 mkdir -p "$DIR/logs"
 note() { echo "$(date '+%Y-%m-%d %H:%M:%S') send.sh $1" >> "$LOG_FILE"; }
+. "$DIR/slogan.sh"
 
 # Only the real channel run is deduped by date; a test run (env override) always sends.
 if [ -z "${IPT_ALERT_CHANNEL:-}" ] && [ -f "$STATE_FILE" ] && [ "$(cat "$STATE_FILE")" = "$TODAY" ]; then
@@ -46,9 +53,18 @@ fi
 shopt -s nullglob
 PARTS=("$PARTS_DIR"/part_*.md)
 if [ ${#PARTS[@]} -eq 0 ]; then
-    note "no parts computed — will retry on next trigger"
-    exit 1
+    # run.py succeeded (checked above) and wrote nothing = clean, non-Friday day.
+    note "clean day — nothing to post"
+    [ -z "${IPT_ALERT_CHANNEL:-}" ] && echo "$TODAY" > "$STATE_FILE"
+    exit 0
 fi
+
+# Friday recap: fill in the encouraging line (same line reused on retries).
+for PART in "${PARTS[@]}"; do
+    if grep -qF '{{SLOGAN}}' "$PART"; then
+        fill_slogan "$PART" "$PART.filled" && mv "$PART.filled" "$PART"
+    fi
+done
 
 ALL_OK=0
 for PART in "${PARTS[@]}"; do
