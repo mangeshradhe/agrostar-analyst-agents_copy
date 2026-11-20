@@ -2,7 +2,10 @@ name: Daily sync from rudra124/agrostar-analyst-agents
 
 on:
   schedule:
-    - cron: '30 1 * * *'        # every day at 07:00 IST (01:30 UTC)
+    # Overnight so a change made in rudra124 TODAY is in this repo by tomorrow morning.
+    # GitHub starts scheduled jobs late (seen up to ~8h), so two tries; it only commits if something changed.
+    - cron: '47 18 * * *'       # 00:17 IST (18:47 UTC)
+    - cron: '47 22 * * *'       # 04:17 IST (22:47 UTC) - backup try
   workflow_dispatch: {}         # lets you also run it manually from the Actions tab
 
 permissions:
